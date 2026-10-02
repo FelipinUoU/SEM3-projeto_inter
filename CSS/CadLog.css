@@ -1,0 +1,208 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background-color: #353341;
+    min-height: 100vh;
+
+    font-family: Georgia, serif;
+}
+
+
+/* =========================
+   CABEÇALHO
+========================= */
+
+header {
+    height: 30px;
+
+    background-color: #000;
+
+    display: flex;
+    align-items: center;
+
+    border-bottom: 1px solid #777;
+}
+
+
+/* Menu */
+
+.menu {
+    width: 32px;
+
+    display: flex;
+    flex-direction: column;
+
+    gap: 4px;
+
+    margin-left: 8px;
+}
+
+.menu span {
+    width: 24px;
+    height: 3px;
+
+    background-color: white;
+
+    border-radius: 5px;
+}
+
+
+/* Logo */
+
+.logo {
+    color: white;
+
+    font-size: 12px;
+    font-weight: bold;
+
+    margin-left: 30px;
+}
+
+
+/* =========================
+   CARD
+========================= */
+
+.cadastro-container {
+    width: 420px;
+    height: 260px;
+
+    margin: 22px auto;
+
+    border: 2px solid #8c3cff;
+
+    padding: 18px 30px;
+
+    background-color: #45434e;
+}
+
+
+/* =========================
+   ABAS
+========================= */
+
+.abas {
+    display: flex;
+
+    justify-content: center;
+    align-items: center;
+
+    gap: 30px;
+
+    margin-bottom: 32px;
+}
+
+.abas button {
+    border: none;
+
+    border-radius: 20px;
+
+    padding: 4px 12px;
+
+    font-family: Georgia, serif;
+    font-size: 14px;
+    font-weight: bold;
+
+    cursor: pointer;
+}
+
+
+/* Cadastro */
+
+.btn-cadastro {
+    background-color: #000;
+
+    color: #d5bd00;
+}
+
+
+/* Login */
+
+.btn-login {
+    background-color: #000;
+
+    color: #d5bd00;
+}
+
+
+/* Linha vertical */
+
+.linha {
+    width: 2px;
+    height: 34px;
+
+    background-color: white;
+}
+
+
+/* =========================
+   BOTÕES SOCIAIS
+========================= */
+
+.opcoes-cadastro {
+    display: flex;
+
+    flex-direction: column;
+
+    align-items: center;
+
+    gap: 18px;
+}
+
+
+.botao-social {
+    width: 220px;
+    height: 28px;
+
+    border: none;
+
+    border-radius: 20px;
+
+    background-color: #454564;
+
+    color: #d5bd00;
+
+    font-family: Georgia, serif;
+
+    font-size: 14px;
+    font-weight: bold;
+
+    cursor: pointer;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    gap: 8px;
+}
+
+
+.botao-social:hover {
+    background-color: #555577;
+}
+
+
+/* Ícone */
+
+.icone {
+    width: 22px;
+    height: 22px;
+
+    border-radius: 50%;
+
+    background-color: white;
+
+    color: #687b9b;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    font-size: 12px;
+}
