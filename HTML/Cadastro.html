@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>HokuPédia - Cadastro</title>
+
+    <link rel="stylesheet" href="../CSS/Cadastro.css">
+</head>
+
+<body>
+
+    <header>
+
+        <div class="menu">
+            <span></span>
+            <span></span>
+            <span></span>
+        </div>
+
+        <div class="logo">
+            HokuPédia
+        </div>
+
+    </header>
+
+
+    <main class="tela">
+
+        <div class="card">
+
+            <div class="abas">
+
+                <button class="aba ativa">
+                    Cadastro
+                </button>
+
+                <div class="linha"></div>
+
+                <a href="../HTML/Login.html">
+                    <button class="aba" id="btnLogin">
+                    Login
+                    </button>
+                </a>
+
+
+            </div>
+
+
+            <form id="formCadastro">
+
+                <div class="campo">
+                    <label for="email">E-mail:</label>
+
+                    <input
+                        type="email"
+                        id="email"
+                        required
+                    >
+                </div>
+
+
+                <div class="campo">
+                    <label for="confirmarEmail">
+                        Confirmar E-mail:
+                    </label>
+
+                    <input
+                        type="email"
+                        id="confirmarEmail"
+                        required
+                    >
+                </div>
+
+
+                <div class="campo">
+                    <label for="senha">Senha:</label>
+
+                    <input
+                        type="password"
+                        id="senha"
+                        required
+                    >
+                </div>
+
+
+                <div class="campo">
+                    <label for="confirmarSenha">
+                        Confirmar Senha:
+                    </label>
+
+                    <input
+                        type="password"
+                        id="confirmarSenha"
+                        required
+                    >
+                </div>
+
+
+                <button
+                    type="submit"
+                    class="botao-cadastrar"
+                >
+                    Cadastrar
+                </button>
+
+            </form>
+
+        </div>
+
+    </main>
+
+
+    <script src="js/cadastro.js"></script>
+
+</body>
+
+</html>

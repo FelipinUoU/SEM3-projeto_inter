@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>HokuPédia - Login</title>
+
+    <link rel="stylesheet" href="../CSS/Login.css">
+</head>
+
+<body>
+
+    <!-- Cabeçalho -->
+    <header>
+
+        <div class="menu">
+            <span></span>
+            <span></span>
+            <span></span>
+        </div>
+
+        <div class="logo">
+            HokuPédia
+        </div>
+
+    </header>
+
+
+    <!-- Área principal -->
+    <main class="tela">
+
+        <div class="card">
+
+            <!-- Abas -->
+            <div class="abas">
+
+                <button
+                    class="aba"
+                    id="btnCadastro">
+                    Cadastro
+                </button>
+
+                <div class="linha"></div>
+
+                <button class="aba ativa">
+                    Login
+                </button>
+
+            </div>
+
+
+            <!-- Formulário -->
+            <form id="formLogin">
+
+                <div class="campo">
+
+                    <label for="email">
+                        E-mail:
+                    </label>
+
+                    <input
+                        type="email"
+                        id="email"
+                        name="email"
+                        required
+                    >
+
+                </div>
+
+
+                <div class="campo">
+
+                    <label for="senha">
+                        Senha:
+                    </label>
+
+                    <input
+                        type="password"
+                        id="senha"
+                        name="senha"
+                        required
+                    >
+
+                </div>
+
+
+                <button
+                    type="submit"
+                    class="botao-entrar">
+                    Entrar
+                </button>
+
+            </form>
+
+        </div>
+
+    </main>
+
+
+    <script src="../JAVA/login.js"></script>
+
+</body>
+
+</html>
