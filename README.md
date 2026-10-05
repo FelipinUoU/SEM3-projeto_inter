@@ -1,7 +1,5 @@
 # *Hokupedia*
 
-Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla mollis faucibus nisl, at consectetur urna posuere quis. Morbi fringilla ac lacus eu mattis. Aliquam imperdiet, massa et pretium fringilla, orci lectus tempor neque, at tincidunt ex sapien at tortor. Orci varius natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Duis sapien felis, ultrices sed purus sed, vulputate consectetur tellus. Vestibulum mattis dictum maximus. Vestibulum interdum nisl in leo dictum convallis. Praesent vehicula dui vel sem pulvinar sagittis. Quisque tincidunt, erat in aliquet vehicula, libero est rhoncus dolor, a scelerisque risus ante ut nisi. Sed vel commodo velit. Sed eget sagittis est.
-
 Este projeto é uma biblioteca de leitura (mangas, hq *por enquanto*) atualizada pela comunidade, com uma ferramenta de tradução de quadros por IA (api do Gemini).
 
 ## Integrantes:
@@ -9,3 +7,30 @@ Este projeto é uma biblioteca de leitura (mangas, hq *por enquanto*) atualizada
 - Arielli Delgado
 - Gabrielly Fonseca
 - Geovanna de Andrade
+
+
+## Banco de dados local (SQLite) e servidor de API
+Foi adicionada uma implementação simples de back-end usando SQLite e Express para suportar cadastro e login, além de tabelas baseadas no diagrama de classes.
+
+Como executar (ambiente com Node.js instalado):
+
+1. Instalar dependências:
+
+   npm install
+
+2. Iniciar o servidor (abre a página inicial em http://localhost:3001, inicializa o banco Database/app.db, cria esquema e insere dados de exemplo):
+
+   npm run server
+
+O front-end é servido na raiz do mesmo endereço; assim, ao abrir http://localhost:3001, a página index é carregada. Para testar as três telas diretamente, use:
+- http://localhost:3001/CadLog
+- http://localhost:3001/Cadastro
+- http://localhost:3001/Login
+
+O servidor também expõe estes endpoints:
+- POST /api/register  { nome, idade, email, senha }
+- POST /api/login     { email, senha }
+- POST /api/pedido_moderacao { usuario_id, motivos, idiomas_preferencia }
+- POST /api/pedido_obra/:id/aprovar (aprova pedido de obra)
+
+Os formulários de Cadastro e Login já foram integrados ao servidor via fetch (arquivos HTML em HTML/ e scripts em JAVA/)

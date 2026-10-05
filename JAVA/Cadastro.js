@@ -1,9 +1,6 @@
 const formCadastro = document.getElementById("formCadastro");
 
-const btnLogin = document.getElementById("btnLogin");
-
-
-formCadastro.addEventListener("submit", function(event) {
+formCadastro.addEventListener("submit", async function(event) {
 
     event.preventDefault();
 
@@ -33,9 +30,24 @@ formCadastro.addEventListener("submit", function(event) {
         return;
     }
 
+    // Enviar para o backend
+    try {
+        const resp = await fetch('/api/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nome: null, idade: null, email, senha })
+        });
 
-    // Cadastro realizado
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || 'Erro no cadastro');
 
-    alert("Cadastro realizado com sucesso!");
+        alert('Cadastro realizado com sucesso! Faça login para continuar.');
+        // redireciona para login
+        window.location.href = '/Login';
+
+    } catch (err) {
+        console.error(err);
+        alert('Erro ao cadastrar: ' + err.message);
+    }
 
 });
