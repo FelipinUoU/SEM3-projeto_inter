@@ -1,0 +1,348 @@
+:root {
+    color-scheme: dark;
+    font-family: Arial, Helvetica, sans-serif;
+    background: #252525;
+    color: #f5f5f5;
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    width: 100%;
+    height: 100%;
+    min-width: 320px;
+    min-height: 100svh;
+    margin: 0;
+    overflow: hidden;
+}
+
+button,
+a {
+    font: inherit;
+}
+
+button {
+    color: inherit;
+}
+
+.reader {
+    position: relative;
+    display: grid;
+    width: 100%;
+    height: 100svh;
+    min-height: 360px;
+    overflow: hidden;
+    place-items: center;
+    background: #2e2e2e;
+}
+
+.page-area {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: 64px 26px 88px;
+    cursor: default;
+}
+
+.comic-page {
+    display: block;
+    width: auto;
+    height: auto;
+    max-width: min(82vw, 900px);
+    max-height: 72svh;
+    object-fit: contain;
+    user-select: none;
+    -webkit-user-drag: none;
+    transition: max-width 180ms ease, max-height 180ms ease;
+}
+
+.reader.fit-width .comic-page {
+    width: 100vw;
+    max-width: none;
+    max-height: none;
+}
+
+.reader.fit-height .comic-page {
+    width: auto;
+    height: 100svh;
+    max-width: none;
+    max-height: none;
+}
+
+.reader.fit-screen .comic-page {
+    width: 100vw;
+    height: 100svh;
+    max-width: 100vw;
+    max-height: 100svh;
+    object-fit: contain;
+}
+
+.reader.fit-width .page-area,
+.reader.fit-height .page-area,
+.reader.fit-screen .page-area {
+    padding: 0;
+}
+
+.reader.fit-width .page-area,
+.reader.fit-height .page-area {
+    display: flex;
+    overflow: auto;
+}
+
+.reader.fit-width .page-area {
+    justify-content: center;
+    align-items: flex-start;
+}
+
+.reader.fit-height .page-area {
+    justify-content: center;
+    align-items: center;
+}
+
+.reader.fit-height .comic-page {
+    flex: 0 0 auto;
+}
+
+.top-menu {
+    position: absolute;
+    z-index: 5;
+    top: 16px;
+    left: 16px;
+}
+
+.menu-trigger {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 40px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: 10px;
+    background: #4b4b4b;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+.menu-trigger:hover,
+.menu-trigger[aria-expanded="true"] {
+    background: #585858;
+}
+
+.chevron {
+    width: 0;
+    height: 0;
+    border-top: 5px solid currentColor;
+    border-right: 4px solid transparent;
+    border-left: 4px solid transparent;
+}
+
+.menu-popover,
+.resize-popover {
+    position: absolute;
+    display: none;
+    min-width: 190px;
+    padding: 6px;
+    border: 1px solid #555;
+    border-radius: 10px;
+    background: #202020;
+    box-shadow: 0 8px 24px #0006;
+}
+
+.menu-popover {
+    top: calc(100% + 7px);
+    left: 0;
+}
+
+.top-menu.is-open .menu-popover,
+.resize-menu.is-open .resize-popover {
+    display: grid;
+}
+
+.menu-popover a,
+.menu-popover button,
+.resize-popover button {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-height: 36px;
+    padding: 7px 9px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: #eee;
+    text-align: left;
+    text-decoration: none;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.menu-popover a:hover,
+.menu-popover button:hover,
+.resize-popover button:hover,
+.resize-popover button[aria-checked="true"] {
+    background: #414141;
+}
+
+.menu-popover button:disabled {
+    color: #9b9b9b;
+    cursor: not-allowed;
+}
+
+.menu-icon {
+    display: grid;
+    width: 14px;
+    height: 14px;
+    place-items: center;
+    color: #aaa;
+    font-size: 12px;
+}
+
+.reader-controls {
+    position: absolute;
+    z-index: 4;
+    bottom: 20px;
+    left: 50%;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 42px;
+    padding: 4px;
+    border: 1px solid #696969;
+    border-radius: 12px;
+    background: #454545;
+    box-shadow: 0 3px 14px #0003;
+    transform: translateX(-50%);
+    transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.icon-button {
+    display: grid;
+    width: 34px;
+    height: 34px;
+    flex: 0 0 auto;
+    place-items: center;
+    border: 1px solid #777;
+    border-radius: 9px;
+    background: #4b4b4b;
+    cursor: pointer;
+}
+
+.icon-button:hover {
+    background: #5a5a5a;
+}
+
+.icon-button svg {
+    width: 17px;
+    height: 17px;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.6;
+}
+
+.translation-button {
+    position: relative;
+}
+
+.translation-button::after {
+    position: absolute;
+    top: -24px;
+    left: 50%;
+    padding: 3px 6px;
+    border-radius: 4px;
+    background: #202020;
+    color: #ddd;
+    content: "Tradução";
+    font-size: 10px;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(-50%);
+    transition: opacity 150ms ease;
+}
+
+.translation-button:hover::after,
+.translation-button:focus-visible::after {
+    opacity: 1;
+}
+
+.resize-menu {
+    position: relative;
+}
+
+.resize-popover {
+    bottom: calc(100% + 9px);
+    left: 50%;
+    min-width: 185px;
+    transform: translateX(-50%);
+}
+
+.page-count {
+    min-width: 58px;
+    padding: 0 7px;
+    color: #c7c7c7;
+    text-align: center;
+    white-space: nowrap;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+}
+
+.page-count-current {
+    color: #fff;
+}
+
+.reader.is-hidden .top-menu,
+.reader.is-hidden .reader-controls {
+    opacity: 0;
+    pointer-events: none;
+    transform: translate(-50%, 12px);
+}
+
+.reader.is-hidden .top-menu {
+    transform: translateY(-8px);
+}
+
+.reader.is-hidden .page-area {
+    cursor: none;
+}
+
+button:focus-visible,
+a:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: 3px;
+}
+
+@media (max-width: 600px) {
+    .top-menu {
+        top: 12px;
+        left: 12px;
+    }
+
+    .page-area {
+        padding: 58px 12px 76px;
+    }
+
+    .comic-page {
+        max-width: 96vw;
+        max-height: 72svh;
+    }
+
+    .reader-controls {
+        bottom: 14px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        transition-duration: 0.01ms !important;
+    }
+}

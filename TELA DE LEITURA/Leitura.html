@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#252525">
+    <title>HokuPédia - Leitor</title>
+    <link rel="stylesheet" href="Leitura.css">
+</head>
+<body>
+    <main class="reader" id="reader">
+        <nav class="top-menu" id="topMenu" aria-label="Menu do leitor">
+            <button class="menu-trigger" id="menuTrigger" type="button" aria-expanded="false" aria-controls="menuPopover">
+                <span class="chevron" aria-hidden="true"></span>
+                <span>HokuPédia</span>
+            </button>
+            <div class="menu-popover" id="menuPopover">
+                <button type="button" disabled title="Denúncia de capítulo ainda indisponível">
+                    <span class="menu-icon" aria-hidden="true">⊙</span>
+                    Denunciar capítulo
+                </button>
+                <a href="../index.html">
+                    <span class="menu-icon" aria-hidden="true">⌂</span>
+                    Tela inicial
+                </a>
+                <a href="../index.html#capitulos">
+                    <span class="menu-icon" aria-hidden="true">‹</span>
+                    Seleção de capítulos
+                </a>
+            </div>
+        </nav>
+
+        <section class="page-area" id="pageArea" aria-label="Página do quadrinho">
+            <img class="comic-page" id="comicPage" src="Snoop.jpg" alt="Página 1 do quadrinho">
+        </section>
+
+        <div class="reader-controls" id="readerControls" aria-label="Controles de leitura">
+            <button class="icon-button translation-button" type="button" aria-label="Tradução (indisponível)" title="Tradução (em breve)" disabled>
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="12" cy="12" r="9"></circle>
+                    <path d="M3.5 9h17M3.5 15h17M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"></path>
+                </svg>
+            </button>
+
+            <div class="resize-menu" id="resizeMenu">
+                <button class="icon-button" id="resizeTrigger" type="button" aria-label="Opções de redimensionamento" aria-expanded="false" aria-controls="resizePopover" title="Redimensionar leitura">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M8 3H3v5M3 3l7 7M16 3h5v5m0-5-7 7M8 21H3v-5m0 5 7-7m6 7h5v-5m0 5-7-7"></path>
+                    </svg>
+                </button>
+                <div class="resize-popover" id="resizePopover" role="radiogroup" aria-label="Ajustar página">
+                    <button type="button" role="radio" aria-checked="true" data-fit="standard">
+                        <span class="menu-icon" aria-hidden="true">◉</span>
+                        Visualização padrão
+                    </button>
+                    <button type="button" role="radio" aria-checked="false" data-fit="width">
+                        <span class="menu-icon" aria-hidden="true">↔</span>
+                        Ajustar pela largura
+                    </button>
+                    <button type="button" role="radio" aria-checked="false" data-fit="height">
+                        <span class="menu-icon" aria-hidden="true">↕</span>
+                        Ajustar pela altura
+                    </button>
+                    <button type="button" role="radio" aria-checked="false" data-fit="screen">
+                        <span class="menu-icon" aria-hidden="true">⛶</span>
+                        Tela inteira
+                    </button>
+                </div>
+            </div>
+
+            <div class="page-count" aria-live="polite">
+                <span class="page-count-current" id="currentPage">1</span>
+                <span aria-hidden="true"> / </span>
+                <span id="totalPages">2</span>
+            </div>
+        </div>
+    </main>
+
+    <script src="Leitura.js"></script>
+</body>
+</html>
