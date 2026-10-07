@@ -7,255 +7,185 @@
 html,
 body {
     width: 100%;
-    height: 100%;
-
-    overflow: hidden;
+    min-height: 100%;
 }
 
 body {
-    background-color: #353341;
-
+    background: linear-gradient(180deg, #353341 0%, #2d2a36 100%);
     font-family: Georgia, serif;
+    color: #f5f5f5;
 }
-
-
-/* =========================
-   CABEÇALHO
-========================= */
 
 header {
-    height: 7vh;
-    min-height: 30px;
-
+    height: 58px;
     background-color: #000;
-
     display: flex;
     align-items: center;
-
-    border-bottom: 1px solid #777;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.18);
 }
 
-
-/* Menu */
-
 .menu {
-    width: 30px;
-
+    width: 34px;
     display: flex;
     flex-direction: column;
-
-    gap: 4px;
-
-    margin-left: 8px;
+    gap: 5px;
+    margin-left: 14px;
 }
 
 .menu span {
-    width: 24px;
+    width: 25px;
     height: 3px;
-
-    background-color: white;
-
-    border-radius: 5px;
+    background-color: #fff;
+    border-radius: 999px;
 }
 
-
-/* Logo */
-
 .logo {
-    color: white;
-
-    font-size: clamp(11px, 1.2vw, 16px);
-
+    color: #fff;
+    font-size: clamp(12px, 1.2vw, 18px);
     font-weight: bold;
-
+    letter-spacing: 0.08em;
     margin-left: 30px;
 }
 
-
-/* =========================
-   ÁREA PRINCIPAL
-========================= */
-
 .tela {
     width: 100%;
-    height: 93vh;
-
+    min-height: calc(100vh - 58px);
     display: flex;
-
     justify-content: center;
     align-items: center;
+    padding: 24px;
 }
-
-
-/* =========================
-   CARD
-========================= */
 
 .card {
-    width: min(720px, 85vw);
-    height: min(570px, 78vh);
-
-    background-color: #5d5b67;
-
-    border-radius: 15px;
-
-    padding: 35px 55px;
+    width: min(720px, 90vw);
+    min-height: 420px;
+    background-color: rgba(69, 67, 78, 0.96);
+    border: 2px solid #8c3cff;
+    border-radius: 18px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+    padding: 32px 30px;
 }
-
-
-/* =========================
-   ABAS
-========================= */
 
 .abas {
     display: flex;
-
     justify-content: center;
     align-items: center;
-
-    gap: 55px;
-
-    margin-bottom: 55px;
+    gap: 32px;
+    margin-bottom: 34px;
 }
 
 .aba {
     border: none;
-
     background-color: #000;
-
     color: #d5bd00;
-
-    border-radius: 25px;
-
-    padding: 7px 18px;
-
+    border-radius: 999px;
+    padding: 10px 22px;
     font-family: Georgia, serif;
-
     font-size: clamp(16px, 1.5vw, 22px);
-
     font-weight: bold;
-
     cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-
-/* Login selecionado */
+.aba:hover {
+    transform: translateY(-1px) scale(1.02);
+}
 
 .aba.ativa {
-    background-color: #c8c6c8;
-
-    color: #55358c;
+    background-color: #d5bd00;
+    color: #2b1a42;
+    box-shadow: 0 0 0 2px rgba(213, 189, 0, 0.18);
 }
-
-
-/* Linha */
 
 .linha {
     width: 2px;
-    height: 55px;
-
-    background-color: white;
+    height: 46px;
+    background-color: rgba(255, 255, 255, 0.7);
 }
-
-
-/* =========================
-   CAMPOS
-========================= */
 
 .campo {
     display: flex;
-
     align-items: center;
-
-    margin-bottom: 35px;
+    margin-bottom: 26px;
 }
 
 .campo label {
-    width: 230px;
-
-    padding-right: 20px;
-
+    width: 220px;
+    padding-right: 18px;
     text-align: right;
-
     color: #d5bd00;
-
     font-size: clamp(18px, 2vw, 27px);
-
     font-weight: bold;
 }
 
 .campo input {
     flex: 1;
-
-    height: 42px;
-
-    border: none;
-
+    height: 46px;
+    border: 1px solid rgba(140, 60, 255, 0.3);
+    border-radius: 12px;
+    background-color: #fff;
     outline: none;
-
-    background-color: white;
-
-    padding: 5px 10px;
-
+    padding: 10px 14px;
     font-size: 16px;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-
-/* =========================
-   BOTÃO ENTRAR
-========================= */
+.campo input:focus {
+    border-color: #8c3cff;
+    box-shadow: 0 0 0 3px rgba(140, 60, 255, 0.15);
+}
 
 .botao-entrar {
     display: block;
-
-    margin: 15px auto 0;
-
+    margin: 16px auto 0;
     border: none;
-
-    border-radius: 25px;
-
-    padding: 8px 20px;
-
+    border-radius: 999px;
+    padding: 10px 26px;
     background-color: #d5bd00;
-
     color: #55358c;
-
     font-family: Georgia, serif;
-
     font-size: clamp(17px, 1.5vw, 23px);
-
     font-weight: bold;
-
     cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    box-shadow: 0 10px 18px rgba(213, 189, 0, 0.22);
 }
 
 .botao-entrar:hover {
-    transform: scale(1.05);
+    transform: translateY(-1px) scale(1.02);
 }
 
-
-/* =========================
-   TELAS MENORES
-========================= */
-
-@media (max-height: 600px) {
-
+@media (max-width: 640px) {
     .card {
-        height: 82vh;
-
-        padding: 20px 40px;
+        padding: 24px 20px;
     }
 
     .abas {
-        margin-bottom: 30px;
+        gap: 18px;
+        margin-bottom: 24px;
+    }
+
+    .linha {
+        height: 40px;
     }
 
     .campo {
+        flex-direction: column;
+        align-items: flex-start;
         margin-bottom: 18px;
     }
 
+    .campo label {
+        width: 100%;
+        text-align: left;
+        padding-right: 0;
+        margin-bottom: 8px;
+    }
+
     .campo input {
-        height: 35px;
+        width: 100%;
+    }
+}
     }
 
     .linha {

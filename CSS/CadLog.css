@@ -4,205 +4,160 @@
     box-sizing: border-box;
 }
 
+html,
 body {
-    background-color: #353341;
-    min-height: 100vh;
-
-    font-family: Georgia, serif;
+    width: 100%;
+    min-height: 100%;
 }
 
-
-/* =========================
-   CABEÇALHO
-========================= */
+body {
+    background: linear-gradient(180deg, #353341 0%, #2d2a36 100%);
+    font-family: Georgia, serif;
+    color: #f5f5f5;
+}
 
 header {
-    height: 30px;
-
+    height: 58px;
     background-color: #000;
-
     display: flex;
     align-items: center;
-
-    border-bottom: 1px solid #777;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.18);
 }
 
-
-/* Menu */
-
 .menu {
-    width: 32px;
-
+    width: 34px;
     display: flex;
     flex-direction: column;
-
-    gap: 4px;
-
-    margin-left: 8px;
+    gap: 5px;
+    margin-left: 14px;
 }
 
 .menu span {
-    width: 24px;
+    width: 25px;
     height: 3px;
-
-    background-color: white;
-
-    border-radius: 5px;
+    background-color: #fff;
+    border-radius: 999px;
 }
 
-
-/* Logo */
-
 .logo {
-    color: white;
-
-    font-size: 12px;
+    color: #fff;
+    font-size: clamp(12px, 1.2vw, 18px);
     font-weight: bold;
-
+    letter-spacing: 0.08em;
     margin-left: 30px;
 }
 
-
-/* =========================
-   CARD
-========================= */
-
 .cadastro-container {
-    width: 420px;
-    height: 260px;
-
-    margin: 22px auto;
-
+    width: min(720px, 90vw);
+    min-height: 420px;
+    margin: 32px auto;
+    background-color: rgba(69, 67, 78, 0.96);
     border: 2px solid #8c3cff;
-
-    padding: 18px 30px;
-
-    background-color: #45434e;
+    border-radius: 18px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+    padding: 32px 30px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
 }
-
-
-/* =========================
-   ABAS
-========================= */
 
 .abas {
     display: flex;
-
     justify-content: center;
     align-items: center;
+    gap: 32px;
+    margin-bottom: 30px;
+}
 
-    gap: 30px;
-
-    margin-bottom: 32px;
+.abas a {
+    text-decoration: none;
 }
 
 .abas button {
     border: none;
-
-    border-radius: 20px;
-
-    padding: 4px 12px;
-
+    border-radius: 999px;
+    padding: 10px 22px;
     font-family: Georgia, serif;
-    font-size: 14px;
+    font-size: clamp(16px, 1.5vw, 22px);
     font-weight: bold;
-
     cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-
-/* Cadastro */
-
-.btn-cadastro {
-    background-color: #000;
-
-    color: #d5bd00;
-}
-
-
-/* Login */
-
+.btn-cadastro,
 .btn-login {
     background-color: #000;
-
     color: #d5bd00;
 }
 
-
-/* Linha vertical */
+.btn-cadastro.ativa,
+.btn-login.ativa {
+    background-color: #d5bd00;
+    color: #2b1a42;
+    box-shadow: 0 0 0 2px rgba(213, 189, 0, 0.18);
+}
 
 .linha {
     width: 2px;
-    height: 34px;
-
-    background-color: white;
+    height: 46px;
+    background-color: rgba(255, 255, 255, 0.7);
 }
-
-
-/* =========================
-   BOTÕES SOCIAIS
-========================= */
 
 .opcoes-cadastro {
     display: flex;
-
     flex-direction: column;
-
     align-items: center;
-
     gap: 18px;
+    margin-top: 8px;
 }
-
 
 .botao-social {
-    width: 220px;
-    height: 28px;
-
+    width: min(320px, 70vw);
+    min-height: 46px;
     border: none;
-
-    border-radius: 20px;
-
-    background-color: #454564;
-
+    border-radius: 999px;
+    background: linear-gradient(180deg, #4d4b5d 0%, #3f3d4d 100%);
     color: #d5bd00;
-
     font-family: Georgia, serif;
-
-    font-size: 14px;
+    font-size: 15px;
     font-weight: bold;
-
     cursor: pointer;
-
     display: flex;
-
     align-items: center;
     justify-content: center;
-
-    gap: 8px;
+    gap: 10px;
+    transition: transform 0.2s ease, background 0.2s ease;
 }
-
 
 .botao-social:hover {
-    background-color: #555577;
+    transform: translateY(-1px) scale(1.01);
+    background: linear-gradient(180deg, #5a5970 0%, #47455c 100%);
 }
 
-
-/* Ícone */
-
 .icone {
-    width: 22px;
-    height: 22px;
-
+    width: 24px;
+    height: 24px;
     border-radius: 50%;
-
-    background-color: white;
-
-    color: #687b9b;
-
+    background-color: #fff;
+    color: #55358c;
     display: flex;
-
     align-items: center;
     justify-content: center;
-
     font-size: 12px;
+    font-weight: bold;
+}
+
+@media (max-width: 640px) {
+    .cadastro-container {
+        padding: 24px 18px;
+    }
+
+    .abas {
+        gap: 18px;
+        margin-bottom: 24px;
+    }
+
+    .linha {
+        height: 40px;
+    }
 }
