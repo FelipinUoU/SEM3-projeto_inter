@@ -35,10 +35,15 @@
         </section>
 
         <div class="reader-controls" id="readerControls" aria-label="Controles de leitura">
-            <button class="icon-button translation-button" type="button" aria-label="Tradução (indisponível)" title="Tradução (em breve)" disabled>
+            <button class="icon-button translation-button" id="translateButton" type="button" aria-label="Traduzir página" title="Traduzir página com Gemini">
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                     <circle cx="12" cy="12" r="9"></circle>
                     <path d="M3.5 9h17M3.5 15h17M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"></path>
+                </svg>
+            </button>
+            <button class="icon-button translation-settings-button" id="translationSettingsButton" type="button" aria-label="Configurações de tradução" title="Configurar idioma">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M19.14 12.94a7.6 7.6 0 0 0 .05-.94 7.6 7.6 0 0 0-.05-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.61-.22l-2.39.96a7.2 7.2 0 0 0-1.63-.94l-.36-2.54A.49.49 0 0 0 13.89 2h-3.78a.49.49 0 0 0-.49.42L9.26 4.96a7.2 7.2 0 0 0-1.63.94l-2.39-.96a.5.5 0 0 0-.61.22L2.71 8.48a.5.5 0 0 0 .12.64l2.03 1.58a7.6 7.6 0 0 0-.05.94c0 .32.02.63.05.94l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32c.13.22.39.31.61.22l2.39-.96c.5.39 1.05.71 1.63.94l.36 2.54c.04.24.24.42.49.42h3.78c.25 0 .45-.18.49-.42l.36-2.54c.58-.23 1.13-.55 1.63-.94l2.39.96c.22.09.48 0 .61-.22l1.92-3.32a.5.5 0 0 0-.12-.64zM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z"></path>
                 </svg>
             </button>
 
@@ -68,12 +73,74 @@
                 </div>
             </div>
 
+            <div class="reading-menu" id="readingMenu">
+                <button class="icon-button" id="readingTrigger" type="button" aria-label="Opções de leitura" aria-expanded="false" aria-controls="readingPopover" title="Modo de leitura">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M4 5h16M4 12h16M4 19h16M8 3 6 5l2 2m8 3 2 2-2 2m-8 3-2 2 2 2"></path>
+                    </svg>
+                </button>
+                <div class="reading-popover" id="readingPopover" role="radiogroup" aria-label="Modo de navegação">
+                    <button type="button" role="radio" aria-checked="true" data-reading-mode="manga">
+                        <span class="menu-icon" aria-hidden="true">←</span>
+                        Manga: esquerda avança
+                    </button>
+                    <button type="button" role="radio" aria-checked="false" data-reading-mode="comic">
+                        <span class="menu-icon" aria-hidden="true">→</span>
+                        HQ: direita avança
+                    </button>
+                    <button type="button" role="radio" aria-checked="false" data-reading-mode="scroll">
+                        <span class="menu-icon" aria-hidden="true">↕</span>
+                        Manhua: rolar para avançar
+                    </button>
+                </div>
+            </div>
+
             <div class="page-count" aria-live="polite">
                 <span class="page-count-current" id="currentPage">1</span>
                 <span aria-hidden="true"> / </span>
                 <span id="totalPages">2</span>
             </div>
         </div>
+
+        <p class="translation-status" id="translationStatus" role="status" aria-live="polite"></p>
+
+        <dialog class="translation-dialog" id="translationDialog" aria-labelledby="translationTitle">
+            <form id="translationForm">
+                <h1 id="translationTitle">Configurações de tradução</h1>
+                <p class="translation-disclaimer">A página será analisada pelo Gemini. Para teste local, salve sua chave como <code>GEMINI_API_KEY</code> no arquivo <code>.env</code> na raiz do projeto e reinicie o servidor. A chave fica no servidor e não é enviada ao navegador.</p>
+                <label class="translation-field" for="translationLanguage">
+                    Traduzir para
+                    <select id="translationLanguage" name="language">
+                        <option value="Português brasileiro">Português (Brasil)</option>
+                        <option value="English">Inglês</option>
+                        <option value="Español">Espanhol</option>
+                        <option value="日本語">Japonês</option>
+                        <option value="한국어">Coreano</option>
+                        <option value="Français">Francês</option>
+                    </select>
+                </label>
+                <label class="translation-field" for="translationCapitalization">
+                    Formato das letras
+                    <select id="translationCapitalization" name="capitalization">
+                        <option value="sentence">Primeira letra da frase em maiúsculo</option>
+                        <option value="uppercase">TUDO EM MAIÚSCULAS</option>
+                    </select>
+                </label>
+                <label class="translation-field" for="translationFont">
+                    Fonte dos balões
+                    <select id="translationFont" name="font">
+                        <option value="arial" class="font-option-arial">Arial — Exemplo de texto</option>
+                        <option value="trebuchet" class="font-option-trebuchet">Trebuchet — Exemplo de texto</option>
+                        <option value="georgia" class="font-option-georgia">Georgia — Exemplo de texto</option>
+                        <option value="comic" class="font-option-comic">Comic Sans — Exemplo de texto</option>
+                    </select>
+                </label>
+                <div class="translation-dialog-actions">
+                    <button class="dialog-button secondary" id="cancelTranslationSettings" type="button">Cancelar</button>
+                    <button class="dialog-button primary" type="submit">Salvar e traduzir</button>
+                </div>
+            </form>
+        </dialog>
     </main>
 
     <script src="Leitura.js"></script>
