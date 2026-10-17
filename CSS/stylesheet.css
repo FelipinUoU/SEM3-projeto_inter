@@ -1,4 +1,4 @@
-master{
+*{
   box-sizing: border-box;
 }
 
@@ -7,6 +7,56 @@ body {
   font-family: Arial, sans-serif;
 }
 
+#master{
+    background-color: #353535
+}
+
+#topo {
+    background-color: #161616;
+    width: 300px;
+    height: 150px;
+    border: 2px solid #000;
+}
+
+#topo #menuBtn {
+  margin: 20px;
+  padding: 10px 20px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: -250px;
+  width: 250px;
+  height: 100%;
+  background: #333;
+  color: white;
+  padding: 20px;
+  transition: 0.3s;
+  box-sizing: border-box;
+}
+
+.sidebar.open {
+  left: 0;
+}
+
+.sidebar a {
+  display: block;
+  color: white;
+  text-decoration: none;
+  margin: 20px 0;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 30px;
+  cursor: pointer;
+  float: right;
+}
 .container {
   width: min(100%, 1200px);
   margin: 0 auto;
