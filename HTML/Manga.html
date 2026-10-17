@@ -8,10 +8,11 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="../CSS/Manga.css" />
+    <link rel="stylesheet" href="../CSS/MenuLat.css" />
   </head>
   <body>
     <header class="topbar">
-      <button class="menu-button" aria-label="Menu">
+      <button class="menu-lateral-button" id="menuBtn" type="button" aria-label="Abrir dashboard" aria-expanded="false" aria-controls="dashboard">
         <span></span>
         <span></span>
         <span></span>
@@ -23,6 +24,21 @@
         <div class="user-mark">AN</div>
       </div>
     </header>
+
+    <button class="menu-lateral-overlay" id="menuOverlay" type="button" aria-label="Fechar dashboard" hidden></button>
+
+    <aside class="menu-lateral-dashboard" id="dashboard" aria-labelledby="dashboardTitle" aria-hidden="true" inert>
+      <div class="menu-lateral-dashboard-header">
+        <h2 id="dashboardTitle">Dashboard</h2>
+        <button class="menu-lateral-close" id="closeDashboard" type="button" aria-label="Fechar dashboard">×</button>
+      </div>
+      <nav class="menu-lateral-items" aria-label="Itens do dashboard">
+        <button class="menu-lateral-item" type="button" aria-pressed="false">1</button>
+        <button class="menu-lateral-item" type="button" aria-pressed="false">2</button>
+        <button class="menu-lateral-item" type="button" aria-pressed="false">3</button>
+      </nav>
+      <p class="menu-lateral-selection" id="dashboardSelection" aria-live="polite">Selecione um item.</p>
+    </aside>
 
     <main class="page-shell">
       <section class="info-card">
@@ -173,5 +189,6 @@
         </div>
       </section>
     </main>
+    <script src="../JAVA/MenuLat.js"></script>
   </body>
 </html>

@@ -7,7 +7,7 @@ const formLogin = document.getElementById("formLogin");
 
 if (btnCadastro) {
     btnCadastro.addEventListener("click", function () {
-        window.location.href = "/Cadastro";
+        window.location.href = "../HTML/Cadastro.html";
     });
 }
 
@@ -39,7 +39,7 @@ formLogin.addEventListener("submit", async function (event) {
         // guarda info mínima em sessionStorage e redireciona
         sessionStorage.setItem('user', JSON.stringify(data.user));
         // redirecionar para página principal (index.html)
-        window.location.href = '/';
+        window.location.href = '../HTML/index.html';
 
     } catch (err) {
         console.error(err);

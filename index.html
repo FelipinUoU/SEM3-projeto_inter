@@ -5,9 +5,36 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Hokupedia - Tela Inicial</title>
+    <link rel="stylesheet" href="/CSS/MenuLat.css" />
   </head>
   <body>
+
+    <header class="menu-lateral-header">
+      <button class="menu-lateral-button" id="menuBtn" type="button" aria-label="Abrir dashboard" aria-expanded="false" aria-controls="dashboard">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+      <h1 class="menu-lateral-logo">HokuPédia</h1>
+    </header>
+
+    <button class="menu-lateral-overlay" id="menuOverlay" type="button" aria-label="Fechar dashboard" hidden></button>
+    <aside class="menu-lateral-dashboard" id="dashboard" aria-labelledby="dashboardTitle" aria-hidden="true" inert>
+      <div class="menu-lateral-dashboard-header">
+        <h2 id="dashboardTitle">Dashboard</h2>
+        <button class="menu-lateral-close" id="closeDashboard" type="button" aria-label="Fechar dashboard">×</button>
+      </div>
+      
+      <nav class="menu-lateral-items" aria-label="Itens do dashboard">
+        <button class="menu-lateral-item" type="button" aria-pressed="false">1</button>
+        <button class="menu-lateral-item" type="button" aria-pressed="false">2</button>
+        <button class="menu-lateral-item" type="button" aria-pressed="false">3</button>
+      </nav>
+      <p class="menu-lateral-selection" id="dashboardSelection" aria-live="polite">Selecione um item.</p>
+    </aside>
+
     <div id="root"></div>
+    <script src="/JAVA/MenuLat.js"></script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

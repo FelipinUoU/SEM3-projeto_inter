@@ -24,21 +24,6 @@ header {
     border-bottom: 1px solid rgba(255, 255, 255, 0.18);
 }
 
-.menu {
-    width: 34px;
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-    margin-left: 14px;
-}
-
-.menu span {
-    width: 25px;
-    height: 3px;
-    background-color: #fff;
-    border-radius: 999px;
-}
-
 .logo {
     color: #fff;
     font-size: clamp(12px, 1.2vw, 18px);

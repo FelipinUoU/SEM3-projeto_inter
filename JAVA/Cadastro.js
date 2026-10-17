@@ -1,5 +1,13 @@
 const formCadastro = document.getElementById("formCadastro");
 
+const formLogin = document.getElementById("formLogin");
+
+if (btnLogin) {
+    btnLogin.addEventListener("click", function () {
+        window.location.href = "../HTML/Login.html";
+    });
+}
+
 formCadastro.addEventListener("submit", async function(event) {
 
     event.preventDefault();
@@ -16,10 +24,9 @@ formCadastro.addEventListener("submit", async function(event) {
     if (email !== confirmarEmail) {
 
         alert("Os e-mails não são iguais.");
-
+        
         return;
     }
-
 
     // Verifica se as senhas são iguais
 
@@ -29,6 +36,8 @@ formCadastro.addEventListener("submit", async function(event) {
 
         return;
     }
+
+    
 
     // Enviar para o backend
     try {
@@ -43,11 +52,10 @@ formCadastro.addEventListener("submit", async function(event) {
 
         alert('Cadastro realizado com sucesso! Faça login para continuar.');
         // redireciona para login
-        window.location.href = '/Login';
+        //window.location.href = '../HTML/Login.html';
 
     } catch (err) {
         console.error(err);
         alert('Erro ao cadastrar: ' + err.message);
     }
-
 });
