@@ -1,0 +1,63 @@
+#master{
+  background-color:#353535;
+}
+
+#topo{
+  background-color: #000;
+  border-top: 1px solid #ff005d;
+  border-left: 2px solid #6cff2d;
+  width: 300px;
+  height: 150px;
+}
+
+#topo #menuBtn {
+  margin: 20px;
+  padding: 10px 20px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.container {
+  width: min(100%, 1200px);
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: -250px;
+  width: 250px;
+  height: 100%;
+  background: #333;
+  color: white;
+  padding: 20px;
+  transition: 0.3s;
+  box-sizing: border-box;
+}
+
+.sidebar.open {
+  left: 0;
+}
+
+.sidebar a {
+  display: block;
+  color: white;
+  text-decoration: none;
+  margin: 20px 0;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 30px;
+  cursor: pointer;
+  float: right;
+}
+
+#Novidades{
+  border: 1px solid #2feeff;
+  width: 100px;
+  height: 500px;
+}
