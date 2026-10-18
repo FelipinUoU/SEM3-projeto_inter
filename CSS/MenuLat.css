@@ -13,6 +13,22 @@ header {
     border-bottom: 1px solid rgba(255, 255, 255, 0.18);
 }
 
+.boxbody{
+    width: 30px;
+    height: 30px;
+    border: 1px solid violet;
+    border-radius: 180px;
+    margin-left: auto;
+    float: left;
+}
+
+#master #corpo .boxbody a img{
+    width: 30px;
+    height: 30px;
+    border-radius: 180px;
+    padding: 15px;
+}
+
 .menu-lateral-button {
     width: 34px;
     height: 32px;

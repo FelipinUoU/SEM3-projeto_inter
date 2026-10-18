@@ -36,10 +36,8 @@ formLogin.addEventListener("submit", async function (event) {
         if (!resp.ok) throw new Error(data.error || 'Erro no login');
 
         alert('Login realizado com sucesso!');
-        // guarda info mínima em sessionStorage e redireciona
         sessionStorage.setItem('user', JSON.stringify(data.user));
-        // redirecionar para página principal (index.html)
-        window.location.href = '../HTML/index.html';
+        window.location.href = './Usuario.html';
 
     } catch (err) {
         console.error(err);

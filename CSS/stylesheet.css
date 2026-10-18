@@ -1,13 +1,24 @@
-#master{
-  background-color:#353535;
+*{
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: sans-serif;
+  background-color: #2b2c34; /* Cor de fundo escura do site */
+  color: #ffffff;
+  width: 100%;
+  min-height: 100vh;
 }
 
 #topo{
   background-color: #000;
   border-top: 1px solid #ff005d;
-  border-left: 2px solid #6cff2d;
+  font-family: 'Arial', sans-serif;
+  color: #fff;
   width: 300px;
-  height: 150px;
+  min-height: 100vh;
 }
 
 #topo #menuBtn {
@@ -56,8 +67,71 @@
   float: right;
 }
 
-#Novidades{
+.novidades,
+.capnovos {
+  width: min(100% - 32px, 1000px);
+  margin: 40px auto;
+  text-align: center;
+}
+
+.novidades-janela {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.novidades-faixa {
+  display: flex;
+  transition: transform 0.35s ease;
+}
+
+.novidades-pagina {
+  flex: 0 0 100%;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.novidades-pagina img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 11.2 / 17.4;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.novidades-controles {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  max-width: 1000px;
+  margin: 20px auto 0;
+  gap: 16px;
+}
+
+.novidades-botao {
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
   border: 1px solid #2feeff;
-  width: 100px;
-  height: 500px;
+  border-radius: 50%;
+  background: #2b2c34;
+  color: #fff;
+  font-size: 22px;
+  cursor: pointer;
+}
+
+.novidades-botao:hover:not(:disabled) {
+  background: #2feeff;
+  color: #2b2c34;
+}
+
+.novidades-botao:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+}
+
+.novidades-botao:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }

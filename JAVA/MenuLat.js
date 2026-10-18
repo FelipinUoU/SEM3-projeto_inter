@@ -35,9 +35,54 @@ document.addEventListener("keydown", (event) => {
 
 dashboardItems.forEach((item) => {
     item.addEventListener("click", () => {
+        const destination = item.dataset.href;
+        if (destination) {
+            window.location.href = destination;
+            return;
+        }
+
         dashboardItems.forEach((dashboardItem) => {
             dashboardItem.setAttribute("aria-pressed", String(dashboardItem === item));
         });
-        selectionMessage.textContent = `Item ${item.textContent.trim()} selecionado.`;
+        if (selectionMessage) {
+            selectionMessage.textContent = `Item ${item.textContent.trim()} selecionado.`;
+        }
     });
 });
+
+const novidadesJanela = document.querySelector(".novidades-janela");
+const novidadesFaixa = document.querySelector(".novidades-faixa");
+const novidadesAnterior = document.getElementById("novidadesAnterior");
+const novidadesProxima = document.getElementById("novidadesProxima");
+
+if (novidadesJanela && novidadesFaixa && novidadesAnterior && novidadesProxima) {
+    const todasImagens = Array.from(novidadesFaixa.querySelectorAll("img"));
+    const limiteImagens = 8;
+    todasImagens.slice(limiteImagens).forEach((imagem) => imagem.remove());
+    const paginas = Array.from(novidadesFaixa.querySelectorAll(".novidades-pagina"))
+        .filter((pagina) => pagina.querySelector("img"));
+    let indicePagina = 0;
+
+    function atualizarCarrossel() {
+        novidadesFaixa.style.transform = `translateX(${-indicePagina * novidadesJanela.clientWidth}px)`;
+        novidadesAnterior.disabled = indicePagina === 0;
+        novidadesProxima.disabled = indicePagina >= paginas.length - 1;
+    }
+
+    novidadesAnterior.addEventListener("click", () => {
+        if (indicePagina > 0) {
+            indicePagina -= 1;
+            atualizarCarrossel();
+        }
+    });
+
+    novidadesProxima.addEventListener("click", () => {
+        if (indicePagina < paginas.length - 1) {
+            indicePagina += 1;
+            atualizarCarrossel();
+        }
+    });
+
+    window.addEventListener("resize", atualizarCarrossel);
+    atualizarCarrossel();
+}

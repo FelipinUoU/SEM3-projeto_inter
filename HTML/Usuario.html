@@ -8,7 +8,7 @@
             <link rel="stylesheet" href="../CSS/MenuLat.css">
         </head>
         <body>
-            <div id="master">
+            <!-- MENU LATERAL -->
                 <header class="menu-lateral-header">
                     <button class="menu-lateral-button" id="menuBtn" type="button" aria-label="Abrir dashboard" aria-expanded="false" aria-controls="dashboard">
                         <span></span>
@@ -16,6 +16,10 @@
                         <span></span>
                     </button>
                     <h1 class="menu-lateral-logo">HokuPédia</h1>
+                        <div class="boxbody">
+                            <a href="#">
+                            <img src="img"/></a>
+                        </div>
                 </header>
                 <button class="menu-lateral-overlay" id="menuOverlay" type="button" aria-label="Fechar dashboard" hidden></button>
                 <aside class="menu-lateral-dashboard" id="dashboard" aria-labelledby="dashboardTitle" aria-hidden="true" inert>
@@ -24,16 +28,68 @@
                         <button class="menu-lateral-close" id="closeDashboard" type="button" aria-label="Fechar dashboard">×</button>
                     </div>
                     <nav class="menu-lateral-items" aria-label="Itens do dashboard">
-                        <button class="menu-lateral-item" type="button" aria-pressed="false">1</button>
-                        <button class="menu-lateral-item" type="button" aria-pressed="false">2</button>
-                        <button class="menu-lateral-item" type="button" aria-pressed="false">3</button>
+                        <button class="menu-lateral-item" type="button" data-href="Login.html">Login</button>
+                        <button class="menu-lateral-item" type="button" data-href="Biblioteca.html">Biblioteca</button>
+                        <button class="menu-lateral-item" type="button" aria-pressed="false">Categorias</button>
                     </nav>
                     <p class="menu-lateral-selection" id="dashboardSelection" aria-live="polite">Selecione um item.</p>
                 </aside>
-                <div id="Novidades">
-                    <h1>Novidade</h1>
-                </div>
-            </div>
+
+                <!-- CARROSEL DE IMAGENS NOVIDADES-->
+                <section class="novidades" aria-labelledby="titulo-novidades">
+                    <h2 id="titulo-novidades">Novidades</h2>
+
+                    <div class="novidades-controles">
+                        <button class="novidades-botao" id="novidadesAnterior" type="button" aria-label="Imagem anterior" disabled>←</button>
+
+                        <div class="novidades-janela" role="region" aria-label="Carrossel de novidades">
+                            <div class="novidades-faixa">
+                                <div class="novidades-pagina">
+                                    <img src="../Img/Capa.jpg" alt="Capa de novidade 1">
+                                    <img src="../Img/Capa.jpg" alt="Capa de novidade 2">
+                                    <img src="../Img/Capa.jpg" alt="Capa de novidade 3">
+                                    <img src="../Img/Capa.jpg" alt="Capa de novidade 4">
+                                </div>
+                                <div class="novidades-pagina">
+                                    <img src="../Img/Capa.jpg" alt="Capa de novidade 5">
+                                    <img src="../Img/Capa.jpg" alt="Capa de novidade 6">
+                                    <img src="../Img/Capa.jpg" alt="Capa de novidade 7">
+                                    <img src="../Img/Capa.jpg" alt="Capa de novidade 8">
+                                </div>
+                            </div>
+                        </div>
+
+                        <button class="novidades-botao" id="novidadesProxima" type="button" aria-label="Próxima imagem">→</button>
+                    </div>
+                </section>
+
+            <!-- CARROSEL CAP NOVOS -->
+            <section class="capnovos" aria-labelledby="titulo-capnovos">
+                    <h2 id="titulo-capnovos">Capítulos Novos</h2>
+
+                    <div class="novidades-controles">
+                        <button class="novidades-botao" id="novidadesAnterior" type="button" aria-label="Imagem anterior" disabled>←</button>
+
+                        <div class="novidades-janela" role="region" aria-label="Carrossel de novidades">
+                            <div class="novidades-faixa">
+                                <div class="novidades-pagina">
+                                    <img src="../Img/Capa.jpg" alt="Capa de novidade 1">
+                                    <img src="../Img/Capa.jpg" alt="Capa de novidade 2">
+                                    <img src="../Img/Capa.jpg" alt="Capa de novidade 3">
+                                    <img src="../Img/Capa.jpg" alt="Capa de novidade 4">
+                                </div>
+                                <div class="novidades-pagina">
+                                    <img src="../Img/Capa.jpg" alt="Capa de novidade 5">
+                                    <img src="../Img/Capa.jpg" alt="Capa de novidade 6">
+                                    <img src="../Img/Capa.jpg" alt="Capa de novidade 7">
+                                    <img src="../Img/Capa.jpg" alt="Capa de novidade 8">
+                                </div>
+                            </div>
+                        </div>
+
+                        <button class="novidades-botao" id="novidadesProxima" type="button" aria-label="Próxima imagem">→</button>
+                    </div>
+                </section>
             <script src="../JAVA/MenuLat.js"></script>
         </body>
    </html>    
