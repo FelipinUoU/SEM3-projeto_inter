@@ -52,64 +52,262 @@
       <div class="catalogo" id="catalogo" aria-live="polite">
         <section class="novidades" aria-labelledby="titulo-novidades">
           <h2 id="titulo-novidades">Novidades</h2>
-          <div class="obras-grade">
-            <article class="obra-card" data-work-id="batman" data-category="hq">
-              <img src="/Img/batman.png" alt="Capa de Batman" />
-              <h3>Batman</h3>
-              <p>HQ</p>
-            </article>
-            <article class="obra-card" data-work-id="manga-exemplo" data-category="manga">
-              <img src="/Img/Capa.jpg" alt="Capa de mangá" />
-              <h3>Mangá de exemplo</h3>
-              <p>Mangá</p>
-            </article>
-            <article class="obra-card" data-work-id="the-god-of-high-school" data-category="manhwa">
-              <img src="/Img/TGOHS.jpg" alt="Capa de The God of High School" />
-              <h3>The God of High School</h3>
-              <p>Manhwa</p>
-            </article>
+          <div class="carrossel-controles" data-carousel>
+            <button class="carrossel-botao" type="button" data-carousel-previous aria-label="Obras anteriores">‹</button>
+            <div class="carrossel-janela">
+              <div class="obras-faixa">
+                <article class="obra-card" data-work-id="batman" data-category="hq" tabindex="0">
+                  <img src="/Img/batman.png" alt="Capa de Batman" />
+                  <h3>Batman</h3>
+                  <p>HQ</p>
+                </article>
+                <article class="obra-card" data-work-id="manga-exemplo" data-category="manga" tabindex="0">
+                  <img src="/Img/Capa.jpg" alt="Capa de mangá" />
+                  <h3>Mangá de exemplo</h3>
+                  <p>Mangá</p>
+                </article>
+                <article class="obra-card" data-work-id="the-god-of-high-school" data-category="manhwa" tabindex="0">
+                  <img src="/Img/TGOHS.jpg" alt="Capa de The God of High School" />
+                  <h3>The God of High School</h3>
+                  <p>Manhwa</p>
+                </article>
+                <article class="obra-card" data-work-id="hq-exemplo" data-category="hq" tabindex="0">
+                  <img src="/Img/batman.png" alt="Capa ilustrativa de HQ" />
+                  <h3>HQ de exemplo</h3>
+                  <p>HQ</p>
+                </article>
+                <article class="obra-card" data-work-id="manga-exemplo-2" data-category="manga" tabindex="0">
+                  <img src="/Img/Capa.jpg" alt="Capa ilustrativa de mangá" />
+                  <h3>Outro mangá de exemplo</h3>
+                  <p>Mangá</p>
+                </article>
+                <article class="obra-card" data-work-id="hq-exemplo-2" data-category="hq" tabindex="0">
+                  <img src="/Img/batman.png" alt="Capa ilustrativa de HQ" />
+                  <h3>HQ de exemplo 2</h3>
+                  <p>HQ</p>
+                </article>
+                <article class="obra-card" data-work-id="hq-exemplo-3" data-category="hq" tabindex="0">
+                  <img src="/Img/batman.png" alt="Capa ilustrativa de HQ" />
+                  <h3>HQ de exemplo 3</h3>
+                  <p>HQ</p>
+                </article>
+                <article class="obra-card" data-work-id="hq-exemplo-4" data-category="hq" tabindex="0">
+                  <img src="/Img/batman.png" alt="Capa ilustrativa de HQ" />
+                  <h3>HQ de exemplo 4</h3>
+                  <p>HQ</p>
+                </article>
+                <article class="obra-card" data-work-id="manga-exemplo-3" data-category="manga" tabindex="0">
+                  <img src="/Img/Capa.jpg" alt="Capa ilustrativa de mangá" />
+                  <h3>Mangá de exemplo 3</h3>
+                  <p>Mangá</p>
+                </article>
+                <article class="obra-card" data-work-id="manga-exemplo-4" data-category="manga" tabindex="0">
+                  <img src="/Img/Capa.jpg" alt="Capa ilustrativa de mangá" />
+                  <h3>Mangá de exemplo 4</h3>
+                  <p>Mangá</p>
+                </article>
+                <article class="obra-card" data-work-id="manga-exemplo-5" data-category="manga" tabindex="0">
+                  <img src="/Img/Capa.jpg" alt="Capa ilustrativa de mangá" />
+                  <h3>Mangá de exemplo 5</h3>
+                  <p>Mangá</p>
+                </article>
+                <article class="obra-card" data-work-id="manhwa-exemplo-2" data-category="manhwa" tabindex="0">
+                  <img src="/Img/TGOHS.jpg" alt="Capa ilustrativa de Manhwa" />
+                  <h3>Manhwa de exemplo 2</h3>
+                  <p>Manhwa</p>
+                </article>
+                <article class="obra-card" data-work-id="manhwa-exemplo-3" data-category="manhwa" tabindex="0">
+                  <img src="/Img/TGOHS.jpg" alt="Capa ilustrativa de Manhwa" />
+                  <h3>Manhwa de exemplo 3</h3>
+                  <p>Manhwa</p>
+                </article>
+                <article class="obra-card" data-work-id="manhwa-exemplo-4" data-category="manhwa" tabindex="0">
+                  <img src="/Img/TGOHS.jpg" alt="Capa ilustrativa de Manhwa" />
+                  <h3>Manhwa de exemplo 4</h3>
+                  <p>Manhwa</p>
+                </article>
+                <article class="obra-card" data-work-id="manhwa-exemplo-5" data-category="manhwa" tabindex="0">
+                  <img src="/Img/TGOHS.jpg" alt="Capa ilustrativa de Manhwa" />
+                  <h3>Manhwa de exemplo 5</h3>
+                  <p>Manhwa</p>
+                </article>
+              </div>
+            </div>
+            <button class="carrossel-botao" type="button" data-carousel-next aria-label="Próximas obras">›</button>
           </div>
         </section>
 
         <section class="capnovos" aria-labelledby="titulo-capnovos">
           <h2 id="titulo-capnovos">Capítulos Novos</h2>
-          <div class="obras-grade">
-            <article class="obra-card" data-work-id="batman" data-category="hq">
-              <img src="/Img/batman.png" alt="Capa de Batman" />
-              <h3>Batman</h3>
-              <p>HQ</p>
-            </article>
-            <article class="obra-card" data-work-id="manga-exemplo" data-category="manga">
-              <img src="/Img/Capa.jpg" alt="Capa de mangá" />
-              <h3>Mangá de exemplo</h3>
-              <p>Mangá</p>
-            </article>
-            <article class="obra-card" data-work-id="the-god-of-high-school" data-category="manhwa">
-              <img src="/Img/TGOHS.jpg" alt="Capa de The God of High School" />
-              <h3>The God of High School</h3>
-              <p>Manhwa</p>
-            </article>
+          <div class="carrossel-controles" data-carousel>
+            <button class="carrossel-botao" type="button" data-carousel-previous aria-label="Capítulos anteriores">‹</button>
+            <div class="carrossel-janela">
+              <div class="obras-faixa">
+                <article class="obra-card" data-work-id="batman" data-category="hq" tabindex="0">
+                  <img src="/Img/batman.png" alt="Capa de Batman" />
+                  <h3>Batman</h3>
+                  <p>HQ</p>
+                </article>
+                <article class="obra-card" data-work-id="manga-exemplo" data-category="manga" tabindex="0">
+                  <img src="/Img/Capa.jpg" alt="Capa de mangá" />
+                  <h3>Mangá de exemplo</h3>
+                  <p>Mangá</p>
+                </article>
+                <article class="obra-card" data-work-id="the-god-of-high-school" data-category="manhwa" tabindex="0">
+                  <img src="/Img/TGOHS.jpg" alt="Capa de The God of High School" />
+                  <h3>The God of High School</h3>
+                  <p>Manhwa</p>
+                </article>
+                <article class="obra-card" data-work-id="hq-exemplo" data-category="hq" tabindex="0">
+                  <img src="/Img/batman.png" alt="Capa ilustrativa de HQ" />
+                  <h3>HQ de exemplo</h3>
+                  <p>HQ</p>
+                </article>
+                <article class="obra-card" data-work-id="manga-exemplo-2" data-category="manga" tabindex="0">
+                  <img src="/Img/Capa.jpg" alt="Capa ilustrativa de mangá" />
+                  <h3>Outro mangá de exemplo</h3>
+                  <p>Mangá</p>
+                </article>
+                <article class="obra-card" data-work-id="hq-exemplo-2" data-category="hq" tabindex="0">
+                  <img src="/Img/batman.png" alt="Capa ilustrativa de HQ" />
+                  <h3>HQ de exemplo 2</h3>
+                  <p>HQ</p>
+                </article>
+                <article class="obra-card" data-work-id="hq-exemplo-3" data-category="hq" tabindex="0">
+                  <img src="/Img/batman.png" alt="Capa ilustrativa de HQ" />
+                  <h3>HQ de exemplo 3</h3>
+                  <p>HQ</p>
+                </article>
+                <article class="obra-card" data-work-id="hq-exemplo-4" data-category="hq" tabindex="0">
+                  <img src="/Img/batman.png" alt="Capa ilustrativa de HQ" />
+                  <h3>HQ de exemplo 4</h3>
+                  <p>HQ</p>
+                </article>
+                <article class="obra-card" data-work-id="manga-exemplo-3" data-category="manga" tabindex="0">
+                  <img src="/Img/Capa.jpg" alt="Capa ilustrativa de mangá" />
+                  <h3>Mangá de exemplo 3</h3>
+                  <p>Mangá</p>
+                </article>
+                <article class="obra-card" data-work-id="manga-exemplo-4" data-category="manga" tabindex="0">
+                  <img src="/Img/Capa.jpg" alt="Capa ilustrativa de mangá" />
+                  <h3>Mangá de exemplo 4</h3>
+                  <p>Mangá</p>
+                </article>
+                <article class="obra-card" data-work-id="manga-exemplo-5" data-category="manga" tabindex="0">
+                  <img src="/Img/Capa.jpg" alt="Capa ilustrativa de mangá" />
+                  <h3>Mangá de exemplo 5</h3>
+                  <p>Mangá</p>
+                </article>
+                <article class="obra-card" data-work-id="manhwa-exemplo-2" data-category="manhwa" tabindex="0">
+                  <img src="/Img/TGOHS.jpg" alt="Capa ilustrativa de Manhwa" />
+                  <h3>Manhwa de exemplo 2</h3>
+                  <p>Manhwa</p>
+                </article>
+                <article class="obra-card" data-work-id="manhwa-exemplo-3" data-category="manhwa" tabindex="0">
+                  <img src="/Img/TGOHS.jpg" alt="Capa ilustrativa de Manhwa" />
+                  <h3>Manhwa de exemplo 3</h3>
+                  <p>Manhwa</p>
+                </article>
+                <article class="obra-card" data-work-id="manhwa-exemplo-4" data-category="manhwa" tabindex="0">
+                  <img src="/Img/TGOHS.jpg" alt="Capa ilustrativa de Manhwa" />
+                  <h3>Manhwa de exemplo 4</h3>
+                  <p>Manhwa</p>
+                </article>
+                <article class="obra-card" data-work-id="manhwa-exemplo-5" data-category="manhwa" tabindex="0">
+                  <img src="/Img/TGOHS.jpg" alt="Capa ilustrativa de Manhwa" />
+                  <h3>Manhwa de exemplo 5</h3>
+                  <p>Manhwa</p>
+                </article>
+              </div>
+            </div>
+            <button class="carrossel-botao" type="button" data-carousel-next aria-label="Próximos capítulos">›</button>
           </div>
         </section>
 
         <section class="recomendados" aria-labelledby="titulo-recomendados">
           <h2 id="titulo-recomendados">Recomendados</h2>
-          <div class="obras-grade">
-            <article class="obra-card" data-work-id="batman" data-category="hq">
-              <img src="/Img/batman.png" alt="Capa de Batman" />
-              <h3>Batman</h3>
-              <p>HQ</p>
-            </article>
-            <article class="obra-card" data-work-id="manga-exemplo" data-category="manga">
-              <img src="/Img/Capa.jpg" alt="Capa de mangá" />
-              <h3>Mangá de exemplo</h3>
-              <p>Mangá</p>
-            </article>
-            <article class="obra-card" data-work-id="the-god-of-high-school" data-category="manhwa">
-              <img src="/Img/TGOHS.jpg" alt="Capa de The God of High School" />
-              <h3>The God of High School</h3>
-              <p>Manhwa</p>
-            </article>
+          <div class="carrossel-controles" data-carousel>
+            <button class="carrossel-botao" type="button" data-carousel-previous aria-label="Recomendações anteriores">‹</button>
+            <div class="carrossel-janela">
+              <div class="obras-faixa">
+                <article class="obra-card" data-work-id="batman" data-category="hq" tabindex="0">
+                  <img src="/Img/batman.png" alt="Capa de Batman" />
+                  <h3>Batman</h3>
+                  <p>HQ</p>
+                </article>
+                <article class="obra-card" data-work-id="manga-exemplo" data-category="manga" tabindex="0">
+                  <img src="/Img/Capa.jpg" alt="Capa de mangá" />
+                  <h3>Mangá de exemplo</h3>
+                  <p>Mangá</p>
+                </article>
+                <article class="obra-card" data-work-id="the-god-of-high-school" data-category="manhwa" tabindex="0">
+                  <img src="/Img/TGOHS.jpg" alt="Capa de The God of High School" />
+                  <h3>The God of High School</h3>
+                  <p>Manhwa</p>
+                </article>
+                <article class="obra-card" data-work-id="hq-exemplo" data-category="hq" tabindex="0">
+                  <img src="/Img/batman.png" alt="Capa ilustrativa de HQ" />
+                  <h3>HQ de exemplo</h3>
+                  <p>HQ</p>
+                </article>
+                <article class="obra-card" data-work-id="manga-exemplo-2" data-category="manga" tabindex="0">
+                  <img src="/Img/Capa.jpg" alt="Capa ilustrativa de mangá" />
+                  <h3>Outro mangá de exemplo</h3>
+                  <p>Mangá</p>
+                </article>
+                <article class="obra-card" data-work-id="hq-exemplo-2" data-category="hq" tabindex="0">
+                  <img src="/Img/batman.png" alt="Capa ilustrativa de HQ" />
+                  <h3>HQ de exemplo 2</h3>
+                  <p>HQ</p>
+                </article>
+                <article class="obra-card" data-work-id="hq-exemplo-3" data-category="hq" tabindex="0">
+                  <img src="/Img/batman.png" alt="Capa ilustrativa de HQ" />
+                  <h3>HQ de exemplo 3</h3>
+                  <p>HQ</p>
+                </article>
+                <article class="obra-card" data-work-id="hq-exemplo-4" data-category="hq" tabindex="0">
+                  <img src="/Img/batman.png" alt="Capa ilustrativa de HQ" />
+                  <h3>HQ de exemplo 4</h3>
+                  <p>HQ</p>
+                </article>
+                <article class="obra-card" data-work-id="manga-exemplo-3" data-category="manga" tabindex="0">
+                  <img src="/Img/Capa.jpg" alt="Capa ilustrativa de mangá" />
+                  <h3>Mangá de exemplo 3</h3>
+                  <p>Mangá</p>
+                </article>
+                <article class="obra-card" data-work-id="manga-exemplo-4" data-category="manga" tabindex="0">
+                  <img src="/Img/Capa.jpg" alt="Capa ilustrativa de mangá" />
+                  <h3>Mangá de exemplo 4</h3>
+                  <p>Mangá</p>
+                </article>
+                <article class="obra-card" data-work-id="manga-exemplo-5" data-category="manga" tabindex="0">
+                  <img src="/Img/Capa.jpg" alt="Capa ilustrativa de mangá" />
+                  <h3>Mangá de exemplo 5</h3>
+                  <p>Mangá</p>
+                </article>
+                <article class="obra-card" data-work-id="manhwa-exemplo-2" data-category="manhwa" tabindex="0">
+                  <img src="/Img/TGOHS.jpg" alt="Capa ilustrativa de Manhwa" />
+                  <h3>Manhwa de exemplo 2</h3>
+                  <p>Manhwa</p>
+                </article>
+                <article class="obra-card" data-work-id="manhwa-exemplo-3" data-category="manhwa" tabindex="0">
+                  <img src="/Img/TGOHS.jpg" alt="Capa ilustrativa de Manhwa" />
+                  <h3>Manhwa de exemplo 3</h3>
+                  <p>Manhwa</p>
+                </article>
+                <article class="obra-card" data-work-id="manhwa-exemplo-4" data-category="manhwa" tabindex="0">
+                  <img src="/Img/TGOHS.jpg" alt="Capa ilustrativa de Manhwa" />
+                  <h3>Manhwa de exemplo 4</h3>
+                  <p>Manhwa</p>
+                </article>
+                <article class="obra-card" data-work-id="manhwa-exemplo-5" data-category="manhwa" tabindex="0">
+                  <img src="/Img/TGOHS.jpg" alt="Capa ilustrativa de Manhwa" />
+                  <h3>Manhwa de exemplo 5</h3>
+                  <p>Manhwa</p>
+                </article>
+              </div>
+            </div>
+            <button class="carrossel-botao" type="button" data-carousel-next aria-label="Próximas recomendações">›</button>
           </div>
         </section>
         <p class="catalogo-vazio" hidden>Nenhuma obra encontrada.</p>
