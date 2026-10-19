@@ -50,6 +50,12 @@ dashboardItems.forEach((item) => {
     });
 });
 
+document.querySelectorAll(".categorias [data-href]").forEach((item) => {
+    item.addEventListener("click", () => {
+        window.location.href = item.dataset.href;
+    });
+});
+
 document.querySelectorAll(".novidades, .capnovos, .recomendados").forEach((carrossel) => {
     const janela = carrossel.querySelector(".novidades-janela");
     const faixa = carrossel.querySelector(".novidades-faixa");

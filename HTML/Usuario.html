@@ -30,7 +30,7 @@
                     <nav class="menu-lateral-items" aria-label="Itens do dashboard">
                         <button class="menu-lateral-item" type="button" data-href="Login.html">Login</button>
                         <button class="menu-lateral-item" type="button" data-href="Biblioteca.html">Biblioteca</button>
-                        <button class="menu-lateral-item" type="button" aria-pressed="false">Categorias</button>
+                        <button class="menu-lateral-item" type="button" data-href="Usuario.html">Home</button>
                     </nav>
                     <p class="menu-lateral-selection" id="dashboardSelection" aria-live="polite">Selecione um item.</p>
                 </aside>
@@ -38,14 +38,15 @@
                 <!-- BOTÕES DE CATEGORIAS -->
                 <div class="inicio-layout">
                     <nav class="categorias" aria-label="Categorias">
-                        <button class="categoria-button" type="button" data-href="HQ.html">HQ's</button>
-                        <button class="categoria-button" type="button" data-href="mangas.html">Mangás</button>
-                        <button class="categoria-button" type="button" data-href="manhwa.html">Manhwa</button>
+                        <button type="button" data-href="HQ.html">HQ's</button>
+                        <button type="button">Mangás</button>
+                        <button type="button" data-href="Manhwa.html">Manhwa</button>
                     </nav>
 
-                    <div class="conteudo-principal">
-                        <!-- Novidades, Capítulos Novos e Recomendados -->
-                    </div>
+                    <form class="barra-pesquisa" role="search">
+                        <input type="search" name="q" placeholder="Pesquisar..." aria-label="Pesquisar na biblioteca">
+                        <button type="submit" aria-label="Pesquisar">⌕</button>
+                    </form>
                 </div>
 
                 <!-- CARROSEL DE IMAGENS NOVIDADES-->
@@ -57,11 +58,11 @@
                             <div class="novidades-faixa">
                                 <div class="novidades-pagina">
                                     <img src="../Img/Capa.jpg" alt="Capa de novidade 1">
-                                    <img src="../Img/Capa.jpg" alt="Capa de novidade 2">
-                                    <img src="../Img/Capa.jpg" alt="Capa de novidade 3">
+                                    <img src="../Img/batman.png" alt="Capa de novidade 2">
+                                    <img src="../Img/TGOHS.jpg" alt="Capa de novidade 3">
                                     <img src="../Img/Capa.jpg" alt="Capa de novidade 4">
-                                    <img src="../Img/Capa.jpg" alt="Capa de novidade 5">
-                                    <img src="../Img/Capa.jpg" alt="Capa de novidade 6">
+                                    <img src="../Img/batman.png" alt="Capa de novidade 5">
+                                    <img src="../Img/TGOHS.jpg" alt="Capa de novidade 6">
                                     <img src="../Img/Capa.jpg" alt="Capa de novidade 7">
                                     <img src="../Img/Capa.jpg" alt="Capa de novidade 8">
                                 </div>

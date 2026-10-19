@@ -99,16 +99,50 @@ body {
   color: #2b2c34;
 }
 
-.conteudo-principal {
+.barra-pesquisa {
   flex: 1;
   min-width: 0;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
 }
 
-.conteudo-principal .novidades,
-.conteudo-principal .capnovos,
-.conteudo-principal .recomendados {
-  width: 100%;
-  margin: 0 0 40px;
+.barra-pesquisa input {
+  width: min(100%, 320px);
+  min-width: 0;
+  height: 42px;
+  padding: 0 14px;
+  border: 1px solid rgba(47, 238, 255, 0.7);
+  border-right: 0;
+  border-radius: 21px 0 0 21px;
+  outline: none;
+  background: #353641;
+  color: #fff;
+  font: inherit;
+}
+
+.barra-pesquisa input::placeholder {
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.barra-pesquisa input:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+.barra-pesquisa button {
+  flex: 0 0 46px;
+  height: 42px;
+  border: 1px solid #2feeff;
+  border-radius: 0 21px 21px 0;
+  background: #2feeff;
+  color: #2b2c34;
+  font-size: 25px;
+  cursor: pointer;
+}
+
+.barra-pesquisa button:hover {
+  background: #fff;
 }
 
 @media (max-width: 700px) {
@@ -121,6 +155,10 @@ body {
     flex: auto;
     flex-direction: row;
     flex-wrap: wrap;
+  }
+
+  .barra-pesquisa {
+    width: 100%;
   }
 }
 

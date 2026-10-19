@@ -1,0 +1,195 @@
+*{
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: sans-serif;
+  background-color: #2b2c34; /* Cor de fundo escura do site */
+  color: #ffffff;
+  width: 100%;
+  min-height: 100vh;
+}
+
+#topo{
+  background-color: #000;
+  border-top: 1px solid #ff005d;
+  font-family: 'Arial', sans-serif;
+  color: #fff;
+  width: 300px;
+  min-height: 100vh;
+}
+
+#topo #menuBtn {
+  margin: 20px;
+  padding: 10px 20px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.container {
+  width: min(100%, 1200px);
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: -250px;
+  width: 250px;
+  height: 100%;
+  background: #333;
+  color: white;
+  padding: 20px;
+  transition: 0.3s;
+  box-sizing: border-box;
+}
+
+.sidebar.open {
+  left: 0;
+}
+
+.sidebar a {
+  display: block;
+  color: white;
+  text-decoration: none;
+  margin: 20px 0;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 30px;
+  cursor: pointer;
+  float: right;
+}
+
+.inicio-layout {
+  display: flex;
+  align-items: flex-start;
+  gap: 24px;
+  width: min(100% - 32px, 890px);
+  margin: 40px auto;
+}
+
+.categorias {
+  position: sticky;
+  top: 78px; /* 58px do cabeçalho fixo + 20px de espaço */
+  flex: 0 0 140px;
+  display: flex;
+  flex-direction: horizontal;
+  gap: 10px;
+}
+
+.categorias button {
+  padding: 12px;
+  border: 1px solid #2feeff;
+  border-radius: 19px;
+  background: #2b2c34;
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+.categorias button:hover {
+  background: #2feeff;
+  color: #2b2c34;
+}
+
+.conteudo-principal {
+  flex: 1;
+  min-width: 0;
+}
+
+.conteudo-principal .novidades,
+.conteudo-principal .capnovos,
+.conteudo-principal .recomendados {
+  width: 100%;
+  margin: 0 0 40px;
+}
+
+@media (max-width: 700px) {
+  .inicio-layout {
+    flex-direction: column;
+  }
+
+  .categorias {
+    position: static;
+    flex: auto;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+}
+
+.novidades,
+.capnovos,
+.recomendados {
+  width: min(100% - 32px, 1000px);
+  margin: 40px auto;
+  text-align: center;
+}
+
+.novidades-janela {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.novidades-faixa {
+  display: flex;
+  transition: transform 0.35s ease;
+}
+
+.novidades-pagina {
+  flex: 0 0 100%;
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.novidades-pagina img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 11.2 / 17.4;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.novidades-controles {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  max-width: 1000px;
+  margin: 20px auto 0;
+  gap: 12px;
+}
+
+.novidades-botao {
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+  border: 1px solid #2feeff;
+  border-radius: 50%;
+  background: #2b2c34;
+  color: #fff;
+  font-size: 22px;
+  cursor: pointer;
+}
+
+.novidades-botao:hover:not(:disabled) {
+  background: #2feeff;
+  color: #2b2c34;
+}
+
+.novidades-botao:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+}
+
+.novidades-botao:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
