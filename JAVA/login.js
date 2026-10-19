@@ -42,7 +42,15 @@ formLogin.addEventListener("submit", async function (event) {
 
         alert('Login realizado com sucesso!');
         sessionStorage.setItem('user', JSON.stringify(data.user));
+<<<<<<< HEAD
         window.location.href = new URL("../HTML/Usuario.html", import.meta.url).href;
+=======
+<<<<<<< HEAD
+        window.location.href = '/index.html';
+=======
+        window.location.href = '/HTML/Usuario.html';
+>>>>>>> 8cd0986909a285651add6a2fd2d2718708ba32e6
+>>>>>>> 267cee2cc36920ca59c644f1d87a602cd011e3d5
 
     } catch (err) {
         console.error(err);

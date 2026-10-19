@@ -3,13 +3,118 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta http-equiv="refresh" content="0; url=/HTML/Usuario.html" />
     <title>HokuPédia</title>
+    <link rel="stylesheet" href="/CSS/stylesheet.css" />
+    <link rel="stylesheet" href="/CSS/MenuLat.css" />
   </head>
   <body>
-    <p><a href="/HTML/Usuario.html">Abrir HokuPédia</a></p>
-    <script>
-      window.location.replace('/HTML/Usuario.html')
-    </script>
+    <header class="menu-lateral-header">
+      <button class="menu-lateral-button" id="menuBtn" type="button" aria-label="Abrir dashboard" aria-expanded="false" aria-controls="dashboard">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+      <h1 class="menu-lateral-logo">HokuPédia</h1>
+      <div class="boxbody">
+        <a href="/index.html" aria-label="Página inicial">
+          <img src="/Img/Capa.jpg" alt="" />
+        </a>
+      </div>
+    </header>
+    <button class="menu-lateral-overlay" id="menuOverlay" type="button" aria-label="Fechar dashboard" hidden></button>
+    <aside class="menu-lateral-dashboard" id="dashboard" aria-labelledby="dashboardTitle" aria-hidden="true" inert>
+      <div class="menu-lateral-dashboard-header">
+        <h2 id="dashboardTitle">Dashboard</h2>
+        <button class="menu-lateral-close" id="closeDashboard" type="button" aria-label="Fechar dashboard">×</button>
+      </div>
+      <nav class="menu-lateral-items" aria-label="Itens do dashboard">
+        <button class="menu-lateral-item" type="button" data-href="/HTML/Login.html">Login</button>
+        <button class="menu-lateral-item" type="button" data-href="/HTML/Biblioteca.html">Biblioteca</button>
+        <button class="menu-lateral-item" type="button" data-href="/index.html">Home</button>
+      </nav>
+      <p class="menu-lateral-selection" id="dashboardSelection" aria-live="polite">Selecione um item.</p>
+    </aside>
+
+    <main>
+      <div class="inicio-layout">
+        <nav class="categorias" aria-label="Filtrar por categoria">
+          <button type="button" data-category-filter="all" aria-pressed="true">Todas</button>
+          <button type="button" data-category-filter="hq" aria-pressed="false">HQ's</button>
+          <button type="button" data-category-filter="manga" aria-pressed="false">Mangás</button>
+          <button type="button" data-category-filter="manhwa" aria-pressed="false">Manhwa</button>
+        </nav>
+        <form class="barra-pesquisa" role="search">
+          <input type="search" name="q" placeholder="Pesquisar..." aria-label="Pesquisar na biblioteca" />
+          <button type="submit" aria-label="Pesquisar">⌕</button>
+        </form>
+      </div>
+
+      <div class="catalogo" id="catalogo" aria-live="polite">
+        <section class="novidades" aria-labelledby="titulo-novidades">
+          <h2 id="titulo-novidades">Novidades</h2>
+          <div class="obras-grade">
+            <article class="obra-card" data-work-id="batman" data-category="hq">
+              <img src="/Img/batman.png" alt="Capa de Batman" />
+              <h3>Batman</h3>
+              <p>HQ</p>
+            </article>
+            <article class="obra-card" data-work-id="manga-exemplo" data-category="manga">
+              <img src="/Img/Capa.jpg" alt="Capa de mangá" />
+              <h3>Mangá de exemplo</h3>
+              <p>Mangá</p>
+            </article>
+            <article class="obra-card" data-work-id="the-god-of-high-school" data-category="manhwa">
+              <img src="/Img/TGOHS.jpg" alt="Capa de The God of High School" />
+              <h3>The God of High School</h3>
+              <p>Manhwa</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="capnovos" aria-labelledby="titulo-capnovos">
+          <h2 id="titulo-capnovos">Capítulos Novos</h2>
+          <div class="obras-grade">
+            <article class="obra-card" data-work-id="batman" data-category="hq">
+              <img src="/Img/batman.png" alt="Capa de Batman" />
+              <h3>Batman</h3>
+              <p>HQ</p>
+            </article>
+            <article class="obra-card" data-work-id="manga-exemplo" data-category="manga">
+              <img src="/Img/Capa.jpg" alt="Capa de mangá" />
+              <h3>Mangá de exemplo</h3>
+              <p>Mangá</p>
+            </article>
+            <article class="obra-card" data-work-id="the-god-of-high-school" data-category="manhwa">
+              <img src="/Img/TGOHS.jpg" alt="Capa de The God of High School" />
+              <h3>The God of High School</h3>
+              <p>Manhwa</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="recomendados" aria-labelledby="titulo-recomendados">
+          <h2 id="titulo-recomendados">Recomendados</h2>
+          <div class="obras-grade">
+            <article class="obra-card" data-work-id="batman" data-category="hq">
+              <img src="/Img/batman.png" alt="Capa de Batman" />
+              <h3>Batman</h3>
+              <p>HQ</p>
+            </article>
+            <article class="obra-card" data-work-id="manga-exemplo" data-category="manga">
+              <img src="/Img/Capa.jpg" alt="Capa de mangá" />
+              <h3>Mangá de exemplo</h3>
+              <p>Mangá</p>
+            </article>
+            <article class="obra-card" data-work-id="the-god-of-high-school" data-category="manhwa">
+              <img src="/Img/TGOHS.jpg" alt="Capa de The God of High School" />
+              <h3>The God of High School</h3>
+              <p>Manhwa</p>
+            </article>
+          </div>
+        </section>
+        <p class="catalogo-vazio" hidden>Nenhuma obra encontrada.</p>
+      </div>
+    </main>
+    <script type="module" src="/JAVA/MenuLat.js"></script>
   </body>
 </html>

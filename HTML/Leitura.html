@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HokuPédia - Leitura</title>
+    <link rel="stylesheet" href="../CSS/Leitura.css">
+</head>
+<body>
+
+    <!-- Header do Site -->
+    <header>
+        <div class="menu-icon">☰</div>
+        <div class="logo">HokuPédia</div>
+        <div class="user-avatar">H</div>
+    </header>
+
+    <!-- Conteúdo da Página / Leitura -->
+    <div class="main-container">
+        <h1 class="titulo-manga" id="reader-work-title">My Little Pony: Friendship is Magic</h1>
+        <div class="breadcrumb"><a href="/HTML/Usuario.html">Home</a> / <a id="reader-work-link" href="/HTML/Obra.html">Obra</a> / <span id="current-chapter-breadcrumb">Capítulo 1</span></div>
+
+        <!-- Controles de Leitura e Modo de Exibição -->
+        <div class="controls-row">
+            <button class="btn-select" id="chapter-label" type="button">Capítulo 1</button>
+            
+            <!-- Menu seletor de Modo de Leitura -->
+            <div class="dropdown-container">
+                <button class="btn-select" id="view-mode-btn">Vertical <span>▼</span></button>
+                <div class="dropdown-menu" id="view-dropdown">
+                    <button data-mode="vertical">Vertical (Contínuo)</button>
+                    <button data-mode="horizontal">Horizontal (Tela Cheia)</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Área onde as páginas do mangá são renderizadas -->
+        <div class="reader-viewport vertical-mode" id="reader-viewport">
+            <div class="manga-page-wrapper" data-page="0">
+                <img src="/reader/000.png" data-original="000.png" alt="Capa" class="manga-page">
+            </div>
+            <div class="manga-page-wrapper" data-page="1">
+                <img src="/reader/001.jpg" data-original="001.jpg" alt="Página 1" class="manga-page">
+            </div>
+            <div class="manga-page-wrapper" data-page="2">
+                <img src="/reader/002.jpg" data-original="002.jpg" alt="Página 2" class="manga-page">
+            </div>
+            <div class="manga-page-wrapper" data-page="3">
+                <img src="/reader/003.jpg" data-original="003.jpg" alt="Página 3" class="manga-page">
+            </div>
+            <div class="manga-page-wrapper" data-page="4">
+                <img src="/reader/004.jpg" data-original="004.jpg" alt="Página 4" class="manga-page">
+            </div>
+            <div class="manga-page-wrapper" data-page="5">
+                <img src="/reader/005.jpg" data-original="005.jpg" alt="Página 5" class="manga-page">
+            </div>
+            <div class="manga-page-wrapper" data-page="6">
+                <img src="/reader/006.jpg" data-original="006.jpg" alt="Página 6" class="manga-page">
+            </div>
+            <div class="manga-page-wrapper" data-page="7">
+                <img src="/reader/007.jpg" data-original="007.jpg" alt="Página 7" class="manga-page">
+            </div>
+            <div class="manga-page-wrapper" data-page="8">
+                <img src="/reader/008.jpg" data-original="008.jpg" alt="Página 8" class="manga-page">
+            </div>
+            <div class="manga-page-wrapper" data-page="9">
+                <img src="/reader/009.jpg" data-original="009.jpg" alt="Página 9" class="manga-page">
+            </div>
+            <div class="manga-page-wrapper" data-page="10">
+                <img src="/reader/010.jpg" data-original="010.jpg" alt="Página 10" class="manga-page">
+            </div>
+            <div class="manga-page-wrapper" data-page="11">
+                <img src="/reader/011.jpg" data-original="011.jpg" alt="Página 11" class="manga-page">
+            </div>
+            <div class="manga-page-wrapper" data-page="12">
+                <img src="/reader/012.jpg" data-original="012.jpg" alt="Página 12" class="manga-page">
+            </div>
+            <div class="manga-page-wrapper" data-page="13">
+                <img src="/reader/013.jpg" data-original="013.jpg" alt="Página 13" class="manga-page">
+            </div>
+            <div class="manga-page-wrapper" data-page="14">
+                <img src="/reader/014.png" data-original="014.png" alt="Página 14" class="manga-page">
+            </div>
+        </div>
+
+        <!-- Tela de Fim de Capítulo -->
+        <div class="end-chapter-card">
+            <h3 id="end-chapter-title">Fim do capítulo 1</h3>
+            <div class="end-actions">
+                <button class="btn-chapter-nav" id="previous-chapter-btn" type="button" disabled>❮ Capítulo anterior</button>
+                <a class="btn-chapter-nav main-indice" id="chapter-index-link" href="/HTML/Obra.html">Índice</a>
+                <button class="btn-chapter-nav" id="next-chapter-btn" type="button" disabled>Próximo capítulo ❯</button>
+            </div>
+            
+            <div class="recommendations">
+                <h4>Leia também</h4>
+                <div class="rec-grid">
+                    <div class="rec-item">
+                        <div class="rec-thumb">Capa</div>
+                        <div class="rec-title">Título genérico..</div>
+                    </div>
+                    <div class="rec-item">
+                        <div class="rec-thumb">Capa</div>
+                        <div class="rec-title">Título genérico</div>
+                    </div>
+                    <div class="rec-item">
+                        <div class="rec-thumb">Capa</div>
+                        <div class="rec-title">Título genérico</div>
+                    </div>
+                    <div class="rec-item">
+                        <div class="rec-thumb">Capa</div>
+                        <div class="rec-title">Título genérico</div>
+                    </div>
+                    <div class="rec-item">
+                        <div class="rec-thumb">Capa</div>
+                        <div class="rec-title">Título genérico</div>
+                    </div>
+                    <div class="rec-item">
+                        <div class="rec-thumb">Capa</div>
+                        <div class="rec-title">Título genérico</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Barra Inferior Flutuante com o Botão de Tradução -->
+    <div class="floating-nav-bar">
+        <button class="nav-arrow" id="prev-page-btn">❮</button>
+        
+        <div class="chapter-indicator" id="page-counter">
+            <span>︽</span> Cap. 1 (1/15) <span>︾</span>
+        </div>
+
+        <div class="translation-container">
+            <button class="translation-settings-trigger" id="translation-settings-btn" type="button" aria-label="Configurações de tradução" title="Configurações de tradução">⚙</button>
+            <button class="btn-translate-gemini" id="translate-btn" type="button" aria-pressed="false" title="Traduzir página com IA">
+                <svg class="gemini-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <defs>
+                        <linearGradient id="ai-sparkle-gradient" x1="3" y1="21" x2="21" y2="3" gradientUnits="userSpaceOnUse">
+                            <stop stop-color="#4285F4" />
+                            <stop offset="0.52" stop-color="#9B72CB" />
+                            <stop offset="1" stop-color="#D96570" />
+                        </linearGradient>
+                    </defs>
+                    <path fill="url(#ai-sparkle-gradient)" d="M12 1.5c1.4 5.5 4 8.1 10.5 10.5C16 14.4 13.4 17 12 22.5 10.6 17 8 14.4 1.5 12 8 9.6 10.6 7 12 1.5Z" />
+                    <path fill="url(#ai-sparkle-gradient)" d="M19 15.5c.5 2 1.5 3 3.5 3.5-2 .5-3 1.5-3.5 3.5-.5-2-1.5-3-3.5-3.5 2-.5 3-1.5 3.5-3.5Z" />
+                </svg>
+                <span id="translate-text">Tradução</span>
+            </button>
+        </div>
+
+        <button class="nav-arrow" id="next-page-btn">❯</button>
+    </div>
+
+    <p class="translation-status" id="translation-status" role="status" aria-live="polite"></p>
+
+    <dialog class="translation-dialog" id="translation-dialog" aria-labelledby="translation-dialog-title">
+        <form id="translation-settings-form">
+            <h2 id="translation-dialog-title">Configurações de tradução</h2>
+            <p>As configurações ficam salvas neste navegador. A chave da IA permanece no servidor.</p>
+            <label for="translation-language">Traduzir para
+                <select id="translation-language" name="language">
+                    <option value="Português brasileiro">Português (Brasil)</option>
+                    <option value="English">Inglês</option>
+                    <option value="Español">Espanhol</option>
+                    <option value="日本語">Japonês</option>
+                    <option value="한국어">Coreano</option>
+                    <option value="Français">Francês</option>
+                </select>
+            </label>
+            <label for="translation-capitalization">Formato das letras
+                <select id="translation-capitalization" name="capitalization">
+                    <option value="sentence">Primeira letra da frase em maiúsculo</option>
+                    <option value="uppercase">TUDO EM MAIÚSCULAS</option>
+                </select>
+            </label>
+            <label for="translation-font">Fonte dos balões
+                <select id="translation-font" name="font">
+                    <option value="arial">Arial</option>
+                    <option value="trebuchet">Trebuchet</option>
+                    <option value="georgia">Georgia</option>
+                    <option value="comic">Comic Sans</option>
+                </select>
+            </label>
+            <div class="translation-dialog-actions">
+                <button class="dialog-button secondary" id="cancel-translation-settings" type="button">Cancelar</button>
+                <button class="dialog-button primary" type="submit">Salvar configurações</button>
+            </div>
+        </form>
+    </dialog>
+
+    <script type="module" src="../JS/Leitura.js"></script>
+</body>
+</html>

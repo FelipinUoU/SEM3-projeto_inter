@@ -200,11 +200,56 @@ body {
   gap: 12px;
 }
 
+.nickname-edit-button,
 .summary-copy p {
   color: rgba(0, 0, 0, 0.82);
   font-size: clamp(30px, 2vw, 44px);
   font-weight: 700;
   line-height: 1.1;
+}
+
+.nickname-edit-button {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 8px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.nickname-edit-icon {
+  width: 0.65em;
+  height: 0.65em;
+  fill: currentColor;
+}
+
+.nickname-edit-button:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 3px;
+}
+
+.nickname-input {
+  width: 100%;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 2px solid rgba(31, 31, 31, 0.55);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.82);
+  color: #1f1f1f;
+  font: 700 1rem Georgia, serif;
+}
+
+.nickname-input[hidden] {
+  display: none;
+}
+
+.nickname-input:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 2px;
 }
 
 .summary-badge {
@@ -216,49 +261,11 @@ body {
   gap: 10px;
 }
 
-.badge-ring {
+.badge-avatar {
   width: 110px;
   height: 110px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.14);
-  border: 5px solid rgba(52, 52, 52, 0.7);
-  display: grid;
-  place-items: center;
-  position: relative;
-}
-
-.badge-ring::before,
-.badge-ring::after {
-  content: "";
-  position: absolute;
-  width: 58px;
-  height: 58px;
-  border: 8px solid rgba(52, 52, 52, 0.85);
-  border-top-color: transparent;
-  border-bottom-color: transparent;
-  transform: rotate(45deg);
-  border-radius: 18px;
-}
-
-.badge-ring::after {
-  transform: rotate(-45deg);
-}
-
-.badge-ring span {
-  position: relative;
-  z-index: 1;
-  font-size: 2.4rem;
-  font-weight: 700;
-  color: rgba(31, 31, 31, 0.9);
-  letter-spacing: 0.06em;
-}
-
-.summary-badge small {
-  color: rgba(31, 31, 31, 0.82);
-  font-size: 0.9rem;
-  font-weight: 700;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
+  object-fit: cover;
 }
 
 .historic-grid,

@@ -1,9 +1,7 @@
 const menuButton = document.getElementById("menuBtn");
 const dashboard = document.getElementById("dashboard");
-const closeButton = document.getElementById("closeDashboard");
 const overlay = document.getElementById("menuOverlay");
 const dashboardItems = document.querySelectorAll(".menu-lateral-item");
-const selectionMessage = document.getElementById("dashboardSelection");
 
 function setDashboardOpen(isOpen) {
     dashboard.classList.toggle("open", isOpen);
@@ -14,7 +12,7 @@ function setDashboardOpen(isOpen) {
     overlay.hidden = !isOpen;
 
     if (isOpen) {
-        closeButton.focus();
+        dashboardItems[0]?.focus();
     } else {
         menuButton.focus();
     }
@@ -24,7 +22,6 @@ menuButton.addEventListener("click", () => {
     setDashboardOpen(menuButton.getAttribute("aria-expanded") !== "true");
 });
 
-closeButton.addEventListener("click", () => setDashboardOpen(false));
 overlay.addEventListener("click", () => setDashboardOpen(false));
 
 document.addEventListener("keydown", (event) => {
@@ -35,26 +32,51 @@ document.addEventListener("keydown", (event) => {
 
 dashboardItems.forEach((item) => {
     item.addEventListener("click", () => {
-        const destination = item.dataset.href;
-        if (destination) {
-            window.location.href = destination;
-            return;
-        }
-
-        dashboardItems.forEach((dashboardItem) => {
-            dashboardItem.setAttribute("aria-pressed", String(dashboardItem === item));
-        });
-        if (selectionMessage) {
-            selectionMessage.textContent = `Item ${item.textContent.trim()} selecionado.`;
-        }
-    });
-});
-
-document.querySelectorAll(".categorias [data-href]").forEach((item) => {
-    item.addEventListener("click", () => {
         window.location.href = item.dataset.href;
     });
 });
+
+const categoryFilters = document.querySelectorAll("[data-category-filter]");
+const catalogCards = document.querySelectorAll(".obra-card[data-category]");
+const catalogSections = document.querySelectorAll(".catalogo > section");
+const searchForm = document.querySelector(".barra-pesquisa");
+const searchInput = searchForm?.querySelector('input[type="search"]');
+const emptyCatalogMessage = document.querySelector(".catalogo-vazio");
+let selectedCategory = "all";
+
+function filterCatalog() {
+    const query = searchInput?.value.trim().toLocaleLowerCase("pt-BR") ?? "";
+
+    catalogCards.forEach((card) => {
+        const matchesCategory = selectedCategory === "all" || card.dataset.category === selectedCategory;
+        const matchesSearch = card.textContent.toLocaleLowerCase("pt-BR").includes(query);
+        card.hidden = !matchesCategory || !matchesSearch;
+    });
+
+    catalogSections.forEach((section) => {
+        section.hidden = !section.querySelector(".obra-card:not([hidden])");
+    });
+
+    if (emptyCatalogMessage) {
+        emptyCatalogMessage.hidden = Array.from(catalogCards).some((card) => !card.hidden);
+    }
+}
+
+categoryFilters.forEach((filter) => {
+    filter.addEventListener("click", () => {
+        selectedCategory = filter.dataset.categoryFilter;
+        categoryFilters.forEach((button) => {
+            button.setAttribute("aria-pressed", String(button === filter));
+        });
+        filterCatalog();
+    });
+});
+
+searchForm?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    filterCatalog();
+});
+searchInput?.addEventListener("input", filterCatalog);
 
 document.querySelectorAll(".novidades, .capnovos, .recomendados").forEach((carrossel) => {
     const janela = carrossel.querySelector(".novidades-janela");

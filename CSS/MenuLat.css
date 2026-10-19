@@ -1,41 +1,47 @@
-header {
-    position: relative;
-    z-index: 10;
-}
-
-.menu-lateral-header {
-    position: fixed;
+body > header {
+    position: sticky;
     top: 0;
-    right: 0;
-    left: 0;
     z-index: 40;
     height: 58px;
     display: flex;
     align-items: center;
     gap: 20px;
+    width: 100%;
     padding: 0 18px 0 14px;
     background: #000;
     border-bottom: 1px solid rgba(255, 255, 255, 0.18);
 }
 
-body:has(> .menu-lateral-header) {
-    padding-top: 58px;
+body > header .logo,
+.menu-lateral-logo {
+    flex: 1;
+    margin: 0 0 0 20px;
+    color: #fff;
+    font: bold clamp(16px, 1.6vw, 28px) Georgia, serif;
+    letter-spacing: 0.08em;
 }
 
-.boxbody{
-    width: 30px;
-    height: 30px;
-    border: 1px solid violet;
-    border-radius: 180px;
+.boxbody {
+    width: 38px;
+    height: 38px;
+    flex: 0 0 38px;
     margin-left: auto;
-    float: left;
+    border: 1px solid rgba(213, 189, 0, 0.75);
+    border-radius: 50%;
+    overflow: hidden;
 }
 
-#master #corpo .boxbody a img{
-    width: 30px;
-    height: 30px;
-    border-radius: 180px;
-    padding: 15px;
+.boxbody a {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.boxbody img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 
 .menu-lateral-button {
@@ -52,6 +58,10 @@ body:has(> .menu-lateral-header) {
     cursor: pointer;
 }
 
+.menu-lateral-button:hover span {
+    background: #d5bd00;
+}
+
 .menu-lateral-button span {
     display: block;
     width: 25px;
@@ -60,16 +70,9 @@ body:has(> .menu-lateral-header) {
     background: #fff;
 }
 
-.menu-lateral-logo {
-    margin: 0;
-    color: #fff;
-    font: bold clamp(16px, 1.6vw, 28px) Georgia, serif;
-    letter-spacing: 0.08em;
-}
-
 .menu-lateral-button:focus-visible,
-.menu-lateral-close:focus-visible,
-.menu-lateral-item:focus-visible {
+.menu-lateral-item:focus-visible,
+.boxbody a:focus-visible {
     outline: 2px solid #d5bd00;
     outline-offset: 3px;
 }
@@ -110,28 +113,6 @@ body:has(> .menu-lateral-header) {
     visibility: visible;
 }
 
-.menu-lateral-dashboard-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 28px;
-}
-
-.menu-lateral-dashboard-header h2 {
-    margin: 0;
-    color: #d5bd00;
-    font: bold 24px Georgia, serif;
-}
-
-.menu-lateral-close {
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: #fff;
-    font: 32px/1 Georgia, serif;
-    cursor: pointer;
-}
-
 .menu-lateral-items {
     display: grid;
     gap: 12px;
@@ -153,12 +134,6 @@ body:has(> .menu-lateral-header) {
 .menu-lateral-item[aria-pressed="true"] {
     background: #d5bd00;
     color: #2b1a42;
-}
-
-.menu-lateral-selection {
-    margin: 24px 0 0;
-    color: rgba(255, 255, 255, 0.8);
-    font: 16px Georgia, serif;
 }
 
 @media (prefers-reduced-motion: reduce) {
