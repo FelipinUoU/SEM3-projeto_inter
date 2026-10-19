@@ -27,9 +27,7 @@ let currentMode = "vertical";
 let currentWork;
 let currentChapter;
 let translationLayer;
-let activeTranslatedBubbles = [];
-let translationObserver;
-let translationPositionHandler;
+const pageTranslationLayers = new Map();
 let translationController;
 let statusTimeout;
 
@@ -46,9 +44,10 @@ const analysisSchema = {
                     y: { type: "INTEGER" },
                     width: { type: "INTEGER" },
                     height: { type: "INTEGER" },
+                    square: { type: "BOOLEAN" },
                     originalText: { type: "STRING" }
                 },
-                required: ["x", "y", "width", "height", "originalText"]
+                required: ["x", "y", "width", "height", "square", "originalText"]
             }
         }
     },
@@ -212,17 +211,26 @@ function updateCounter() {
     pageCounter.textContent = `${chapterText} (${currentPageIndex + 1}/${wrappers.length})`;
 }
 
-function clearTranslation() {
-    translationObserver?.disconnect();
-    translationObserver = undefined;
-    if (translationPositionHandler) {
-        window.removeEventListener("resize", translationPositionHandler);
-        translationPositionHandler = undefined;
-    }
-    translationLayer?.remove();
-    translationLayer = undefined;
-    activeTranslatedBubbles = [];
-    translateButton.setAttribute("aria-pressed", "false");
+function syncCurrentTranslation() {
+    const currentTranslation = pageTranslationLayers.get(wrappers[currentPageIndex]);
+    translationLayer = currentTranslation?.layer;
+    translateButton.setAttribute("aria-pressed", String(Boolean(translationLayer)));
+}
+
+function clearTranslation(wrapper) {
+    const targets = wrapper ? [wrapper] : [...pageTranslationLayers.keys()];
+    targets.forEach((target) => {
+        const translation = pageTranslationLayers.get(target);
+        if (!translation) return;
+        translation.observer?.disconnect();
+        translation.layer.remove();
+        pageTranslationLayers.delete(target);
+    });
+    syncCurrentTranslation();
+}
+
+function positionTranslationLayers() {
+    pageTranslationLayers.forEach((translation) => translation.position());
 }
 
 function setTranslationPending(isPending) {
@@ -236,26 +244,26 @@ function showHorizontalPage(index) {
     wrappers.forEach((wrapper, wrapperIndex) => {
         wrapper.classList.toggle("active-horizontal", wrapperIndex === currentPageIndex);
     });
-    clearTranslation();
     translationController?.abort("navigation");
     translationController = undefined;
     translateButton.disabled = false;
     setTranslationPending(false);
     setStatus("");
     updateCounter();
+    syncCurrentTranslation();
 }
 
 function setCurrentPage(index) {
     const nextPageIndex = Math.max(0, Math.min(wrappers.length - 1, index));
     if (nextPageIndex === currentPageIndex) return;
     currentPageIndex = nextPageIndex;
-    clearTranslation();
     translationController?.abort("navigation");
     translationController = undefined;
     translateButton.disabled = false;
     setTranslationPending(false);
     setStatus("");
     updateCounter();
+    syncCurrentTranslation();
 }
 
 function nearestVisiblePage() {
@@ -294,6 +302,7 @@ function toggleMode(mode) {
         wrappers.forEach((wrapper) => wrapper.classList.remove("active-horizontal"));
         wrappers[currentPageIndex]?.scrollIntoView({ block: "center" });
         updateCounter();
+        syncCurrentTranslation();
     }
 }
 
@@ -370,7 +379,8 @@ function validateBubbles(bubbles) {
         const validBox = bubble && [bubble.x, bubble.y, bubble.width, bubble.height].every(Number.isFinite)
             && bubble.x >= 0 && bubble.y >= 0 && bubble.width > 0 && bubble.height > 0
             && bubble.x + bubble.width <= 1000 && bubble.y + bubble.height <= 1000;
-        if (!validBox || typeof bubble.originalText !== "string" || !bubble.originalText.trim()) {
+        if (!validBox || typeof bubble.square !== "boolean"
+            || typeof bubble.originalText !== "string" || !bubble.originalText.trim()) {
             throw new Error(`A IA retornou dados inválidos para o balão ${index + 1}.`);
         }
         return { ...bubble, id: index + 1, originalText: bubble.originalText.trim() };
@@ -434,14 +444,16 @@ function fitBubbleText(element, bubble) {
 }
 
 function displayTranslations(bubbles, wrapper) {
-    clearTranslation();
+    clearTranslation(wrapper);
     const image = wrapper.querySelector("img");
     const layer = document.createElement("div");
     layer.className = "translation-layer";
     layer.setAttribute("aria-label", "Tradução dos balões");
     const elements = bubbles.map((bubble) => {
         const element = document.createElement("span");
-        element.className = "translated-bubble";
+        element.className = bubble.square
+            ? "translated-bubble translated-bubble--square"
+            : "translated-bubble";
         element.title = `Original: ${bubble.originalText}`;
         element.style.left = `${bubble.x / 10}%`;
         element.style.top = `${bubble.y / 10}%`;
@@ -451,10 +463,7 @@ function displayTranslations(bubbles, wrapper) {
         return element;
     });
     wrapper.append(layer);
-    translationLayer = layer;
-    activeTranslatedBubbles = bubbles;
     const positionLayer = () => {
-        if (!translationLayer) return;
         const imageRect = image.getBoundingClientRect();
         const wrapperRect = wrapper.getBoundingClientRect();
         layer.style.left = `${imageRect.left - wrapperRect.left}px`;
@@ -464,13 +473,14 @@ function displayTranslations(bubbles, wrapper) {
         elements.forEach((element, index) => fitBubbleText(element, bubbles[index]));
     };
     positionLayer();
+    const translation = { layer, bubbles, observer: undefined, position: positionLayer };
+    pageTranslationLayers.set(wrapper, translation);
     if ("ResizeObserver" in window) {
-        translationObserver = new ResizeObserver(positionLayer);
-        translationObserver.observe(image);
-        translationObserver.observe(wrapper);
+        translation.observer = new ResizeObserver(positionLayer);
+        translation.observer.observe(image);
+        translation.observer.observe(wrapper);
     }
-    translationPositionHandler = positionLayer;
-    window.addEventListener("resize", translationPositionHandler);
+    syncCurrentTranslation();
 }
 
 async function translateCurrentPage() {
@@ -495,7 +505,7 @@ async function translateCurrentPage() {
             if (!analysis) {
                 setStatus("Etapa 1/2: analisando a página e localizando os balões…");
                 analysis = await requestAI([{
-                    text: "Analise a página inteira como um sistema de visão e OCR para quadrinhos. Faça uma varredura linha por linha, de cima para baixo, identificando todos os balões de fala e pensamento com texto legível. Transcreva cada fala exatamente e informe o idioma predominante em detectedLanguage. Para cada balão, estime uma caixa que cubra o interior sem a cauda: x, y, width e height são inteiros de 0 a 1000 normalizados pela imagem inteira. Ignore textos fora de balões, desenhos e efeitos sonoros. Não invente texto."
+                    text: "Analise a página inteira como um sistema de visão e OCR para quadrinhos. Faça uma varredura linha por linha, de cima para baixo, identificando todos os balões de fala e pensamento com texto legível. Transcreva cada fala exatamente e informe o idioma predominante em detectedLanguage. Para cada balão, estime uma caixa que cubra o interior sem a cauda: x, y, width e height são inteiros de 0 a 1000 normalizados pela imagem inteira. Defina square como true quando o balão tiver formato quadrado ou retangular, com laterais retas e cantos predominantemente retos; use false para balões ovais ou arredondados. Não classifique quadros, legendas ou caixas de narração como balões. Ignore textos fora de balões, desenhos e efeitos sonoros. Não invente texto."
                 }, { inlineData: image.inlineData }], analysisSchema, controller, 4096);
                 analysis = { ...analysis, bubbles: validateBubbles(analysis.bubbles) };
                 analysisCache.set(image.cacheKey, analysis);
@@ -559,14 +569,17 @@ window.addEventListener("click", () => viewDropdown.classList.remove("show"));
 document.getElementById("next-page-btn").addEventListener("click", () => goToPage(currentPageIndex + 1));
 document.getElementById("prev-page-btn").addEventListener("click", () => goToPage(currentPageIndex - 1));
 window.addEventListener("scroll", nearestVisiblePage, { passive: true });
-window.addEventListener("resize", nearestVisiblePage);
+window.addEventListener("resize", () => {
+    positionTranslationLayers();
+    nearestVisiblePage();
+});
 
 translateButton.addEventListener("click", () => {
     if (translationController) {
         translationController.abort("user");
         setStatus("Tradução interrompida.");
     } else if (translationLayer) {
-        clearTranslation();
+        clearTranslation(wrappers[currentPageIndex]);
         setStatus("Tradução ocultada.");
     } else {
         nearestVisiblePage();
@@ -608,14 +621,24 @@ settingsForm.addEventListener("submit", (event) => {
         return;
     }
     const languageChanged = settings.language !== nextSettings.language;
+    const hasTranslations = pageTranslationLayers.size > 0;
     settings = nextSettings;
     settingsBeforeDialog = undefined;
     settingsDialog.close();
-    if (translationLayer && !languageChanged) {
-        displayTranslations(activeTranslatedBubbles, wrappers[currentPageIndex]);
-        setStatus("Configurações aplicadas.", "success");
-    } else if (languageChanged && translationLayer) {
+    if (languageChanged && hasTranslations) {
         clearTranslation();
         void translateCurrentPage();
+    } else if (!languageChanged && hasTranslations) {
+        [...pageTranslationLayers.entries()].forEach(([wrapper, translation]) => {
+            displayTranslations(translation.bubbles, wrapper);
+        });
+        setStatus("Configurações aplicadas.", "success");
     }
+});
+
+window.addEventListener("pagehide", () => {
+    translationController?.abort("chapter-exit");
+    clearTranslation();
+    analysisCache.clear();
+    translationCache.clear();
 });

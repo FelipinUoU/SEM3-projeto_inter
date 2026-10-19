@@ -337,6 +337,10 @@ h1.titulo-manga { font-size: 26px; margin-bottom: 5px; }
     white-space: pre-wrap;
 }
 
+.translated-bubble--square {
+    border-radius: 2px;
+}
+
 .translation-container select {
     background: #2a2a3d;
     color: var(--text-color);
