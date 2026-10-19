@@ -3,6 +3,7 @@ import cors from 'cors';
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import sqlite3 from 'sqlite3';
 import { open } from 'sqlite';
 
@@ -12,10 +13,11 @@ if (fs.existsSync('.env')) {
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const SERVER_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
 const DB_PATH = path.resolve('Database', 'app.db');
 const SCHEMA_PATH = path.resolve('Database', 'schema.sql');
 const SEED_PATH = path.resolve('Database', 'seed.sql');
-const READER_DIRECTORY = path.resolve('TELA DE LEITURA');
+const READER_DIRECTORY = path.resolve(SERVER_DIRECTORY, '..', 'TELA DE LEITURA');
 const READER_IMAGE_EXTENSIONS = new Set(['.avif', '.gif', '.jpeg', '.jpg', '.png', '.webp']);
 const gemini = process.env.GEMINI_API_KEY
   ? new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
