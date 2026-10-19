@@ -9,16 +9,27 @@ Este projeto é uma biblioteca de leitura (mangas, hq *por enquanto*) atualizada
 - Geovanna de Andrade
 
 
-## Banco de dados local (MySQL) e servidor de API
-O servidor Express usa MySQL para cadastro, login e persistência dos dados. O serviço MySQL deve estar ativo. Ao iniciar, o servidor cria o banco definido em `DB_NAME` (por padrão, `hokupedia`) e as tabelas definidas em `Database/schema.sql`. O usuário MySQL configurado precisa ter permissão para criar bancos; se não tiver, crie o banco manualmente ou conceda essa permissão.
+## Banco de dados MySQL e servidor
 
-Como executar (ambiente com Node.js instalado):
+O servidor Express conecta-se ao MySQL para cadastro/login de usuários e operações dos endpoints de pedidos. **A conexão e a inicialização estão implementadas:** ao executar `npm run server`, o servidor cria o banco indicado por `DB_NAME` (padrão `hokupedia`) se ainda não existir, aplica `Database/schema.sql` e executa `Database/seed.sql` quando a tabela `usuarios` está vazia. Não é necessário importar os arquivos SQL manualmente. O serviço MySQL precisa estar instalado e em execução, e o usuário configurado precisa ter permissão para criar o banco e as tabelas. Se não tiver, crie o banco e conceda permissões antes de iniciar o servidor.
 
-1. Instalar dependências:
+### Preparar em outro computador
 
+1. Instale o **Node.js 22 LTS ou superior** e o **MySQL 8**. Inicie o serviço MySQL.
+2. Obtenha o projeto (por exemplo, clone o repositório) e abra um terminal na pasta raiz, onde ficam `package.json` e `server`.
+3. Instale as dependências:
+
+   ```powershell
    npm install
+   ```
 
-2. Configurar as credenciais em `.env`, na raiz do projeto:
+4. Crie o arquivo de configuração local a partir do exemplo:
+
+   ```powershell
+   Copy-Item .env.example .env
+   ```
+
+   Edite `.env` e configure a conexão. Para MySQL na mesma máquina, use `DB_HOST=localhost`; ajuste usuário e senha para os dados configurados no MySQL:
 
    ```env
    DB_HOST=localhost
@@ -28,9 +39,20 @@ Como executar (ambiente com Node.js instalado):
    PORT=3001
    ```
 
-3. Iniciar o servidor (cria o banco e as tabelas e, se `usuarios` estiver vazia, insere dados de exemplo):
+   Se o MySQL estiver em outra máquina, `DB_HOST` deve ser o endereço dela e o usuário MySQL precisa aceitar conexões desse servidor. Configure a rede/firewall do MySQL para permitir o acesso necessário.
 
+5. Inicie o servidor na pasta raiz:
+
+   ```powershell
    npm run server
+   ```
+
+   A mensagem `Conectado com sucesso ao MySQL e tabelas criadas!` indica que a inicialização do banco terminou. Para confirmar depois, abra `http://localhost:3001/api/health`; a resposta esperada é `{"status":"ok","database":"connected"}`.
+
+6. Abra `http://localhost:3001` no computador que está executando o servidor.
+
+
+O `Database/seed.sql` contém contas e dados de demonstração, inseridos apenas quando `usuarios` está vazia. Use esses dados somente em desenvolvimento; não os trate como credenciais seguras. Mantenha o `.env` local, não o compartilhe nem o envie ao Git. O `.env.example` contém apenas valores de exemplo.
 
 ### Tela de leitura e tradução
 
@@ -40,7 +62,7 @@ Como executar (ambiente com Node.js instalado):
 
 A rota http://localhost:3001/Leitura também abre o leitor principal. A tela está em `HTML/Leitura.html`, com estilos em `CSS/Leitura.css` e lógica em `JS/Leitura.js`. As imagens de demonstração ficam em `public/reader`. Ao acessar um capítulo cadastrado, o leitor carrega as imagens armazenadas localmente neste navegador.
 
-Obras, capítulos, capas e páginas são armazenados no `localStorage` do navegador; ainda não há conexão desse CRUD com o banco de dados. As imagens também ficam no navegador e estão sujeitas ao limite de armazenamento do browser.
+Obras, capítulos, capas e páginas do CRUD continuam armazenados no `localStorage` do navegador; esse conteúdo ainda não está conectado ao MySQL. As imagens também ficam no navegador e estão sujeitas ao limite de armazenamento do browser.
 
 As configurações de idioma, capitalização e fonte da tradução também são salvas no navegador. O servidor mantém as chaves fora do cliente e tenta os provedores configurados nesta ordem: Gemini, OpenAI, Qwen e Groq. Para OpenAI, o modelo padrão é `gpt-4o-mini`; use `OPENAI_MODEL` para escolher outro modelo compatível com entrada de imagens e saída JSON. Para Qwen, o padrão é `qwen-vl-max`; ajuste `QWEN_MODEL` e `QWEN_API_URL` para outro modelo ou endpoint compatível. Para Groq, o padrão é `llama-3.2-11b-vision-preview`; ajuste `GROQ_MODEL` se necessário. Se todos os provedores falharem, o leitor mostra os detalhes sem expor as chaves.
 
