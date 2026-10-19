@@ -1,3 +1,5 @@
+import { createAuthorIcon } from "./authorIcon.js";
+
 const storageKey = "hokupedia.works.v1";
 const imageTypes = new Set(["image/avif", "image/gif", "image/jpeg", "image/png", "image/webp"]);
 const languageNames = {
@@ -67,24 +69,6 @@ function saveWorks() {
 function showFeedback(message, isError = false) {
     feedback.textContent = message;
     feedback.classList.toggle("is-error", isError);
-}
-
-function appendAuthorIcon(parent) {
-    const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    icon.setAttribute("viewBox", "0 0 24 24");
-    icon.setAttribute("class", "author-icon");
-    icon.setAttribute("aria-hidden", "true");
-
-    const head = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-    head.setAttribute("cx", "12");
-    head.setAttribute("cy", "7");
-    head.setAttribute("r", "4");
-    icon.append(head);
-
-    const body = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    body.setAttribute("d", "M4.5 21v-2a7.5 7.5 0 0 1 15 0v2");
-    icon.append(body);
-    parent.append(icon);
 }
 
 function createButton(label, action, className, title = label) {
@@ -180,7 +164,7 @@ function renderWorkCard(work) {
 
             const chapterAuthor = document.createElement("span");
             chapterAuthor.className = "chapter-row-author";
-            appendAuthorIcon(chapterAuthor);
+            chapterAuthor.append(createAuthorIcon());
             const authorName = document.createElement("span");
             authorName.textContent = "MeridinhaFDP";
             chapterAuthor.append(authorName);

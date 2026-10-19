@@ -180,32 +180,7 @@ function parseProviderJson(text, responseSchema, providerName) {
   return parsed;
 }
 
-function toGroqMessages(contents, responseSchema) {
-  const userContent = [];
-  for (const content of contents) {
-    for (const part of content.parts || []) {
-      if (typeof part.text === 'string') {
-        userContent.push({ type: 'text', text: part.text });
-      }
-      if (part.inlineData?.data && part.inlineData?.mimeType) {
-        userContent.push({
-          type: 'image_url',
-          image_url: {
-            url: `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`
-          }
-        });
-      }
-    }
-  }
-
-  userContent.push({
-    type: 'text',
-    text: `Retorne apenas um objeto JSON válido que corresponda a este schema: ${JSON.stringify(responseSchema)}`
-  });
-  return [{ role: 'user', content: userContent }];
-}
-
-function toOpenAIChatMessages(contents, responseSchema) {
+function toChatCompletionMessages(contents, responseSchema) {
   const userContent = [];
   for (const content of contents) {
     for (const part of content.parts || []) {
@@ -272,9 +247,7 @@ async function generateWithProvider(provider, contents, generationConfig, respon
       : 'https://api.groq.com/openai/v1/chat/completions';
   const apiKey = isOpenAI ? openAIKey : isQwen ? qwenApiKey : groqApiKey;
   const model = isOpenAI ? openAIModel : isQwen ? qwenModel : groqModel;
-  const messages = isOpenAI || isQwen
-    ? toOpenAIChatMessages(contents, responseSchema)
-    : toGroqMessages(contents, responseSchema);
+  const messages = toChatCompletionMessages(contents, responseSchema);
   const providerResponse = await fetch(apiUrl, {
     method: 'POST',
     headers: {

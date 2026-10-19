@@ -31,12 +31,7 @@ header {
     border-bottom: 1px solid #2a2a3d;
 }
 
-.menu-icon { font-size: 24px; cursor: pointer; color: var(--text-color); }
 .logo { font-size: 22px; font-weight: bold; font-style: italic; letter-spacing: 1px; }
-.user-avatar {
-    width: 32px; height: 32px; border-radius: 50%; background-color: #3b3b4f;
-    display: flex; align-items: center; justify-content: center; font-size: 14px; border: 1px solid var(--accent-yellow);
-}
 
 /* Container Principal */
 .main-container {

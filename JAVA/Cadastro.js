@@ -1,6 +1,5 @@
 const formCadastro = document.getElementById("formCadastro");
-
-const formLogin = document.getElementById("formLogin");
+const btnLogin = document.getElementById("btnLogin");
 
 if (btnLogin) {
     btnLogin.addEventListener("click", function () {
@@ -8,7 +7,7 @@ if (btnLogin) {
     });
 }
 
-formCadastro.addEventListener("submit", async function(event) {
+formCadastro?.addEventListener("submit", async function(event) {
 
     event.preventDefault();
 
@@ -51,8 +50,7 @@ formCadastro.addEventListener("submit", async function(event) {
         if (!resp.ok) throw new Error(data.error || 'Erro no cadastro');
 
         alert('Cadastro realizado com sucesso! Faça login para continuar.');
-        // redireciona para login
-        //window.location.href = '../HTML/Login.html';
+        window.location.href = '/HTML/Login.html';
 
     } catch (err) {
         console.error(err);
