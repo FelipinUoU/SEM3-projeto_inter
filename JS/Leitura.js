@@ -1,5 +1,27 @@
 (() => {
+    const readerQuery = new URLSearchParams(window.location.search);
+    const workId = readerQuery.get("obra");
+    const chapterId = readerQuery.get("capitulo");
+    if (workId && chapterId) {
+        try {
+            const historyKey = "hokupedia.readChapters.v1";
+            const storedHistory = localStorage.getItem(historyKey);
+            const parsedHistory = storedHistory === null ? [] : JSON.parse(storedHistory);
+            if (!Array.isArray(parsedHistory) || parsedHistory.some((item) => typeof item !== "string")) {
+                throw new Error("O histórico local de leitura está inválido.");
+            }
+            const chapterKey = `${workId}:${chapterId}`;
+            if (!parsedHistory.includes(chapterKey)) {
+                parsedHistory.push(chapterKey);
+                localStorage.setItem(historyKey, JSON.stringify(parsedHistory));
+            }
+        } catch (error) {
+            console.error("Não foi possível registrar este capítulo no histórico local:", error);
+        }
+    }
+
     const reader = document.getElementById("reader");
+    const chapterSelectionLink = document.getElementById("chapterSelectionLink");
     const pageArea = document.getElementById("pageArea");
     const comicPage = document.getElementById("comicPage");
     const currentPageLabel = document.getElementById("currentPage");
@@ -34,6 +56,9 @@
     const pageAnalysisCache = new Map();
     const pageTranslationCache = new Map();
     const apiEndpoint = "/api/gemini";
+    if (chapterSelectionLink && workId) {
+        chapterSelectionLink.href = `/Obra?obra=${encodeURIComponent(workId)}`;
+    }
     const analysisSchema = {
         type: "OBJECT",
         properties: {
@@ -107,7 +132,7 @@
             const response = await fetch("/api/reader/pages", { cache: "no-store" });
             const contentType = response.headers.get("content-type") || "";
             if (!contentType.includes("application/json")) {
-                throw new Error("O servidor local está desatualizado e não reconhece a rota de páginas. Pare e reinicie `npm run server` e reabra o leitor em http://localhost:3001/reader/Leitura.html.");
+                throw new Error("O servidor local está desatualizado e não reconhece a rota de páginas. Pare e reinicie `npm run server` e reabra o leitor em http://localhost:3001/Leitura.");
             }
 
             let result;
@@ -135,7 +160,7 @@
                 currentPage = 0;
                 currentPageLabel.textContent = "0";
                 comicPage.removeAttribute("src");
-                setTranslationStatus("Adicione imagens à pasta TELA DE LEITURA para começar a leitura.", "error");
+                setTranslationStatus("Nenhuma página disponível. Adicione imagens à pasta TELA DE LEITURA para começar a leitura.", "error");
                 return;
             }
 
@@ -319,7 +344,7 @@
             });
         } catch (error) {
             if (error.name === "AbortError") throw error;
-            throw new Error("Não foi possível conectar ao servidor local. Inicie-o com `npm run server` e abra http://localhost:3001/reader/Leitura.html.");
+            throw new Error("Não foi possível conectar ao servidor local. Inicie-o com `npm run server` e abra http://localhost:3001/Leitura.");
         }
 
         let result;

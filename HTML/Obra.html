@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#29272f">
+    <title>Naruto — Hub de Obra | HokuPédia</title>
+    <link rel="stylesheet" href="/CSS/Obra.css">
+</head>
+<body>
+    <header class="site-header">
+        <a class="brand" href="/" aria-label="HokuPédia — tela inicial">
+            <span class="brand-mark" aria-hidden="true">H</span>
+            <span>HokuPédia</span>
+        </a>
+        <nav class="header-actions" aria-label="Navegação da obra">
+            <a class="manage-link" href="/GerenciarObras">Gerenciar obras</a>
+            <a class="back-link" href="/" aria-label="Voltar à tela inicial">
+                <span aria-hidden="true">‹</span>
+                <span>Voltar</span>
+            </a>
+        </nav>
+    </header>
+
+    <main class="work-page">
+        <section class="work-summary" aria-labelledby="workTitle">
+            <div class="work-cover" aria-hidden="true">
+                <span>HOKU<br>PÉDIA</span>
+            </div>
+            <div class="work-info">
+                <div class="work-heading">
+                    <h1 id="workTitle">Naruto</h1>
+                    <span class="work-divider" aria-hidden="true"></span>
+                    <p class="work-description" id="workDescription">Acompanhe os capítulos desta obra.</p>
+                </div>
+                <div class="work-author">
+                    <svg class="author-icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <circle cx="12" cy="7" r="4"></circle>
+                        <path d="M4.5 21v-2a7.5 7.5 0 0 1 15 0v2"></path>
+                    </svg>
+                    <span id="workAuthor">Masashi Kishimoto</span>
+                </div>
+            </div>
+        </section>
+
+        <section class="chapter-section" aria-labelledby="chapterHeading">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Continue de onde parou</p>
+                    <h2 id="chapterHeading">Capítulos</h2>
+                </div>
+            </div>
+            <div class="chapter-list" id="chapterList" aria-label="Capítulos disponíveis"></div>
+        </section>
+    </main>
+
+    <script src="/JS/Obra.js"></script>
+</body>
+</html>

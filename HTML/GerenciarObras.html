@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#29272f">
+    <title>Gerenciar obras | HokuPédia</title>
+    <link rel="stylesheet" href="/CSS/GerenciarObras.css">
+</head>
+<body>
+    <header class="site-header">
+        <a class="brand" href="/" aria-label="HokuPédia — tela inicial">
+            <span class="brand-mark" aria-hidden="true">H</span>
+            <span>HokuPédia</span>
+        </a>
+        <a class="back-link" href="/Obra">Voltar ao Hub de Obra</a>
+    </header>
+
+    <main class="management-page">
+        <div class="page-heading">
+            <div>
+                <p class="eyebrow">Painel da comunidade</p>
+                <h1>Gerenciamento de obras</h1>
+            </div>
+            <button class="add-work-button" id="addWorkButton" type="button">
+                <span aria-hidden="true">＋</span>
+                Adicionar Obra
+            </button>
+        </div>
+
+        <p class="storage-note">
+            Protótipo: as alterações ficam salvas somente neste navegador e ainda não são enviadas ao banco de dados.
+        </p>
+        <p class="feedback" id="feedback" role="status" aria-live="polite"></p>
+
+        <section class="editor-region" id="editorRegion" aria-live="polite"></section>
+        <section class="work-list" id="workList" aria-label="Obras cadastradas"></section>
+    </main>
+
+    <script src="/JS/GerenciarObras.js"></script>
+</body>
+</html>

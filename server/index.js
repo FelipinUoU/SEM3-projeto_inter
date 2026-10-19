@@ -32,6 +32,7 @@ const providerTimeoutMs = 180000;
 
 app.use(express.json({ limit: '15mb' }));
 app.use(cors({ origin: '*' }));
+app.use('/HTML', express.static(path.resolve('HTML')));
 app.use('/CSS', express.static(path.resolve('CSS')));
 app.use('/JS', express.static(path.resolve('JS')));
 app.use('/reader', express.static(READER_DIRECTORY));
@@ -65,7 +66,10 @@ const dbPromise = initDb();
 const screenRoutes = {
   '/CadLog': 'CadLog.html',
   '/Cadastro': 'Cadastro.html',
-  '/Login': 'Login.html'
+  '/Login': 'Login.html',
+  '/GerenciarObras': 'GerenciarObras.html',
+  '/Obra': 'Obra.html',
+  '/Leitura': 'Leitura.html'
 };
 
 for (const [route, file] of Object.entries(screenRoutes)) {
@@ -99,6 +103,10 @@ app.get('/api/reader/pages', async (req, res) => {
     res.set('Cache-Control', 'no-store');
     return res.json({ pages });
   } catch (error) {
+    if (error.code === 'ENOENT') {
+      res.set('Cache-Control', 'no-store');
+      return res.json({ pages: [] });
+    }
     console.error('Could not list reader pages:', error);
     return res.status(500).json({ error: { message: 'Não foi possível listar as imagens do leitor.' } });
   }
