@@ -35,13 +35,24 @@
                     <p class="menu-lateral-selection" id="dashboardSelection" aria-live="polite">Selecione um item.</p>
                 </aside>
 
+                <!-- BOTÕES DE CATEGORIAS -->
+                <div class="inicio-layout">
+                    <nav class="categorias" aria-label="Categorias">
+                        <button class="categoria-button" type="button" data-href="HQ.html">HQ's</button>
+                        <button class="categoria-button" type="button" data-href="mangas.html">Mangás</button>
+                        <button class="categoria-button" type="button" data-href="manhwa.html">Manhwa</button>
+                    </nav>
+
+                    <div class="conteudo-principal">
+                        <!-- Novidades, Capítulos Novos e Recomendados -->
+                    </div>
+                </div>
+
                 <!-- CARROSEL DE IMAGENS NOVIDADES-->
                 <section class="novidades" aria-labelledby="titulo-novidades">
                     <h2 id="titulo-novidades">Novidades</h2>
-
                     <div class="novidades-controles">
-                        <button class="novidades-botao" id="novidadesAnterior" type="button" aria-label="Imagem anterior" disabled>←</button>
-
+                        <button class="novidades-botao" type="button" aria-label="Imagem anterior" disabled>←</button>
                         <div class="novidades-janela" role="region" aria-label="Carrossel de novidades">
                             <div class="novidades-faixa">
                                 <div class="novidades-pagina">
@@ -49,45 +60,93 @@
                                     <img src="../Img/Capa.jpg" alt="Capa de novidade 2">
                                     <img src="../Img/Capa.jpg" alt="Capa de novidade 3">
                                     <img src="../Img/Capa.jpg" alt="Capa de novidade 4">
-                                </div>
-                                <div class="novidades-pagina">
                                     <img src="../Img/Capa.jpg" alt="Capa de novidade 5">
                                     <img src="../Img/Capa.jpg" alt="Capa de novidade 6">
                                     <img src="../Img/Capa.jpg" alt="Capa de novidade 7">
                                     <img src="../Img/Capa.jpg" alt="Capa de novidade 8">
                                 </div>
+                                <div class="novidades-pagina">
+                                    <img src="../Img/Capa.jpg" alt="Capa de novidade 9">
+                                    <img src="../Img/Capa.jpg" alt="Capa de novidade 10">
+                                    <img src="../Img/Capa.jpg" alt="Capa de novidade 11">
+                                    <img src="../Img/Capa.jpg" alt="Capa de novidade 12">
+                                    <img src="../Img/Capa.jpg" alt="Capa de novidade 13">
+                                    <img src="../Img/Capa.jpg" alt="Capa de novidade 14">
+                                    <img src="../Img/Capa.jpg" alt="Capa de novidade 15">
+                                    <img src="../Img/Capa.jpg" alt="Capa de novidade 16">
+                                </div>
                             </div>
                         </div>
-
-                        <button class="novidades-botao" id="novidadesProxima" type="button" aria-label="Próxima imagem">→</button>
+                        <button class="novidades-botao" type="button" aria-label="Próxima imagem">→</button>
                     </div>
                 </section>
 
             <!-- CARROSEL CAP NOVOS -->
             <section class="capnovos" aria-labelledby="titulo-capnovos">
                     <h2 id="titulo-capnovos">Capítulos Novos</h2>
-
                     <div class="novidades-controles">
-                        <button class="novidades-botao" id="novidadesAnterior" type="button" aria-label="Imagem anterior" disabled>←</button>
+                        <button class="novidades-botao" type="button" aria-label="Imagem anterior" disabled>←</button>
 
-                        <div class="novidades-janela" role="region" aria-label="Carrossel de novidades">
+                        <div class="novidades-janela" role="region" aria-label="Carrossel de capítulos novos">
                             <div class="novidades-faixa">
                                 <div class="novidades-pagina">
                                     <img src="../Img/Capa.jpg" alt="Capa de novidade 1">
                                     <img src="../Img/Capa.jpg" alt="Capa de novidade 2">
                                     <img src="../Img/Capa.jpg" alt="Capa de novidade 3">
                                     <img src="../Img/Capa.jpg" alt="Capa de novidade 4">
-                                </div>
-                                <div class="novidades-pagina">
                                     <img src="../Img/Capa.jpg" alt="Capa de novidade 5">
                                     <img src="../Img/Capa.jpg" alt="Capa de novidade 6">
                                     <img src="../Img/Capa.jpg" alt="Capa de novidade 7">
                                     <img src="../Img/Capa.jpg" alt="Capa de novidade 8">
                                 </div>
+                                <div class="novidades-pagina">
+                                    <img src="../Img/Capa.jpg" alt="Capa de novidade 9">
+                                    <img src="../Img/Capa.jpg" alt="Capa de novidade 10">
+                                    <img src="../Img/Capa.jpg" alt="Capa de novidade 11">
+                                    <img src="../Img/Capa.jpg" alt="Capa de novidade 12">
+                                    <img src="../Img/Capa.jpg" alt="Capa de novidade 13">
+                                    <img src="../Img/Capa.jpg" alt="Capa de novidade 14">
+                                    <img src="../Img/Capa.jpg" alt="Capa de novidade 15">
+                                    <img src="../Img/Capa.jpg" alt="Capa de novidade 16">
+                                </div>
                             </div>
                         </div>
+                        <button class="novidades-botao" type="button" aria-label="Próxima imagem">→</button>
+                    </div>
+                </section>
 
-                        <button class="novidades-botao" id="novidadesProxima" type="button" aria-label="Próxima imagem">→</button>
+                <!-- CARROSEL DE RECOMENDADOS -->
+                 <section class="recomendados" aria-labelledby="titulo-recomendados">
+                    <h2 id="titulo-recomendados">Recomendados</h2>
+
+                    <div class="novidades-controles">
+                        <button class="novidades-botao" type="button" aria-label="Imagem anterior" disabled>←</button>
+
+                        <div class="novidades-janela" role="region" aria-label="Carrossel de recomendados">
+                            <div class="novidades-faixa">
+                                <div class="novidades-pagina">
+                                    <img src="../Img/Capa.jpg" alt="Capa de novidade 1">
+                                    <img src="../Img/Capa.jpg" alt="Capa de novidade 2">
+                                    <img src="../Img/Capa.jpg" alt="Capa de novidade 3">
+                                    <img src="../Img/Capa.jpg" alt="Capa de novidade 4">
+                                    <img src="../Img/Capa.jpg" alt="Capa de novidade 5">
+                                    <img src="../Img/Capa.jpg" alt="Capa de novidade 6">
+                                    <img src="../Img/Capa.jpg" alt="Capa de novidade 7">
+                                    <img src="../Img/Capa.jpg" alt="Capa de novidade 8">
+                                </div>
+                                <div class="novidades-pagina">
+                                    <img src="../Img/Capa.jpg" alt="Capa de novidade 9">
+                                    <img src="../Img/Capa.jpg" alt="Capa de novidade 10">
+                                    <img src="../Img/Capa.jpg" alt="Capa de novidade 11">
+                                    <img src="../Img/Capa.jpg" alt="Capa de novidade 12">
+                                    <img src="../Img/Capa.jpg" alt="Capa de novidade 13">
+                                    <img src="../Img/Capa.jpg" alt="Capa de novidade 14">
+                                    <img src="../Img/Capa.jpg" alt="Capa de novidade 15">
+                                    <img src="../Img/Capa.jpg" alt="Capa de novidade 16">
+                                </div>
+                            </div>
+                        </div>
+                        <button class="novidades-botao" type="button" aria-label="Próxima imagem">→</button>
                     </div>
                 </section>
             <script src="../JAVA/MenuLat.js"></script>

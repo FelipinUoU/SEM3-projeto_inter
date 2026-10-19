@@ -50,33 +50,33 @@ dashboardItems.forEach((item) => {
     });
 });
 
-const novidadesJanela = document.querySelector(".novidades-janela");
-const novidadesFaixa = document.querySelector(".novidades-faixa");
-const novidadesAnterior = document.getElementById("novidadesAnterior");
-const novidadesProxima = document.getElementById("novidadesProxima");
+document.querySelectorAll(".novidades, .capnovos, .recomendados").forEach((carrossel) => {
+    const janela = carrossel.querySelector(".novidades-janela");
+    const faixa = carrossel.querySelector(".novidades-faixa");
+    const [anterior, proxima] = carrossel.querySelectorAll(".novidades-botao");
 
-if (novidadesJanela && novidadesFaixa && novidadesAnterior && novidadesProxima) {
-    const todasImagens = Array.from(novidadesFaixa.querySelectorAll("img"));
-    const limiteImagens = 8;
-    todasImagens.slice(limiteImagens).forEach((imagem) => imagem.remove());
-    const paginas = Array.from(novidadesFaixa.querySelectorAll(".novidades-pagina"))
+    if (!janela || !faixa || !anterior || !proxima) {
+        return;
+    }
+
+    const paginas = Array.from(faixa.querySelectorAll(".novidades-pagina"))
         .filter((pagina) => pagina.querySelector("img"));
     let indicePagina = 0;
 
     function atualizarCarrossel() {
-        novidadesFaixa.style.transform = `translateX(${-indicePagina * novidadesJanela.clientWidth}px)`;
-        novidadesAnterior.disabled = indicePagina === 0;
-        novidadesProxima.disabled = indicePagina >= paginas.length - 1;
+        faixa.style.transform = `translateX(${-indicePagina * janela.clientWidth}px)`;
+        anterior.disabled = indicePagina === 0;
+        proxima.disabled = indicePagina >= paginas.length - 1;
     }
 
-    novidadesAnterior.addEventListener("click", () => {
+    anterior.addEventListener("click", () => {
         if (indicePagina > 0) {
             indicePagina -= 1;
             atualizarCarrossel();
         }
     });
 
-    novidadesProxima.addEventListener("click", () => {
+    proxima.addEventListener("click", () => {
         if (indicePagina < paginas.length - 1) {
             indicePagina += 1;
             atualizarCarrossel();
@@ -85,4 +85,4 @@ if (novidadesJanela && novidadesFaixa && novidadesAnterior && novidadesProxima) 
 
     window.addEventListener("resize", atualizarCarrossel);
     atualizarCarrossel();
-}
+});

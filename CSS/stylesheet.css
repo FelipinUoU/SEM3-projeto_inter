@@ -67,8 +67,66 @@ body {
   float: right;
 }
 
+.inicio-layout {
+  display: flex;
+  align-items: flex-start;
+  gap: 24px;
+  width: min(100% - 32px, 890px);
+  margin: 40px auto;
+}
+
+.categorias {
+  position: sticky;
+  top: 78px; /* 58px do cabeçalho fixo + 20px de espaço */
+  flex: 0 0 140px;
+  display: flex;
+  flex-direction: horizontal;
+  gap: 10px;
+}
+
+.categorias button {
+  padding: 12px;
+  border: 1px solid #2feeff;
+  border-radius: 19px;
+  background: #2b2c34;
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+.categorias button:hover {
+  background: #2feeff;
+  color: #2b2c34;
+}
+
+.conteudo-principal {
+  flex: 1;
+  min-width: 0;
+}
+
+.conteudo-principal .novidades,
+.conteudo-principal .capnovos,
+.conteudo-principal .recomendados {
+  width: 100%;
+  margin: 0 0 40px;
+}
+
+@media (max-width: 700px) {
+  .inicio-layout {
+    flex-direction: column;
+  }
+
+  .categorias {
+    position: static;
+    flex: auto;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+}
+
 .novidades,
-.capnovos {
+.capnovos,
+.recomendados {
   width: min(100% - 32px, 1000px);
   margin: 40px auto;
   text-align: center;
@@ -88,8 +146,8 @@ body {
 .novidades-pagina {
   flex: 0 0 100%;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .novidades-pagina img {
@@ -106,7 +164,7 @@ body {
   width: 100%;
   max-width: 1000px;
   margin: 20px auto 0;
-  gap: 16px;
+  gap: 12px;
 }
 
 .novidades-botao {
