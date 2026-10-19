@@ -153,8 +153,11 @@ searchForm?.addEventListener("submit", (event) => {
     filterCatalog();
 });
 searchInput?.addEventListener("input", filterCatalog);
+<<<<<<< HEAD
 
 filterCatalog();
 window.addEventListener("resize", () => {
     carouselStates.forEach((state) => updateCarousel(state));
 });
+=======
+>>>>>>> 1f79075dfcf99cb6d22e97d2e212235a6c7809d6

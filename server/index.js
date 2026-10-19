@@ -1,18 +1,15 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
 import { GoogleGenAI } from '@google/genai';
 import cors from 'cors';
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
-import sqlite3 from 'sqlite3';
-import { open } from 'sqlite';
-
-if (fs.existsSync('.env')) {
-  process.loadEnvFile('.env');
-}
+import mysql from 'mysql2/promise';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-const DB_PATH = path.resolve('Database', 'app.db');
 const SCHEMA_PATH = path.resolve('Database', 'schema.sql');
 const SEED_PATH = path.resolve('Database', 'seed.sql');
 const READER_DIRECTORY = path.resolve('public', 'reader');
@@ -30,6 +27,15 @@ const groqApiKey = process.env.GROQ_API_KEY;
 const groqModel = process.env.GROQ_MODEL || 'llama-3.2-11b-vision-preview';
 const providerTimeoutMs = 180000;
 
+function readSqlStatements(filePath) {
+  return fs.readFileSync(filePath, 'utf8')
+    .replace(/^\uFEFF/, '')
+    .replace(/^\s*--.*$/gm, '')
+    .split(';')
+    .map((statement) => statement.trim())
+    .filter(statement => statement.length > 0 && !/^PRAGMA\b/i.test(statement));
+}
+
 app.use(express.json({ limit: '15mb' }));
 app.use(cors({ origin: '*' }));
 app.use('/HTML', express.static(path.resolve('HTML')));
@@ -37,31 +43,65 @@ app.use('/CSS', express.static(path.resolve('CSS')));
 app.use('/JS', express.static(path.resolve('JS')));
 app.use('/reader', express.static(READER_DIRECTORY));
 
-async function initDb() {
-  const db = await open({ filename: DB_PATH, driver: sqlite3.Database });
-  const schema = fs.readFileSync(SCHEMA_PATH, 'utf8');
-  await db.exec(schema);
+const databaseName = process.env.DB_NAME || 'hokupedia';
+const mysqlConnectionOptions = {
+  host: process.env.DB_HOST || 'localhost',
+  user: process.env.DB_USER || 'root',
+  password: process.env.DB_PASSWORD || 'root',
+};
+const pool = mysql.createPool({
+  ...mysqlConnectionOptions,
+  database: databaseName,
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0
+});
 
-  const row = await db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='usuarios'");
-  if (row) {
-    const count = await db.get('SELECT COUNT(*) as c FROM usuarios');
-    if (count.c === 0) {
-      const seed = fs.readFileSync(SEED_PATH, 'utf8');
-      await db.exec('BEGIN TRANSACTION');
-      try {
-        await db.exec(seed);
-        await db.exec('COMMIT');
-      } catch (err) {
-        console.error('Seed failed', err);
-        await db.exec('ROLLBACK');
-      }
-    }
+async function ensureDatabase() {
+  const connection = await mysql.createConnection(mysqlConnectionOptions);
+  try {
+    await connection.query(
+      `CREATE DATABASE IF NOT EXISTS ${mysql.escapeId(databaseName)} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
+    );
+  } finally {
+    await connection.end();
   }
-
-  return db;
 }
 
-const dbPromise = initDb();
+async function initDb() {
+  let connection;
+  try {
+    await ensureDatabase();
+    connection = await pool.getConnection();
+    for (const statement of readSqlStatements(SCHEMA_PATH)) {
+      await connection.query(statement);
+    }
+
+    const [rows] = await connection.query("SHOW TABLES LIKE 'usuarios'");
+    if (rows.length > 0 && fs.existsSync(SEED_PATH)) {
+      const [countResult] = await connection.query('SELECT COUNT(*) as c FROM usuarios');
+      if (Number(countResult[0].c) === 0) {
+        await connection.beginTransaction();
+        try {
+          for (const statement of readSqlStatements(SEED_PATH)) {
+            await connection.query(statement);
+          }
+          await connection.commit();
+        } catch (err) {
+          console.error('Seed failed', err);
+          await connection.rollback();
+          throw err;
+        }
+      }
+    }
+    console.log('Conectado com sucesso ao MySQL e tabelas criadas!');
+  } catch (err) {
+    console.error('Erro ao inicializar o banco de dados MySQL:', err);
+    throw err;
+  } finally {
+    connection?.release();
+  }
+}
 
 const screenRoutes = {
   '/CadLog': 'CadLog.html',
@@ -86,8 +126,7 @@ app.get('/Leitura', (req, res) => {
 
 app.get('/api/health', async (req, res) => {
   try {
-    const db = await dbPromise;
-    await db.get('SELECT 1');
+    await pool.query('SELECT 1');
     res.json({ status: 'ok', database: 'connected' });
   } catch (err) {
     console.error('Health check failed:', err);
@@ -180,32 +219,7 @@ function parseProviderJson(text, responseSchema, providerName) {
   return parsed;
 }
 
-function toGroqMessages(contents, responseSchema) {
-  const userContent = [];
-  for (const content of contents) {
-    for (const part of content.parts || []) {
-      if (typeof part.text === 'string') {
-        userContent.push({ type: 'text', text: part.text });
-      }
-      if (part.inlineData?.data && part.inlineData?.mimeType) {
-        userContent.push({
-          type: 'image_url',
-          image_url: {
-            url: `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`
-          }
-        });
-      }
-    }
-  }
-
-  userContent.push({
-    type: 'text',
-    text: `Retorne apenas um objeto JSON válido que corresponda a este schema: ${JSON.stringify(responseSchema)}`
-  });
-  return [{ role: 'user', content: userContent }];
-}
-
-function toOpenAIChatMessages(contents, responseSchema) {
+function toChatCompletionMessages(contents, responseSchema) {
   const userContent = [];
   for (const content of contents) {
     for (const part of content.parts || []) {
@@ -272,9 +286,7 @@ async function generateWithProvider(provider, contents, generationConfig, respon
       : 'https://api.groq.com/openai/v1/chat/completions';
   const apiKey = isOpenAI ? openAIKey : isQwen ? qwenApiKey : groqApiKey;
   const model = isOpenAI ? openAIModel : isQwen ? qwenModel : groqModel;
-  const messages = isOpenAI || isQwen
-    ? toOpenAIChatMessages(contents, responseSchema)
-    : toGroqMessages(contents, responseSchema);
+  const messages = toChatCompletionMessages(contents, responseSchema);
   const providerResponse = await fetch(apiUrl, {
     method: 'POST',
     headers: {
@@ -391,65 +403,74 @@ app.post('/api/gemini', async (req, res) => {
 });
 
 app.post('/api/register', async (req, res) => {
-  const db = await dbPromise;
-  const { nome, idade, email, senha } = req.body;
-  if (!email || !senha) return res.status(400).json({ error: 'email and senha required' });
+  const { nome = null, idade = null, email, senha } = req.body;
+  if (!email || !senha) {
+    return res.status(400).json({ error: 'email and senha required' });
+  }
   try {
-    const result = await db.run(
+    const [result] = await pool.execute(
       'INSERT INTO usuarios (nome, idade, email, senha) VALUES (?, ?, ?, ?)',
-      [nome || null, idade || null, email, senha]
+      [nome, idade, email, senha]
     );
-    const user = await db.get(
+    const [users] = await pool.query(
       'SELECT id, nome, idade, email FROM usuarios WHERE id = ?',
-      [result.lastID]
+      [result.insertId]
     );
-    res.json({ user });
+    res.status(201).json({ user: users[0] });
   } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ error: 'Email already registered' });
+    }
     console.error(err);
     res.status(500).json({ error: 'Could not create user' });
   }
 });
 
 app.post('/api/login', async (req, res) => {
-  const db = await dbPromise;
   const { email, senha } = req.body;
   if (!email || !senha) return res.status(400).json({ error: 'email and senha required' });
   try {
-    const user = await db.get(
-      'SELECT id, nome, idade, email FROM usuarios WHERE email = ? AND senha = ?',
+    const [users] = await pool.query(
+      'SELECT id, nome, idade, email FROM usuarios WHERE email = ? AND senha = ?', 
       [email, senha]
     );
-    if (!user) return res.status(401).json({ error: 'Invalid credentials' });
-    res.json({ user });
+    if (users.length === 0) return res.status(401).json({ error: 'Invalid credentials' });
+    res.json({ user: users[0] });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Login failed' });
   }
 });
 
+// Simple endpoints to request moderation
 app.post('/api/pedido_moderacao', async (req, res) => {
-  const db = await dbPromise;
   const { usuario_id, motivos, idiomas_preferencia } = req.body;
   try {
-    const result = await db.run(
-      'INSERT INTO pedido_moderacao (usuario_id, motivos, idiomas_preferencia) VALUES (?, ?, ?)',
+    const [result] = await pool.execute(
+      'INSERT INTO pedido_moderacao (usuario_id, motivos, idiomas_preferencia) VALUES (?, ?, ?)', 
       [usuario_id, motivos, idiomas_preferencia]
     );
-    const pedido = await db.get('SELECT * FROM pedido_moderacao WHERE id = ?', [result.lastID]);
-    res.json({ pedido });
+    const [pedidos] = await pool.query('SELECT * FROM pedido_moderacao WHERE id = ?', [result.insertId]);
+    res.json({ pedido: pedidos[0] });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Could not create pedido' });
   }
 });
 
+// Admin approves pedido_obra
 app.post('/api/pedido_obra/:id/aprovar', async (req, res) => {
-  const db = await dbPromise;
-  const { id } = req.params;
+  const id = req.params.id;
   try {
-    await db.run("UPDATE pedido_obra SET status='APROVADO' WHERE id = ?", [id]);
-    const pedido = await db.get('SELECT * FROM pedido_obra WHERE id = ?', [id]);
-    res.json({ pedido });
+    const [result] = await pool.execute(
+      "UPDATE pedido_obra SET status='APROVADO' WHERE id = ?",
+      [id]
+    );
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Pedido not found' });
+    }
+    const [pedidos] = await pool.query('SELECT * FROM pedido_obra WHERE id = ?', [id]);
+    res.json({ pedido: pedidos[0] });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Could not update pedido' });
@@ -457,6 +478,8 @@ app.post('/api/pedido_obra/:id/aprovar', async (req, res) => {
 });
 
 async function startServer() {
+  await initDb();
+
   if (process.env.NODE_ENV === 'production') {
     const frontendPath = path.resolve('dist');
     app.use(express.static(frontendPath));
@@ -477,11 +500,14 @@ async function startServer() {
 
   app.listen(PORT, () => {
     console.log(`Server listening on http://localhost:${PORT}`);
-    console.log(`DB path: ${DB_PATH}`);
+    console.log(`Connected to MySQL Database: ${databaseName}`);
   });
 }
 
 startServer().catch((err) => {
+  if (err.code === 'ER_DBACCESS_DENIED_ERROR' || err.code === 'ER_ACCESS_DENIED_ERROR') {
+    console.error(`MySQL user does not have permission to create or access database "${databaseName}". Create it manually or grant CREATE privileges.`);
+  }
   console.error('Could not start server:', err);
   process.exitCode = 1;
-});
+})

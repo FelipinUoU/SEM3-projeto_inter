@@ -9,8 +9,8 @@ Este projeto é uma biblioteca de leitura (mangas, hq *por enquanto*) atualizada
 - Geovanna de Andrade
 
 
-## Banco de dados local (SQLite) e servidor de API
-Foi adicionada uma implementação simples de back-end usando SQLite e Express para suportar cadastro e login, além de tabelas baseadas no diagrama de classes.
+## Banco de dados local (MySQL) e servidor de API
+O servidor Express usa MySQL para cadastro, login e persistência dos dados. O serviço MySQL deve estar ativo. Ao iniciar, o servidor cria o banco definido em `DB_NAME` (por padrão, `hokupedia`) e as tabelas definidas em `Database/schema.sql`. O usuário MySQL configurado precisa ter permissão para criar bancos; se não tiver, crie o banco manualmente ou conceda essa permissão.
 
 Como executar (ambiente com Node.js instalado):
 
@@ -18,7 +18,17 @@ Como executar (ambiente com Node.js instalado):
 
    npm install
 
-2. Iniciar o servidor (abre a página inicial em http://localhost:3001, inicializa o banco Database/app.db, cria esquema e insere dados de exemplo):
+2. Configurar as credenciais em `.env`, na raiz do projeto:
+
+   ```env
+   DB_HOST=localhost
+   DB_USER=root
+   DB_PASSWORD=sua_senha_mysql
+   DB_NAME=hokupedia
+   PORT=3001
+   ```
+
+3. Iniciar o servidor (cria o banco e as tabelas e, se `usuarios` estiver vazia, insere dados de exemplo):
 
    npm run server
 
@@ -34,7 +44,7 @@ Obras, capítulos, capas e páginas são armazenados no `localStorage` do navega
 
 As configurações de idioma, capitalização e fonte da tradução também são salvas no navegador. O servidor mantém as chaves fora do cliente e tenta os provedores configurados nesta ordem: Gemini, OpenAI, Qwen e Groq. Para OpenAI, o modelo padrão é `gpt-4o-mini`; use `OPENAI_MODEL` para escolher outro modelo compatível com entrada de imagens e saída JSON. Para Qwen, o padrão é `qwen-vl-max`; ajuste `QWEN_MODEL` e `QWEN_API_URL` para outro modelo ou endpoint compatível. Para Groq, o padrão é `llama-3.2-11b-vision-preview`; ajuste `GROQ_MODEL` se necessário. Se todos os provedores falharem, o leitor mostra os detalhes sem expor as chaves.
 
-As análises OCR e traduções ficam em cache na memória da aba, por conteúdo de imagem e idioma. Alterar fonte ou capitalização não repete a chamada à IA.
+As análises OCR e traduções ficam em cache na memória do capítulo aberto, por conteúdo de imagem e idioma. Cada página mantém os balões traduzidos ao rolar, trocar entre os modos vertical e horizontal ou navegar para outra página do mesmo capítulo. Balões quadrados ou retangulares são identificados e recebem tradução com cantos retos. Alterar fonte ou capitalização não repete a chamada à IA; ao sair do capítulo, as traduções e o cache são descartados.
 
 O front-end é servido na raiz do mesmo endereço; assim, ao abrir http://localhost:3001, a página index é carregada. Para testar as três telas diretamente, use:
 - http://localhost:3001/CadLog

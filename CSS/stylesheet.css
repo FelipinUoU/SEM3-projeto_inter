@@ -12,61 +12,6 @@ body {
   min-height: 100vh;
 }
 
-#topo{
-  background-color: #000;
-  border-top: 1px solid #ff005d;
-  font-family: 'Arial', sans-serif;
-  color: #fff;
-  width: 300px;
-  min-height: 100vh;
-}
-
-#topo #menuBtn {
-  margin: 20px;
-  padding: 10px 20px;
-  font-size: 16px;
-  cursor: pointer;
-}
-
-.container {
-  width: min(100%, 1200px);
-  margin: 0 auto;
-  padding: 0 20px;
-}
-
-.sidebar {
-  position: fixed;
-  top: 0;
-  left: -250px;
-  width: 250px;
-  height: 100%;
-  background: #333;
-  color: white;
-  padding: 20px;
-  transition: 0.3s;
-  box-sizing: border-box;
-}
-
-.sidebar.open {
-  left: 0;
-}
-
-.sidebar a {
-  display: block;
-  color: white;
-  text-decoration: none;
-  margin: 20px 0;
-}
-
-.close-btn {
-  background: none;
-  border: none;
-  color: white;
-  font-size: 30px;
-  cursor: pointer;
-  float: right;
-}
-
 .inicio-layout {
   display: flex;
   align-items: center;
@@ -265,6 +210,7 @@ body {
   text-align: center;
 }
 
+<<<<<<< HEAD
 .carrossel-botao {
   width: 42px;
   height: 42px;
@@ -311,5 +257,10 @@ body {
 @media (max-width: 520px) {
   .obras-faixa {
     --carousel-slots: 2;
+=======
+@media (max-width: 760px) {
+  .obras-grade {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+>>>>>>> 1f79075dfcf99cb6d22e97d2e212235a6c7809d6
   }
 }
