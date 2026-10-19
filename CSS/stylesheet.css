@@ -119,12 +119,15 @@ body {
 .novidades,
 .capnovos,
 .recomendados {
-  width: min(100% - 30px, 1180px);
+  width: min(100% - 30px, 1100px);
   margin: 30px auto 0;
   padding: 18px 0 12px;
-  background: #3d3d3d;
-  border-radius: 0;
+  background: #34313b;
   text-align: center;
+}
+
+.novidades {
+  background: #2b2c34;
 }
 
 .novidades h2,
@@ -136,23 +139,57 @@ body {
   letter-spacing: 0.04em;
 }
 
-.obras-grade {
+.carrossel-controles {
+  --carousel-gap: clamp(12px, 2.5vw, 30px);
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 18px;
+  grid-template-columns: 42px minmax(0, 1fr) 42px;
+  align-items: center;
+  gap: clamp(8px, 1.5vw, 18px);
+  width: min(100%, 1100px);
+  margin: 18px auto 0;
   padding: 0 12px;
 }
 
-.obra-card {
+.carrossel-janela {
   min-width: 0;
+  overflow: hidden;
+}
+
+.obras-faixa {
+  --carousel-slots: 5;
+  display: flex;
+  align-items: stretch;
+  gap: var(--carousel-gap);
+  transition: transform 0.35s ease;
+  will-change: transform;
+}
+
+.obras-faixa.is-short {
+  justify-content: center;
+}
+
+.obra-card {
+  flex: 0 0 calc((100% - (var(--carousel-slots) - 1) * var(--carousel-gap)) / var(--carousel-slots));
+  min-width: 0;
+  padding: 0 0 8px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.18s ease;
+}
+
+.obra-card:hover {
+  transform: translateY(-2px);
 }
 
 .obra-card img {
   display: block;
   width: 100%;
-  aspect-ratio: 0.7;
-  object-fit: cover;
-  border-radius: 10px;
+  height: auto;
+  object-fit: contain;
+  border-radius: 3px;
   background: #d7d7d7;
 }
 
@@ -173,8 +210,57 @@ body {
   text-align: center;
 }
 
+<<<<<<< HEAD
+.carrossel-botao {
+  width: 42px;
+  height: 42px;
+  border: 0;
+  border-radius: 50%;
+  background: #08080b;
+  color: #918a9f;
+  font: 36px/1 Arial, sans-serif;
+  cursor: pointer;
+  transition: background-color 0.18s ease, color 0.18s ease, opacity 0.18s ease;
+}
+
+.carrossel-botao:hover:not(:disabled) {
+  background: #a832ff;
+  color: #fff;
+}
+
+.carrossel-botao:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+}
+
+.carrossel-botao:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+@media (max-width: 760px) {
+  .carrossel-controles {
+    grid-template-columns: 36px minmax(0, 1fr) 36px;
+    gap: 8px;
+  }
+
+  .carrossel-botao {
+    width: 36px;
+    height: 36px;
+  }
+
+  .obras-faixa {
+    --carousel-slots: 3;
+  }
+}
+
+@media (max-width: 520px) {
+  .obras-faixa {
+    --carousel-slots: 2;
+=======
 @media (max-width: 760px) {
   .obras-grade {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+>>>>>>> 1f79075dfcf99cb6d22e97d2e212235a6c7809d6
   }
 }
