@@ -1,3 +1,13 @@
+<<<<<<< HEAD
+import dotenv from 'dotenv';
+dotenv.config();
+
+import express from 'express';
+import fs from 'fs';
+import path from 'path';
+import mysql from 'mysql2/promise';
+import cors from 'cors';
+=======
 import { GoogleGenAI } from '@google/genai';
 import cors from 'cors';
 import express from 'express';
@@ -9,10 +19,10 @@ import { open } from 'sqlite';
 if (fs.existsSync('.env')) {
   process.loadEnvFile('.env');
 }
+>>>>>>> 267cee2cc36920ca59c644f1d87a602cd011e3d5
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-const DB_PATH = path.resolve('Database', 'app.db');
 const SCHEMA_PATH = path.resolve('Database', 'schema.sql');
 const SEED_PATH = path.resolve('Database', 'seed.sql');
 const READER_DIRECTORY = path.resolve('public', 'reader');
@@ -30,14 +40,46 @@ const groqApiKey = process.env.GROQ_API_KEY;
 const groqModel = process.env.GROQ_MODEL || 'llama-3.2-11b-vision-preview';
 const providerTimeoutMs = 180000;
 
+<<<<<<< HEAD
+function readSqlStatements(filePath) {
+  return fs.readFileSync(filePath, 'utf8')
+    .replace(/^\s*--.*$/gm, '')
+    .split(';')
+    .map(statement => statement.trim())
+    .filter(statement => statement.length > 0 && !/^PRAGMA\b/i.test(statement));
+}
+
+app.use(express.json());
+=======
 app.use(express.json({ limit: '15mb' }));
+>>>>>>> 267cee2cc36920ca59c644f1d87a602cd011e3d5
 app.use(cors({ origin: '*' }));
 app.use('/HTML', express.static(path.resolve('HTML')));
 app.use('/CSS', express.static(path.resolve('CSS')));
 app.use('/JS', express.static(path.resolve('JS')));
 app.use('/reader', express.static(READER_DIRECTORY));
 
+// Configuração da pool de conexões com MySQL usando o .env
+const pool = mysql.createPool({
+  host: process.env.DB_HOST || 'localhost',
+  user: process.env.DB_USER || 'root',
+  password: process.env.DB_PASSWORD || 'root',
+  database: process.env.DB_NAME || 'hokupedia',
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0
+});
+
 async function initDb() {
+<<<<<<< HEAD
+  let connection;
+  try {
+    connection = await pool.getConnection();
+    
+    if (fs.existsSync(SCHEMA_PATH)) {
+      for (const statement of readSqlStatements(SCHEMA_PATH)) {
+        await connection.query(statement);
+=======
   const db = await open({ filename: DB_PATH, driver: sqlite3.Database });
   const schema = fs.readFileSync(SCHEMA_PATH, 'utf8');
   await db.exec(schema);
@@ -54,14 +96,44 @@ async function initDb() {
       } catch (err) {
         console.error('Seed failed', err);
         await db.exec('ROLLBACK');
+>>>>>>> 267cee2cc36920ca59c644f1d87a602cd011e3d5
       }
     }
+
+    // Verifica se a tabela usuarios tem registros para aplicar o seed
+    const [rows] = await connection.query("SHOW TABLES LIKE 'usuarios'");
+    if (rows.length > 0) {
+      const [countResult] = await connection.query('SELECT COUNT(*) as c FROM usuarios');
+      if (countResult[0].c === 0 && fs.existsSync(SEED_PATH)) {
+        await connection.beginTransaction();
+        try {
+          for (const statement of readSqlStatements(SEED_PATH)) {
+            await connection.query(statement);
+          }
+          await connection.commit();
+        } catch (err) {
+          console.error('Seed failed', err);
+          await connection.rollback();
+          throw err;
+        }
+      }
+    }
+    console.log('Conectado com sucesso ao MySQL e tabelas criadas!');
+  } catch (err) {
+    console.error('Erro ao inicializar o banco de dados MySQL:', err);
+    throw err;
+  } finally {
+    connection?.release();
   }
+<<<<<<< HEAD
+};
+=======
 
   return db;
 }
 
 const dbPromise = initDb();
+>>>>>>> 267cee2cc36920ca59c644f1d87a602cd011e3d5
 
 const screenRoutes = {
   '/CadLog': 'CadLog.html',
@@ -86,8 +158,9 @@ app.get('/Leitura', (req, res) => {
 
 app.get('/api/health', async (req, res) => {
   try {
-    const db = await dbPromise;
-    await db.get('SELECT 1');
+    const connection = await pool.getConnection();
+    await connection.query('SELECT 1');
+    connection.release();
     res.json({ status: 'ok', database: 'connected' });
   } catch (err) {
     console.error('Health check failed:', err);
@@ -180,32 +253,7 @@ function parseProviderJson(text, responseSchema, providerName) {
   return parsed;
 }
 
-function toGroqMessages(contents, responseSchema) {
-  const userContent = [];
-  for (const content of contents) {
-    for (const part of content.parts || []) {
-      if (typeof part.text === 'string') {
-        userContent.push({ type: 'text', text: part.text });
-      }
-      if (part.inlineData?.data && part.inlineData?.mimeType) {
-        userContent.push({
-          type: 'image_url',
-          image_url: {
-            url: `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`
-          }
-        });
-      }
-    }
-  }
-
-  userContent.push({
-    type: 'text',
-    text: `Retorne apenas um objeto JSON válido que corresponda a este schema: ${JSON.stringify(responseSchema)}`
-  });
-  return [{ role: 'user', content: userContent }];
-}
-
-function toOpenAIChatMessages(contents, responseSchema) {
+function toChatCompletionMessages(contents, responseSchema) {
   const userContent = [];
   for (const content of contents) {
     for (const part of content.parts || []) {
@@ -272,9 +320,7 @@ async function generateWithProvider(provider, contents, generationConfig, respon
       : 'https://api.groq.com/openai/v1/chat/completions';
   const apiKey = isOpenAI ? openAIKey : isQwen ? qwenApiKey : groqApiKey;
   const model = isOpenAI ? openAIModel : isQwen ? qwenModel : groqModel;
-  const messages = isOpenAI || isQwen
-    ? toOpenAIChatMessages(contents, responseSchema)
-    : toGroqMessages(contents, responseSchema);
+  const messages = toChatCompletionMessages(contents, responseSchema);
   const providerResponse = await fetch(apiUrl, {
     method: 'POST',
     headers: {
@@ -391,10 +437,19 @@ app.post('/api/gemini', async (req, res) => {
 });
 
 app.post('/api/register', async (req, res) => {
-  const db = await dbPromise;
-  const { nome, idade, email, senha } = req.body;
-  if (!email || !senha) return res.status(400).json({ error: 'email and senha required' });
+  const { email, senha } = req.body;
+  if (!email || !senha) {
+    return res.status(400).json({ error: 'email and senha required' });
+  }
   try {
+<<<<<<< HEAD
+    const [result] = await pool.execute(
+      'INSERT INTO usuarios ( email, senha) VALUES ( ?, ?)', 
+      [email, senha]
+    );
+    const [users] = await pool.query('SELECT id, email FROM usuarios WHERE id = ?', [result.insertId]);
+    res.json({ user: users[0] });
+=======
     const result = await db.run(
       'INSERT INTO usuarios (nome, idade, email, senha) VALUES (?, ?, ?, ?)',
       [nome || null, idade || null, email, senha]
@@ -404,52 +459,80 @@ app.post('/api/register', async (req, res) => {
       [result.lastID]
     );
     res.json({ user });
+>>>>>>> 267cee2cc36920ca59c644f1d87a602cd011e3d5
   } catch (err) {
     console.error(err);
+    // IMPORTANTE: Sempre retorne JSON aqui, nunca .send() puro com texto
     res.status(500).json({ error: 'Could not create user' });
   }
 });
 
 app.post('/api/login', async (req, res) => {
-  const db = await dbPromise;
   const { email, senha } = req.body;
   if (!email || !senha) return res.status(400).json({ error: 'email and senha required' });
   try {
+<<<<<<< HEAD
+    const [users] = await pool.query(
+      'SELECT id, nome, idade, email FROM usuarios WHERE email = ? AND senha = ?', 
+      [email, senha]
+    );
+    if (users.length === 0) return res.status(401).json({ error: 'Invalid credentials' });
+    res.json({ user: users[0] });
+=======
     const user = await db.get(
       'SELECT id, nome, idade, email FROM usuarios WHERE email = ? AND senha = ?',
       [email, senha]
     );
     if (!user) return res.status(401).json({ error: 'Invalid credentials' });
     res.json({ user });
+>>>>>>> 267cee2cc36920ca59c644f1d87a602cd011e3d5
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Login failed' });
   }
 });
 
+<<<<<<< HEAD
+// Simple endpoints to request moderation
+=======
+>>>>>>> 267cee2cc36920ca59c644f1d87a602cd011e3d5
 app.post('/api/pedido_moderacao', async (req, res) => {
-  const db = await dbPromise;
   const { usuario_id, motivos, idiomas_preferencia } = req.body;
   try {
+<<<<<<< HEAD
+    const [result] = await pool.execute(
+      'INSERT INTO pedido_moderacao (usuario_id, motivos, idiomas_preferencia) VALUES (?, ?, ?)', 
+      [usuario_id, motivos, idiomas_preferencia]
+    );
+    const [pedidos] = await pool.query('SELECT * FROM pedido_moderacao WHERE id = ?', [result.insertId]);
+    res.json({ pedido: pedidos[0] });
+=======
     const result = await db.run(
       'INSERT INTO pedido_moderacao (usuario_id, motivos, idiomas_preferencia) VALUES (?, ?, ?)',
       [usuario_id, motivos, idiomas_preferencia]
     );
     const pedido = await db.get('SELECT * FROM pedido_moderacao WHERE id = ?', [result.lastID]);
     res.json({ pedido });
+>>>>>>> 267cee2cc36920ca59c644f1d87a602cd011e3d5
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Could not create pedido' });
   }
 });
 
+<<<<<<< HEAD
+// Admin approves pedido_obra
+app.post('/api/pedido_obra/:id/aprovar', async (req, res) => {
+  const id = req.params.id;
+=======
 app.post('/api/pedido_obra/:id/aprovar', async (req, res) => {
   const db = await dbPromise;
   const { id } = req.params;
+>>>>>>> 267cee2cc36920ca59c644f1d87a602cd011e3d5
   try {
-    await db.run("UPDATE pedido_obra SET status='APROVADO' WHERE id = ?", [id]);
-    const pedido = await db.get('SELECT * FROM pedido_obra WHERE id = ?', [id]);
-    res.json({ pedido });
+    await pool.execute("UPDATE pedido_obra SET status='APROVADO' WHERE id = ?", [id]);
+    const [pedidos] = await pool.query('SELECT * FROM pedido_obra WHERE id = ?', [id]);
+    res.json({ pedido: pedidos[0] });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Could not update pedido' });
@@ -457,6 +540,8 @@ app.post('/api/pedido_obra/:id/aprovar', async (req, res) => {
 });
 
 async function startServer() {
+  await initDb();
+
   if (process.env.NODE_ENV === 'production') {
     const frontendPath = path.resolve('dist');
     app.use(express.static(frontendPath));
@@ -477,11 +562,11 @@ async function startServer() {
 
   app.listen(PORT, () => {
     console.log(`Server listening on http://localhost:${PORT}`);
-    console.log(`DB path: ${DB_PATH}`);
+    console.log(`Connected to MySQL Database: ${process.env.DB_NAME || 'hokupedia'}`);
   });
 }
 
 startServer().catch((err) => {
   console.error('Could not start server:', err);
   process.exitCode = 1;
-});
+})

@@ -12,61 +12,6 @@ body {
   min-height: 100vh;
 }
 
-#topo{
-  background-color: #000;
-  border-top: 1px solid #ff005d;
-  font-family: 'Arial', sans-serif;
-  color: #fff;
-  width: 300px;
-  min-height: 100vh;
-}
-
-#topo #menuBtn {
-  margin: 20px;
-  padding: 10px 20px;
-  font-size: 16px;
-  cursor: pointer;
-}
-
-.container {
-  width: min(100%, 1200px);
-  margin: 0 auto;
-  padding: 0 20px;
-}
-
-.sidebar {
-  position: fixed;
-  top: 0;
-  left: -250px;
-  width: 250px;
-  height: 100%;
-  background: #333;
-  color: white;
-  padding: 20px;
-  transition: 0.3s;
-  box-sizing: border-box;
-}
-
-.sidebar.open {
-  left: 0;
-}
-
-.sidebar a {
-  display: block;
-  color: white;
-  text-decoration: none;
-  margin: 20px 0;
-}
-
-.close-btn {
-  background: none;
-  border: none;
-  color: white;
-  font-size: 30px;
-  cursor: pointer;
-  float: right;
-}
-
 .inicio-layout {
   display: flex;
   align-items: center;
@@ -95,6 +40,12 @@ body {
 }
 
 .categorias button:hover {
+  background: #fff;
+  color: #1f2025;
+  border-color: #fff;
+}
+
+.categorias button[aria-pressed="true"] {
   background: #fff;
   color: #1f2025;
   border-color: #fff;
@@ -185,27 +136,18 @@ body {
   letter-spacing: 0.04em;
 }
 
-.novidades-janela {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  background: transparent;
-}
-
-.novidades-faixa {
-  display: flex;
-  transition: transform 0.35s ease;
-}
-
-.novidades-pagina {
-  flex: 0 0 100%;
+.obras-grade {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 18px;
   padding: 0 12px;
 }
 
-.novidades-pagina img {
+.obra-card {
+  min-width: 0;
+}
+
+.obra-card img {
   display: block;
   width: 100%;
   aspect-ratio: 0.7;
@@ -214,50 +156,25 @@ body {
   background: #d7d7d7;
 }
 
-.novidades-controles {
-  display: grid;
-  grid-template-columns: 42px minmax(0, 1fr) 42px;
-  align-items: center;
-  gap: 10px;
-  width: min(100%, 1120px);
-  margin: 0 auto;
-}
-
-.novidades-botao {
-  width: 42px;
-  height: 42px;
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  border-radius: 50%;
-  background: rgba(14, 14, 14, 0.8);
+.obra-card h3 {
+  margin-top: 8px;
   color: #fff;
-  font-size: 22px;
-  line-height: 1;
-  cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+  font: 600 1rem/1.3 Arial, sans-serif;
 }
 
-.novidades-botao:hover:not(:disabled) {
-  background: #fff;
-  color: #1d1d1d;
+.obra-card p {
+  margin-top: 4px;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 0.9rem;
 }
 
-.novidades-botao:focus-visible {
-  outline: 2px solid #fff;
-  outline-offset: 3px;
-}
-
-.novidades-botao:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
+.catalogo-vazio {
+  margin: 30px auto;
+  text-align: center;
 }
 
 @media (max-width: 760px) {
-  .novidades-pagina {
+  .obras-grade {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .novidades-controles {
-    grid-template-columns: 36px minmax(0, 1fr) 36px;
-    gap: 8px;
   }
 }

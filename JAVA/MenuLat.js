@@ -36,45 +36,44 @@ dashboardItems.forEach((item) => {
     });
 });
 
-document.querySelectorAll(".categorias [data-href]").forEach((item) => {
-    item.addEventListener("click", () => {
-        window.location.href = item.dataset.href;
+const categoryFilters = document.querySelectorAll("[data-category-filter]");
+const catalogCards = document.querySelectorAll(".obra-card[data-category]");
+const catalogSections = document.querySelectorAll(".catalogo > section");
+const searchForm = document.querySelector(".barra-pesquisa");
+const searchInput = searchForm?.querySelector('input[type="search"]');
+const emptyCatalogMessage = document.querySelector(".catalogo-vazio");
+let selectedCategory = "all";
+
+function filterCatalog() {
+    const query = searchInput?.value.trim().toLocaleLowerCase("pt-BR") ?? "";
+
+    catalogCards.forEach((card) => {
+        const matchesCategory = selectedCategory === "all" || card.dataset.category === selectedCategory;
+        const matchesSearch = card.textContent.toLocaleLowerCase("pt-BR").includes(query);
+        card.hidden = !matchesCategory || !matchesSearch;
+    });
+
+    catalogSections.forEach((section) => {
+        section.hidden = !section.querySelector(".obra-card:not([hidden])");
+    });
+
+    if (emptyCatalogMessage) {
+        emptyCatalogMessage.hidden = Array.from(catalogCards).some((card) => !card.hidden);
+    }
+}
+
+categoryFilters.forEach((filter) => {
+    filter.addEventListener("click", () => {
+        selectedCategory = filter.dataset.categoryFilter;
+        categoryFilters.forEach((button) => {
+            button.setAttribute("aria-pressed", String(button === filter));
+        });
+        filterCatalog();
     });
 });
 
-document.querySelectorAll(".novidades, .capnovos, .recomendados").forEach((carrossel) => {
-    const janela = carrossel.querySelector(".novidades-janela");
-    const faixa = carrossel.querySelector(".novidades-faixa");
-    const [anterior, proxima] = carrossel.querySelectorAll(".novidades-botao");
-
-    if (!janela || !faixa || !anterior || !proxima) {
-        return;
-    }
-
-    const paginas = Array.from(faixa.querySelectorAll(".novidades-pagina"))
-        .filter((pagina) => pagina.querySelector("img"));
-    let indicePagina = 0;
-
-    function atualizarCarrossel() {
-        faixa.style.transform = `translateX(${-indicePagina * janela.clientWidth}px)`;
-        anterior.disabled = indicePagina === 0;
-        proxima.disabled = indicePagina >= paginas.length - 1;
-    }
-
-    anterior.addEventListener("click", () => {
-        if (indicePagina > 0) {
-            indicePagina -= 1;
-            atualizarCarrossel();
-        }
-    });
-
-    proxima.addEventListener("click", () => {
-        if (indicePagina < paginas.length - 1) {
-            indicePagina += 1;
-            atualizarCarrossel();
-        }
-    });
-
-    window.addEventListener("resize", atualizarCarrossel);
-    atualizarCarrossel();
+searchForm?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    filterCatalog();
 });
+searchInput?.addEventListener("input", filterCatalog);

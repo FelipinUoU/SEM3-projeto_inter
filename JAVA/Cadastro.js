@@ -1,61 +1,72 @@
-const formCadastro = document.getElementById("formCadastro");
 
+const formCadastro = document.getElementById("formCadastro");
 const formLogin = document.getElementById("formLogin");
+const btnLogin = document.getElementById("btnLogin");
+const apiBaseUrl = window.location.protocol === "file:" ? "http://localhost:3001" : "";
 
 if (btnLogin) {
     btnLogin.addEventListener("click", function () {
-        window.location.href = "/HTML/Login.html";
+        window.location.href = new URL("../HTML/Login.html", import.meta.url).href;
     });
 }
 
-formCadastro.addEventListener("submit", async function(event) {
+if (formCadastro) {
+    formCadastro.addEventListener("submit", async function (event) {
+        event.preventDefault();
 
-    event.preventDefault();
+        const email = document.getElementById("email").value.trim();
+        const confirmarEmail = document.getElementById("confirmarEmail").value.trim();
 
-    const email = document.getElementById("email").value;
-    const confirmarEmail = document.getElementById("confirmarEmail").value;
+        const senha = document.getElementById("senha").value;
+        const confirmarSenha = document.getElementById("confirmarSenha").value;
 
-    const senha = document.getElementById("senha").value;
-    const confirmarSenha = document.getElementById("confirmarSenha").value;
+        // Verifica se os e-mails são iguais.
+        if (email.toLowerCase() !== confirmarEmail.toLowerCase()) {
+            alert("Os e-mails não são iguais.");
+            return;
+        }
 
+        // Verifica se as senhas são iguais.
+        if (senha !== confirmarSenha) {
+            alert("As senhas não são iguais.");
+            return;
+        }
 
-    // Verifica se os e-mails são iguais
+        try {
+            const resp = await fetch(`${apiBaseUrl}/api/register`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    email,
+                    confirmarEmail,
+                    senha,
+                    confirmarSenha
+                })
+            });
 
-    if (email !== confirmarEmail) {
+            const contentType = resp.headers.get("content-type") || "";
+            const data = contentType.includes("application/json") ? await resp.json() : null;
 
-        alert("Os e-mails não são iguais.");
-        
-        return;
-    }
+            if (!data) {
+                throw new Error(`Resposta inesperada do servidor (HTTP ${resp.status}). Confirme que a API está ativa na porta 3001.`);
+            }
 
-    // Verifica se as senhas são iguais
+            if (!resp.ok) {
+                throw new Error(data.mensagem || data.error || "Erro no cadastro.");
+            }
 
-    if (senha !== confirmarSenha) {
+            alert(data.mensagem || "Cadastro realizado com sucesso!");
 
-        alert("As senhas não são iguais.");
+            formCadastro.reset();
 
-        return;
-    }
+            // Redireciona para a tela de login.
+            window.location.href = new URL("../HTML/Login.html", import.meta.url).href;
 
-    
-
-    // Enviar para o backend
-    try {
-        const resp = await fetch('/api/register', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ nome: null, idade: null, email, senha })
-        });
-
-        const data = await resp.json();
-        if (!resp.ok) throw new Error(data.error || 'Erro no cadastro');
-
-        alert('Cadastro realizado com sucesso! Faça login para continuar.');
-        // redireciona para login
-        //window.location.href = '../HTML/Login.html';
-
-    } catch (err) {
-        console.error(err);
-        alert('Erro ao cadastrar: ' + err.message);
-    }
-});
+        } catch (err) {
+            console.error("Erro no cadastro:", err);
+            alert("Erro ao cadastrar: " + err.message);
+        }
+    });
+}
