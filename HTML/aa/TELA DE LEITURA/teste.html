@@ -5,15 +5,36 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HokuPédia - Leitura</title>
     <link rel="stylesheet" href="teste.css">
+    <link rel="stylesheet" href="../../../CSS/MenuLat.css">
 </head>
 <body>
 
     <!-- Header do Site -->
-    <header>
-        <div class="menu-icon">☰</div>
+    <header class="menu-lateral-header">
+        <button class="menu-lateral-button" id="menuBtn" type="button" aria-label="Abrir dashboard" aria-expanded="false" aria-controls="dashboard">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
         <div class="logo">HokuPédia</div>
-        <div class="user-avatar">H</div>
+        <div class="boxbody">
+            <a href="/HTML/Biblioteca.html" aria-label="Abrir biblioteca">
+                <img src="../../../Img/PerfilExemplo.svg" alt="Avatar do perfil">
+            </a>
+        </div>
     </header>
+    <button class="menu-lateral-overlay" id="menuOverlay" type="button" aria-label="Fechar dashboard" hidden></button>
+    <aside class="menu-lateral-dashboard" id="dashboard" aria-labelledby="dashboardTitle" aria-hidden="true" inert>
+        <div class="menu-lateral-dashboard-header">
+            <h2 id="dashboardTitle">HokuPedia</h2>
+            <button class="menu-lateral-close" id="closeDashboard" type="button" aria-label="Fechar dashboard">×</button>
+        </div>
+        <nav class="menu-lateral-items" aria-label="Itens do dashboard">
+            <button class="menu-lateral-item" type="button" data-href="/HTML/Login.html">Login</button>
+            <button class="menu-lateral-item" type="button" data-href="/HTML/Biblioteca.html">Biblioteca</button>
+            <button class="menu-lateral-item" type="button" data-href="/HTML/Usuario.html">Home</button>
+        </nav>
+    </aside>
 
     <!-- Conteúdo da Página / Leitura -->
     <div class="main-container">
@@ -148,5 +169,6 @@
     </div>
 
     <script type="module" src="teste.js"></script>
+    <script type="module" src="../../../JAVA/MenuLat.js"></script>
 </body>
 </html>
