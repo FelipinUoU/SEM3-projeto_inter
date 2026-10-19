@@ -69,60 +69,58 @@ body {
 
 .inicio-layout {
   display: flex;
-  align-items: flex-start;
-  gap: 24px;
-  width: min(100% - 32px, 890px);
-  margin: 40px auto;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;    
+  width: min(100% - 24px, 1180px);
+  margin: 14px auto 0;
 }
 
 .categorias {
-  position: sticky;
-  top: 78px; /* 58px do cabeçalho fixo + 20px de espaço */
-  flex: 0 0 140px;
   display: flex;
-  flex-direction: horizontal;
-  gap: 10px;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: nowrap;
 }
 
 .categorias button {
-  padding: 12px;
-  border: 1px solid #2feeff;
-  border-radius: 19px;
-  background: #2b2c34;
+  padding: 10px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 18px;
+  background: #1f2025;
   color: #fff;
-  font: inherit;
+  font: 600 0.95rem/1.2 Arial, sans-serif;
   cursor: pointer;
+  transition: all 0.2s ease;
 }
 
 .categorias button:hover {
-  background: #2feeff;
-  color: #2b2c34;
+  background: #fff;
+  color: #1f2025;
+  border-color: #fff;
 }
 
 .barra-pesquisa {
-  flex: 1;
-  min-width: 0;
+  margin-left: auto;
   display: flex;
-  justify-content: flex-end;
   align-items: center;
+  justify-content: flex-end;
 }
 
 .barra-pesquisa input {
-  width: min(100%, 320px);
-  min-width: 0;
-  height: 42px;
-  padding: 0 14px;
-  border: 1px solid rgba(47, 238, 255, 0.7);
+  width: min(100%, 330px);
+  height: 40px;
+  padding: 0 16px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
   border-right: 0;
-  border-radius: 21px 0 0 21px;
-  outline: none;
-  background: #353641;
+  border-radius: 20px 0 0 20px;
+  background: #303238;
   color: #fff;
   font: inherit;
 }
 
 .barra-pesquisa input::placeholder {
-  color: rgba(255, 255, 255, 0.65);
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .barra-pesquisa input:focus-visible {
@@ -131,33 +129,38 @@ body {
 }
 
 .barra-pesquisa button {
-  flex: 0 0 46px;
-  height: 42px;
-  border: 1px solid #2feeff;
-  border-radius: 0 21px 21px 0;
-  background: #2feeff;
-  color: #2b2c34;
-  font-size: 25px;
+  width: 42px;
+  height: 40px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 0 20px 20px 0;
+  background: #f4f4f4;
+  color: #1b1c20;
+  font-size: 24px;
+  line-height: 1;
   cursor: pointer;
 }
 
 .barra-pesquisa button:hover {
-  background: #fff;
+  background: #d7d7d7;
 }
 
 @media (max-width: 700px) {
   .inicio-layout {
     flex-direction: column;
+    align-items: stretch;
   }
 
   .categorias {
-    position: static;
-    flex: auto;
-    flex-direction: row;
+    justify-content: center;
     flex-wrap: wrap;
   }
 
   .barra-pesquisa {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .barra-pesquisa input {
     width: 100%;
   }
 }
@@ -165,15 +168,28 @@ body {
 .novidades,
 .capnovos,
 .recomendados {
-  width: min(100% - 32px, 1000px);
-  margin: 40px auto;
+  width: min(100% - 30px, 1180px);
+  margin: 30px auto 0;
+  padding: 18px 0 12px;
+  background: #3d3d3d;
+  border-radius: 0;
   text-align: center;
+}
+
+.novidades h2,
+.capnovos h2,
+.recomendados h2 {
+  margin: 0 0 10px;
+  color: #fff;
+  font: bold clamp(1.7rem, 2vw, 3rem) Georgia, serif;
+  letter-spacing: 0.04em;
 }
 
 .novidades-janela {
   flex: 1;
   min-width: 0;
   overflow: hidden;
+  background: transparent;
 }
 
 .novidades-faixa {
@@ -184,42 +200,45 @@ body {
 .novidades-pagina {
   flex: 0 0 100%;
   display: grid;
-  grid-template-columns: repeat(8, minmax(0, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 18px;
+  padding: 0 12px;
 }
 
 .novidades-pagina img {
   display: block;
   width: 100%;
-  aspect-ratio: 11.2 / 17.4;
+  aspect-ratio: 0.7;
   object-fit: cover;
-  border-radius: 8px;
+  border-radius: 10px;
+  background: #d7d7d7;
 }
 
 .novidades-controles {
-  display: flex;
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) 42px;
   align-items: center;
-  width: 100%;
-  max-width: 1000px;
-  margin: 20px auto 0;
-  gap: 12px;
+  gap: 10px;
+  width: min(100%, 1120px);
+  margin: 0 auto;
 }
 
 .novidades-botao {
-  flex: 0 0 40px;
-  width: 40px;
-  height: 40px;
-  border: 1px solid #2feeff;
+  width: 42px;
+  height: 42px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
   border-radius: 50%;
-  background: #2b2c34;
+  background: rgba(14, 14, 14, 0.8);
   color: #fff;
   font-size: 22px;
+  line-height: 1;
   cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
 }
 
 .novidades-botao:hover:not(:disabled) {
-  background: #2feeff;
-  color: #2b2c34;
+  background: #fff;
+  color: #1d1d1d;
 }
 
 .novidades-botao:focus-visible {
@@ -230,4 +249,15 @@ body {
 .novidades-botao:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+@media (max-width: 760px) {
+  .novidades-pagina {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .novidades-controles {
+    grid-template-columns: 36px minmax(0, 1fr) 36px;
+    gap: 8px;
+  }
 }
