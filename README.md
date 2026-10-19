@@ -9,8 +9,8 @@ Este projeto é uma biblioteca de leitura (mangas, hq *por enquanto*) atualizada
 - Geovanna de Andrade
 
 
-## Banco de dados local (SQLite) e servidor de API
-Foi adicionada uma implementação simples de back-end usando SQLite e Express para suportar cadastro e login, além de tabelas baseadas no diagrama de classes.
+## Banco de dados local (MySQL) e servidor de API
+O servidor Express usa MySQL para cadastro, login e persistência dos dados. O serviço MySQL deve estar ativo e o banco `hokupedia` deve existir antes de iniciar o servidor. As tabelas são criadas automaticamente a partir de `Database/schema.sql`.
 
 Como executar (ambiente com Node.js instalado):
 
@@ -18,7 +18,23 @@ Como executar (ambiente com Node.js instalado):
 
    npm install
 
-2. Iniciar o servidor (abre a página inicial em http://localhost:3001, inicializa o banco Database/app.db, cria esquema e insere dados de exemplo):
+2. Criar o banco no MySQL, se ainda não existir:
+
+   ```sql
+   CREATE DATABASE hokupedia CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+   ```
+
+3. Configurar as credenciais em `.env`, na raiz do projeto:
+
+   ```env
+   DB_HOST=localhost
+   DB_USER=root
+   DB_PASSWORD=sua_senha_mysql
+   DB_NAME=hokupedia
+   PORT=3001
+   ```
+
+4. Iniciar o servidor (cria as tabelas e, se `usuarios` estiver vazia, insere dados de exemplo):
 
    npm run server
 
