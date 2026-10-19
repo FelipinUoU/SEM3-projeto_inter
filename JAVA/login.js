@@ -7,7 +7,7 @@ const apiBaseUrl = window.location.protocol === "file:" ? "http://localhost:3001
 
 if (btnCadastro) {
     btnCadastro.addEventListener("click", function () {
-        window.location.href = new URL("../HTML/Cadastro.html", import.meta.url).href;
+        window.location.href = new URL("../HTML/Cadastro.html", document.baseURI).href;
     });
 }
 
@@ -41,19 +41,7 @@ formLogin?.addEventListener("submit", async function (event) {
 
         alert('Login realizado com sucesso!');
         sessionStorage.setItem('user', JSON.stringify(data.user));
-<<<<<<< HEAD
         window.location.href = '/';
-=======
-<<<<<<< HEAD
-        window.location.href = new URL("../HTML/Usuario.html", import.meta.url).href;
-=======
-<<<<<<< HEAD
-        window.location.href = '/index.html';
-=======
-        window.location.href = '/HTML/Usuario.html';
->>>>>>> 8cd0986909a285651add6a2fd2d2718708ba32e6
->>>>>>> 267cee2cc36920ca59c644f1d87a602cd011e3d5
->>>>>>> 4c0b09409fe9364abaa5d208d8548f39b22b7843
 
     } catch (err) {
         console.error(err);

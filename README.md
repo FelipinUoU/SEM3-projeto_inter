@@ -10,7 +10,7 @@ Este projeto é uma biblioteca de leitura (mangas, hq *por enquanto*) atualizada
 
 
 ## Banco de dados local (MySQL) e servidor de API
-O servidor Express usa MySQL para cadastro, login e persistência dos dados. O serviço MySQL deve estar ativo e o banco `hokupedia` deve existir antes de iniciar o servidor. As tabelas são criadas automaticamente a partir de `Database/schema.sql`.
+O servidor Express usa MySQL para cadastro, login e persistência dos dados. O serviço MySQL deve estar ativo. Ao iniciar, o servidor cria o banco definido em `DB_NAME` (por padrão, `hokupedia`) e as tabelas definidas em `Database/schema.sql`. O usuário MySQL configurado precisa ter permissão para criar bancos; se não tiver, crie o banco manualmente ou conceda essa permissão.
 
 Como executar (ambiente com Node.js instalado):
 
@@ -18,13 +18,7 @@ Como executar (ambiente com Node.js instalado):
 
    npm install
 
-2. Criar o banco no MySQL, se ainda não existir:
-
-   ```sql
-   CREATE DATABASE hokupedia CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-   ```
-
-3. Configurar as credenciais em `.env`, na raiz do projeto:
+2. Configurar as credenciais em `.env`, na raiz do projeto:
 
    ```env
    DB_HOST=localhost
@@ -34,7 +28,7 @@ Como executar (ambiente com Node.js instalado):
    PORT=3001
    ```
 
-4. Iniciar o servidor (cria as tabelas e, se `usuarios` estiver vazia, insere dados de exemplo):
+3. Iniciar o servidor (cria o banco e as tabelas e, se `usuarios` estiver vazia, insere dados de exemplo):
 
    npm run server
 

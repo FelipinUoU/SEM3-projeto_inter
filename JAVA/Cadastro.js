@@ -1,12 +1,11 @@
 
 const formCadastro = document.getElementById("formCadastro");
-const formLogin = document.getElementById("formLogin");
 const btnLogin = document.getElementById("btnLogin");
 const apiBaseUrl = window.location.protocol === "file:" ? "http://localhost:3001" : "";
 
 if (btnLogin) {
     btnLogin.addEventListener("click", function () {
-        window.location.href = new URL("../HTML/Login.html", import.meta.url).href;
+        window.location.href = new URL("../HTML/Login.html", document.baseURI).href;
     });
 }
 
@@ -62,7 +61,7 @@ if (formCadastro) {
             formCadastro.reset();
 
             // Redireciona para a tela de login.
-            window.location.href = new URL("../HTML/Login.html", import.meta.url).href;
+            window.location.href = new URL("../HTML/Login.html", document.baseURI).href;
 
         } catch (err) {
             console.error("Erro no cadastro:", err);
