@@ -71,7 +71,6 @@ body > header .logo,
 }
 
 .menu-lateral-button:focus-visible,
-.menu-lateral-close:focus-visible,
 .menu-lateral-item:focus-visible,
 .boxbody a:focus-visible {
     outline: 2px solid #d5bd00;
@@ -114,28 +113,6 @@ body > header .logo,
     visibility: visible;
 }
 
-.menu-lateral-dashboard-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 28px;
-}
-
-.menu-lateral-dashboard-header h2 {
-    margin: 0;
-    color: #d5bd00;
-    font: bold 24px Georgia, serif;
-}
-
-.menu-lateral-close {
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: #fff;
-    font: 32px/1 Georgia, serif;
-    cursor: pointer;
-}
-
 .menu-lateral-items {
     display: grid;
     gap: 12px;
@@ -157,12 +134,6 @@ body > header .logo,
 .menu-lateral-item[aria-pressed="true"] {
     background: #d5bd00;
     color: #2b1a42;
-}
-
-.menu-lateral-selection {
-    margin: 24px 0 0;
-    color: rgba(255, 255, 255, 0.8);
-    font: 16px Georgia, serif;
 }
 
 @media (prefers-reduced-motion: reduce) {

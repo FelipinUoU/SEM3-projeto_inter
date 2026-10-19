@@ -1,9 +1,7 @@
 const menuButton = document.getElementById("menuBtn");
 const dashboard = document.getElementById("dashboard");
-const closeButton = document.getElementById("closeDashboard");
 const overlay = document.getElementById("menuOverlay");
 const dashboardItems = document.querySelectorAll(".menu-lateral-item");
-const selectionMessage = document.getElementById("dashboardSelection");
 
 function setDashboardOpen(isOpen) {
     dashboard.classList.toggle("open", isOpen);
@@ -14,7 +12,7 @@ function setDashboardOpen(isOpen) {
     overlay.hidden = !isOpen;
 
     if (isOpen) {
-        closeButton.focus();
+        dashboardItems[0]?.focus();
     } else {
         menuButton.focus();
     }
@@ -24,7 +22,6 @@ menuButton.addEventListener("click", () => {
     setDashboardOpen(menuButton.getAttribute("aria-expanded") !== "true");
 });
 
-closeButton.addEventListener("click", () => setDashboardOpen(false));
 overlay.addEventListener("click", () => setDashboardOpen(false));
 
 document.addEventListener("keydown", (event) => {
@@ -35,18 +32,7 @@ document.addEventListener("keydown", (event) => {
 
 dashboardItems.forEach((item) => {
     item.addEventListener("click", () => {
-        const destination = item.dataset.href;
-        if (destination) {
-            window.location.href = destination;
-            return;
-        }
-
-        dashboardItems.forEach((dashboardItem) => {
-            dashboardItem.setAttribute("aria-pressed", String(dashboardItem === item));
-        });
-        if (selectionMessage) {
-            selectionMessage.textContent = `Item ${item.textContent.trim()} selecionado.`;
-        }
+        window.location.href = item.dataset.href;
     });
 });
 
