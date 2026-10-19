@@ -29,6 +29,18 @@ body:has(> .menu-lateral-header) {
     border-radius: 180px;
     margin-left: auto;
     float: left;
+    overflow: hidden;
+}
+
+.boxbody a,
+.boxbody img {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.boxbody img {
+    object-fit: cover;
 }
 
 #master #corpo .boxbody a img{
