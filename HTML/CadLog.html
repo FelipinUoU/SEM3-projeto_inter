@@ -42,9 +42,9 @@
             <button class="menu-lateral-close" id="closeDashboard" type="button" aria-label="Fechar dashboard">×</button>
         </div>
         <nav class="menu-lateral-items" aria-label="Itens do dashboard">
-            <button class="menu-lateral-item" type="button" aria-pressed="false">1</button>
-            <button class="menu-lateral-item" type="button" aria-pressed="false">2</button>
-            <button class="menu-lateral-item" type="button" aria-pressed="false">3</button>
+            <button class="menu-lateral-item" type="button" data-href="/HTML/Login.html">Login</button>
+            <button class="menu-lateral-item" type="button" data-href="/HTML/Biblioteca.html">Biblioteca</button>
+            <button class="menu-lateral-item" type="button" data-href="/HTML/Usuario.html">Home</button>
         </nav>
         <p class="menu-lateral-selection" id="dashboardSelection" aria-live="polite">Selecione um item.</p>
     </aside>
@@ -57,14 +57,14 @@
         <div class="abas">
 
             
-        <a href="/Cadastro">
+        <a href="/HTML/Cadastro.html">
             <button class="btn-cadastro">
             Cadastro 
             </button>
         </a>
            
             <div class="linha"></div>
-        <a href="/Login">
+        <a href="/HTML/Login.html">
             <button class="btn-login" id="btnLogin">
                 Login
             </button>
@@ -97,8 +97,8 @@
     </main>
 
 
-    <script src="../JAVA/MenuLat.js"></script>
-    <script src="../JAVA/CadLog.js"></script>
+    <script type="module" src="../JAVA/MenuLat.js"></script>
+    <script type="module" src="../JAVA/CadLog.js"></script>
 
 </body>
 
