@@ -35,7 +35,7 @@
 
     <main class="page-shell">
       <section class="library-section">
-        <h2>Novidades</h2>
+        <h2>Ultimas Leituras</h2>
 
         <div class="feature-row">
           <div class="thumb-grid">
@@ -60,15 +60,18 @@
 
           <aside class="summary-panel">
             <div class="summary-copy">
-              <p>Nickname</p>
+              <button class="nickname-edit-button" id="nicknameEditButton" type="button" aria-controls="nicknameInput" aria-expanded="false">
+                <span id="nicknameText">Nickname</span>
+                <svg class="nickname-edit-icon" aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+                  <path d="M14.06 9.02 15 9.96 5.92 19H5v-.92l9.06-9.06M17.66 3c-.26 0-.53.1-.73.3l-1.83 1.83 3.77 3.77 1.83-1.83a1.03 1.03 0 0 0 0-1.46l-2.31-2.31a1.03 1.03 0 0 0-.73-.3ZM14.06 6.54 3 17.6V21h3.4L17.46 9.94l-3.4-3.4Z"/>
+                </svg>
+              </button>
+              <input class="nickname-input" id="nicknameInput" type="text" placeholder="Digite seu nickname" autocomplete="nickname" aria-label="Nickname" hidden>
               <p>Contagem</p>
             </div>
 
-            <div class="summary-badge" aria-label="Logo da banda">
-              <div class="badge-ring">
-                <span>SB</span>
-              </div>
-              <small>SB19</small>
+            <div class="summary-badge">
+              <img class="badge-avatar" src="../Img/PerfilExemplo.svg" alt="Avatar de exemplo">
             </div>
           </aside>
         </div>
@@ -159,5 +162,6 @@
       </section>
     </main>
     <script type="module" src="../JAVA/MenuLat.js"></script>
+    <script type="module" src="../JAVA/Biblioteca.js"></script>
   </body>
 </html>
