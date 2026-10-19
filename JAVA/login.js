@@ -37,7 +37,7 @@ formLogin.addEventListener("submit", async function (event) {
 
         alert('Login realizado com sucesso!');
         sessionStorage.setItem('user', JSON.stringify(data.user));
-        window.location.href = './Usuario.html';
+        window.location.href = '/HTML/Usuario.html';
 
     } catch (err) {
         console.error(err);

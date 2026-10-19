@@ -4,7 +4,7 @@ const formLogin = document.getElementById("formLogin");
 
 if (btnLogin) {
     btnLogin.addEventListener("click", function () {
-        window.location.href = "../HTML/Login.html";
+        window.location.href = "/HTML/Login.html";
     });
 }
 
