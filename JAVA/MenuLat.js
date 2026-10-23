@@ -4,6 +4,7 @@ const overlay = document.getElementById("menuOverlay");
 const dashboardItems = document.querySelectorAll(".menu-lateral-item");
 
 function setDashboardOpen(isOpen) {
+    if (!dashboard || !menuButton || !overlay) return;
     dashboard.classList.toggle("open", isOpen);
     dashboard.setAttribute("aria-hidden", String(!isOpen));
     dashboard.inert = !isOpen;
@@ -18,26 +19,22 @@ function setDashboardOpen(isOpen) {
     }
 }
 
-menuButton.addEventListener("click", () => {
-    setDashboardOpen(menuButton.getAttribute("aria-expanded") !== "true");
-});
-
-overlay.addEventListener("click", () => setDashboardOpen(false));
-
-document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && menuButton.getAttribute("aria-expanded") === "true") {
-        setDashboardOpen(false);
-    }
-});
-
-dashboardItems.forEach((item) => {
-    item.addEventListener("click", () => {
-        window.location.href = item.dataset.href;
+if (menuButton && dashboard && overlay) {
+    menuButton.addEventListener("click", () => {
+        setDashboardOpen(menuButton.getAttribute("aria-expanded") !== "true");
     });
-});
+
+    overlay.addEventListener("click", () => setDashboardOpen(false));
+
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && menuButton.getAttribute("aria-expanded") === "true") {
+            setDashboardOpen(false);
+        }
+    });
+}
 
 const categoryFilters = document.querySelectorAll("[data-category-filter]");
-const catalogCards = document.querySelectorAll(".obra-card[data-category]");
+const getCatalogCards = () => Array.from(document.querySelectorAll(".obra-card[data-category]"));
 const catalogSections = document.querySelectorAll(".catalogo > section");
 const searchForm = document.querySelector(".barra-pesquisa");
 const searchInput = searchForm?.querySelector('input[type="search"]');
@@ -104,6 +101,7 @@ carouselStates.forEach((state) => {
             .filter((item) => !item.hidden)
             .indexOf(card);
         updateCarousel(state);
+        if (card.dataset.href) window.location.href = card.dataset.href;
     });
 
     state.track.addEventListener("keydown", (event) => {
@@ -115,12 +113,14 @@ carouselStates.forEach((state) => {
             .filter((item) => !item.hidden)
             .indexOf(card);
         updateCarousel(state);
+        if (card.dataset.href) window.location.href = card.dataset.href;
     });
 });
 
 function filterCatalog() {
     const query = searchInput?.value.trim().toLocaleLowerCase("pt-BR") ?? "";
 
+    const catalogCards = getCatalogCards();
     catalogCards.forEach((card) => {
         const matchesCategory = selectedCategory === "all" || card.dataset.category === selectedCategory;
         const matchesSearch = card.textContent.toLocaleLowerCase("pt-BR").includes(query);
@@ -135,6 +135,48 @@ function filterCatalog() {
 
     if (emptyCatalogMessage) {
         emptyCatalogMessage.hidden = Array.from(catalogCards).some((card) => !card.hidden);
+    }
+}
+
+async function loadCommunityWorks() {
+    const track = document.querySelector("[data-community-works]");
+    const status = document.getElementById("communityWorksStatus");
+    if (!track || !status) return;
+
+    try {
+        const response = await fetch("/api/works");
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Não foi possível carregar as obras.");
+        if (!Array.isArray(data.works)) throw new Error("A resposta do servidor contém uma lista de obras inválida.");
+
+        track.replaceChildren();
+        for (const work of data.works) {
+            const card = document.createElement("article");
+            card.className = "obra-card";
+            card.dataset.workId = work.id;
+            card.dataset.category = "manga";
+            card.dataset.href = `/HTML/Obra.html?obra=${encodeURIComponent(work.id)}`;
+            card.tabIndex = 0;
+
+            const cover = document.createElement("img");
+            cover.src = work.cover || "/Img/Capa.jpg";
+            cover.alt = `Capa de ${work.title}`;
+            card.append(cover);
+
+            const title = document.createElement("h3");
+            title.textContent = work.title;
+            card.append(title);
+
+            const author = document.createElement("p");
+            author.textContent = work.author || "Obra da comunidade";
+            card.append(author);
+            track.append(card);
+        }
+        status.textContent = data.works.length ? "" : "Nenhuma obra cadastrada pela comunidade.";
+        filterCatalog();
+    } catch (error) {
+        console.error("Não foi possível carregar as obras da comunidade:", error);
+        status.textContent = error.message || "Não foi possível carregar as obras da comunidade.";
     }
 }
 
@@ -153,11 +195,10 @@ searchForm?.addEventListener("submit", (event) => {
     filterCatalog();
 });
 searchInput?.addEventListener("input", filterCatalog);
-<<<<<<< HEAD
+
 
 filterCatalog();
+void loadCommunityWorks();
 window.addEventListener("resize", () => {
     carouselStates.forEach((state) => updateCarousel(state));
 });
-=======
->>>>>>> 1f79075dfcf99cb6d22e97d2e212235a6c7809d6

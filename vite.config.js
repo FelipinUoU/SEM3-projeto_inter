@@ -22,8 +22,6 @@ export default defineConfig({
         index: resolve(process.cwd(), 'index.html'),
         biblioteca: resolve(process.cwd(), 'HTML/Biblioteca.html'),
         cadLog: resolve(process.cwd(), 'HTML/CadLog.html'),
-        cadastro: resolve(process.cwd(), 'HTML/Cadastro.html'),
-        login: resolve(process.cwd(), 'HTML/Login.html'),
         gerenciarObras: resolve(process.cwd(), 'HTML/GerenciarObras.html'),
         obra: resolve(process.cwd(), 'HTML/Obra.html'),
         leitura: resolve(process.cwd(), 'HTML/Leitura.html'),

@@ -1,4 +1,4 @@
-﻿-- Database schema adapted for MySQL
+﻿-- Legacy MySQL schema; the server now stores application data in Appwrite.
 
 CREATE TABLE IF NOT EXISTS usuarios (
   id INT AUTO_INCREMENT PRIMARY KEY,

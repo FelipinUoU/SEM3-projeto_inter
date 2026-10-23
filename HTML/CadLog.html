@@ -43,53 +43,191 @@
 
     <aside class="menu-lateral-dashboard" id="dashboard" aria-label="Navegação principal" aria-hidden="true" inert>
         <nav class="menu-lateral-items" aria-label="Navegação principal">
-            <button class="menu-lateral-item" type="button" data-href="/">Home</button>
-            <button class="menu-lateral-item" type="button" data-href="/HTML/Biblioteca.html">Biblioteca</button>
-            <button class="menu-lateral-item" type="button" data-href="/HTML/Login.html">Login</button>
+            <a class="menu-lateral-item" href="/">Home</a>
+            <a class="menu-lateral-item" href="/HTML/Biblioteca.html">Biblioteca</a>
+            <a class="menu-lateral-item" href="/HTML/CadLog.html?mode=login">Login</a>
         </nav>
     </aside>
 
 
-    <!-- Área de cadastro -->
-    <main class="cadastro-container">
+    <main class="auth-main">
+        <section class="auth-card" aria-label="Acesso à HokuPédia">
+            <div class="auth-tabs" role="tablist" aria-label="Cadastro ou login">
+                <button
+                    class="auth-tab is-active"
+                    id="registerTab"
+                    type="button"
+                    role="tab"
+                    aria-selected="true"
+                    aria-controls="registerPanel"
+                    data-auth-mode="register">
+                    Cadastrar
+                </button>
+                <span class="auth-divider" aria-hidden="true"></span>
+                <button
+                    class="auth-tab"
+                    id="loginTab"
+                    type="button"
+                    role="tab"
+                    aria-selected="false"
+                    aria-controls="loginPanel"
+                    data-auth-mode="login"
+                    tabindex="-1">
+                    Login
+                </button>
+            </div>
 
-        <!-- Abas -->
-        <div class="abas">
+            <section class="auth-panel" id="registerPanel" role="tabpanel" aria-labelledby="registerTab">
+                <h1>Criar conta</h1>
+                <form id="formCadastro">
+                    <div class="auth-field">
+                        <label for="registerName">Nome</label>
+                        <input
+                            type="text"
+                            id="registerName"
+                            name="name"
+                            placeholder="Digite seu nome"
+                            autocomplete="name"
+                            required>
+                    </div>
+                    <div class="auth-field">
+                        <label for="registerEmail">E-mail</label>
+                        <input
+                            type="email"
+                            id="registerEmail"
+                            name="email"
+                            autocomplete="email"
+                            required>
+                    </div>
+                    <div class="auth-field">
+                        <label for="confirmRegisterEmail">Confirmar e-mail</label>
+                        <input
+                            type="email"
+                            id="confirmRegisterEmail"
+                            name="confirmEmail"
+                            autocomplete="email"
+                            required>
+                    </div>
+                    <div class="auth-field">
+                        <label for="registerPassword">Senha</label>
+                        <input
+                            type="password"
+                            id="registerPassword"
+                            name="password"
+                            minlength="8"
+                            maxlength="256"
+                            autocomplete="new-password"
+                            required>
+                    </div>
+                    <p class="auth-hint">A senha deve ter entre 8 e 256 caracteres.</p>
+                    <div class="auth-field">
+                        <label for="confirmRegisterPassword">Confirmar senha</label>
+                        <input
+                            type="password"
+                            id="confirmRegisterPassword"
+                            name="confirmPassword"
+                            minlength="8"
+                            maxlength="256"
+                            autocomplete="new-password"
+                            required>
+                    </div>
+                    <p class="auth-feedback" id="registerFeedback" role="status" aria-live="polite"></p>
+                    <button class="auth-submit" type="submit">Cadastrar</button>
+                </form>
+            </section>
 
-            
-        <a class="btn-cadastro" href="/HTML/Cadastro.html">Cadastro</a>
-           
-            <div class="linha"></div>
-        <a class="btn-login" href="/HTML/Login.html">Login</a>
+            <section class="auth-panel" id="loginPanel" role="tabpanel" aria-labelledby="loginTab" hidden inert>
+                <h1>Entrar</h1>
+                <form id="formLogin" action="/HTML/CadLog.html?mode=login" method="post">
+                    <div class="auth-field">
+                        <label for="loginEmail">E-mail</label>
+                        <input
+                            type="email"
+                            id="loginEmail"
+                            name="email"
+                            autocomplete="username"
+                            required>
+                    </div>
+                    <div class="auth-field">
+                        <label for="loginPassword">Senha</label>
+                        <input
+                            type="password"
+                            id="loginPassword"
+                            name="password"
+                            autocomplete="current-password"
+                            required>
+                    </div>
+                    <p class="auth-feedback" id="loginFeedback" role="status" aria-live="polite"></p>
+                    <button class="auth-submit" type="submit">Entrar</button>
+                </form>
+                <button class="auth-link" id="showRecoveryButton" type="button">Esqueci minha senha</button>
+                <form class="recovery-request" id="formRecoveryRequest" hidden inert>
+                    <p>Informe seu e-mail para receber um código de recuperação de 6 dígitos.</p>
+                    <div class="auth-field">
+                        <label for="recoveryEmail">E-mail</label>
+                        <input
+                            type="email"
+                            id="recoveryEmail"
+                            name="email"
+                            autocomplete="email"
+                            required>
+                    </div>
+                    <p class="auth-feedback" id="recoveryRequestFeedback" role="status" aria-live="polite"></p>
+                    <button class="auth-submit" type="submit">Enviar código</button>
+                    <button class="auth-link" id="cancelRecoveryButton" type="button">Voltar ao login</button>
+                </form>
 
-        </div>
-
-        <!-- Opções de cadastro -->
-        <div class="opcoes-cadastro">
-
-            <button class="botao-social">
-                <span class="icone">◈</span>
-                Continuar com Google
-            </button>
-
-
-            <button class="botao-social">
-                <span class="icone">◈</span>
-                Continuar com Email
-            </button>
-
-
-            <button class="botao-social">
-                <span class="icone">◈</span>
-                Continuar com Facebook
-            </button>
-
-        </div>
-
+                <form class="recovery-request" id="formPasswordReset" hidden inert>
+                    <p>Digite o código de 6 dígitos recebido por e-mail e escolha uma nova senha.</p>
+                    <div class="auth-field">
+                        <label for="recoveryCode">Código</label>
+                        <input
+                            type="text"
+                            id="recoveryCode"
+                            name="code"
+                            inputmode="numeric"
+                            pattern="[0-9]{6}"
+                            minlength="6"
+                            maxlength="6"
+                            autocomplete="one-time-code"
+                            aria-describedby="recoveryCodeHint"
+                            required>
+                    </div>
+                    <p class="auth-hint" id="recoveryCodeHint">O código expira após 15 minutos.</p>
+                    <div class="auth-field">
+                        <label for="newPassword">Nova senha</label>
+                        <input
+                            type="password"
+                            id="newPassword"
+                            name="password"
+                            minlength="8"
+                            maxlength="256"
+                            autocomplete="new-password"
+                            required>
+                    </div>
+                    <p class="auth-hint">A senha deve ter entre 8 e 256 caracteres.</p>
+                    <div class="auth-field">
+                        <label for="confirmNewPassword">Confirmar nova senha</label>
+                        <input
+                            type="password"
+                            id="confirmNewPassword"
+                            name="confirmPassword"
+                            minlength="8"
+                            maxlength="256"
+                            autocomplete="new-password"
+                            required>
+                    </div>
+                    <p class="auth-feedback" id="passwordResetFeedback" role="status" aria-live="polite"></p>
+                    <button class="auth-submit" type="submit">Salvar nova senha</button>
+                    <button class="auth-link" id="resendRecoveryButton" type="button">Enviar outro código</button>
+                    <button class="auth-link" id="backToLoginButton" type="button">Voltar ao login</button>
+                </form>
+            </section>
+        </section>
     </main>
 
-
     <script type="module" src="../JAVA/MenuLat.js"></script>
+    <script type="module" src="../JAVA/CadLog.js"></script>
 
 </body>
 
