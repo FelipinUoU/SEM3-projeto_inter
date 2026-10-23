@@ -1,4 +1,5 @@
 import { createAuthorIcon } from "./authorIcon.js";
+import { account } from "./JAVA/appwriteClient.js";
 
 const readHistoryKey = "hokupedia.readChapters.v1";
 const chapterList = document.querySelector("#chapterList");
@@ -6,6 +7,20 @@ const workTitle = document.querySelector("#workTitle");
 const workDescription = document.querySelector("#workDescription");
 const workAuthor = document.querySelector("#workAuthor");
 const workCover = document.querySelector("#workCover");
+const manageLink = document.querySelector(".manage-link");
+
+async function showAdminLink() {
+    try {
+        const user = await account.get();
+        if (user.email.trim().toLowerCase() === "hokupedia@gmail.com") {
+            manageLink.hidden = false;
+        }
+    } catch (error) {
+        if (error.code !== 401) {
+            console.error("Não foi possível verificar o acesso administrativo:", error);
+        }
+    }
+}
 
 function loadOpenedChapters() {
     try {
@@ -140,4 +155,5 @@ async function renderChapters() {
     }
 }
 
+void showAdminLink();
 renderChapters();

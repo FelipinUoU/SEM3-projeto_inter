@@ -286,7 +286,10 @@ loginForm.addEventListener("submit", async (event) => {
         }
 
         await account.createEmailPasswordSession({ email, password });
-        window.location.assign("/HTML/Biblioteca.html");
+        const destination = email.toLowerCase() === "hokupedia@gmail.com"
+            ? "/HTML/GerenciarObras.html"
+            : "/HTML/Biblioteca.html";
+        window.location.assign(destination);
     } catch (error) {
         console.error("Erro no login:", error);
         const message = error.code === 401

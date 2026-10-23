@@ -8,6 +8,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { Account, Client, Databases, ID, Query } from 'node-appwrite';
 import ImageKit from 'imagekit';
+import { readChapterArchive } from './chapterArchive.js';
 
 const app = express();
 const rootDirectory = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -19,6 +20,9 @@ const READER_IMAGE_EXTENSIONS = new Set(['.avif', '.gif', '.jpeg', '.jpg', '.png
 const UPLOAD_IMAGE_TYPES = new Set(['image/avif', 'image/gif', 'image/jpeg', 'image/png', 'image/webp']);
 const MAX_UPLOAD_BYTES = Number.parseInt(process.env.MAX_IMAGE_BYTES || '20971520', 10);
 const MAX_CHAPTER_PAGES = Number.parseInt(process.env.MAX_CHAPTER_PAGES || '500', 10);
+const MAX_CHAPTER_ARCHIVE_BYTES = Number.parseInt(process.env.MAX_CHAPTER_ARCHIVE_BYTES || '104857600', 10);
+const MAX_CHAPTER_UNPACKED_BYTES = 209715200;
+const ADMIN_EMAIL = 'hokupedia@gmail.com';
 const appwriteEndpoint = process.env.APPWRITE_ENDPOINT;
 const appwriteProjectId = process.env.APPWRITE_PROJECT_ID;
 const appwriteApiKey = process.env.APPWRITE_API_KEY;
@@ -74,12 +78,16 @@ function requireAppwriteConfiguration() {
 }
 
 function getAppwriteStatus(error) {
-  return error?.code === 404 ? 404 : error?.code === 409 ? 409 : 500;
+  return Number.isInteger(error?.code) && error.code >= 400 && error.code < 600
+    ? error.code
+    : 500;
 }
 
 function sendAppwriteError(res, error, message) {
   console.error(`${message}:`, error);
-  return res.status(getAppwriteStatus(error)).json({ error: message });
+  return res.status(getAppwriteStatus(error)).json({
+    error: error?.message || message
+  });
 }
 
 async function listAllDocuments(collectionId, filters = []) {
@@ -104,7 +112,8 @@ async function listAllDocuments(collectionId, filters = []) {
 function isValidPage(page) {
   if (!page || typeof page.name !== 'string' || page.name.length > 255
     || typeof page.fileId !== 'string' || page.fileId.length > 255
-    || typeof page.url !== 'string' || page.url.length > 2048) return false;
+    || typeof page.url !== 'string' || page.url.length > 2048
+    || !UPLOAD_IMAGE_TYPES.has(page.format)) return false;
   try {
     const imageUrl = new URL(page.url);
     const endpointUrl = new URL(process.env.IMAGEKIT_URL_ENDPOINT);
@@ -145,10 +154,26 @@ async function requireAuthenticatedUser(req, res, next) {
 }
 
 function requireAdminUser(req, res, next) {
-  if (!req.appwriteUser?.labels?.includes('admin')) {
-    return res.status(403).json({ error: 'Aprovação disponível somente para administradores.' });
+  if (req.appwriteUser?.email?.trim().toLowerCase() !== ADMIN_EMAIL) {
+    return res.status(403).json({ error: 'Acesso disponível somente para o administrador.' });
   }
   return next();
+}
+
+function isImageKitAsset(url) {
+  if (typeof url !== 'string' || !url.trim()) return false;
+  try {
+    const assetUrl = new URL(url);
+    const endpointUrl = new URL(process.env.IMAGEKIT_URL_ENDPOINT);
+    return assetUrl.protocol === 'https:' && assetUrl.origin === endpointUrl.origin;
+  } catch {
+    return false;
+  }
+}
+
+function getWorkAttribute(value) {
+  if (typeof value === 'string') return value;
+  return Array.isArray(value) && typeof value[0] === 'string' ? value[0] : '';
 }
 
 const screenRoutes = {
@@ -196,7 +221,7 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
-app.post('/api/uploads', requireAuthenticatedUser, express.raw({
+app.post('/api/uploads', requireAuthenticatedUser, requireAdminUser, express.raw({
   type: [...UPLOAD_IMAGE_TYPES],
   limit: MAX_UPLOAD_BYTES
 }), async (req, res) => {
@@ -229,6 +254,81 @@ app.post('/api/uploads', requireAuthenticatedUser, express.raw({
   }
 });
 
+app.post('/api/uploads/chapter-archive', requireAuthenticatedUser, requireAdminUser, express.raw({
+  type: ['application/zip', 'application/x-zip-compressed'],
+  limit: MAX_CHAPTER_ARCHIVE_BYTES
+}), async (req, res) => {
+  if (!imageKit) {
+    return res.status(503).json({ error: 'Configure as chaves do ImageKit no servidor.' });
+  }
+  const filename = typeof req.query.filename === 'string' ? req.query.filename : '';
+  if (!filename.toLowerCase().endsWith('.zip')) {
+    return res.status(415).json({ error: 'Envie um único arquivo .zip com as páginas do capítulo.' });
+  }
+  if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+    return res.status(400).json({ error: 'O arquivo ZIP está vazio ou não foi enviado corretamente.' });
+  }
+
+  let pages;
+  try {
+    pages = await readChapterArchive(req.body, {
+      maxImageBytes: MAX_UPLOAD_BYTES,
+      maxPages: MAX_CHAPTER_PAGES,
+      maxUnpackedBytes: MAX_CHAPTER_UNPACKED_BYTES
+    });
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+  if (pages.length === 0) {
+    return res.status(400).json({ error: 'O ZIP não contém páginas de imagem compatíveis.' });
+  }
+
+  const uploadedFiles = [];
+  try {
+    for (const page of pages) {
+      const image = await imageKit.upload({
+        file: page.buffer,
+        fileName: page.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 180) || 'pagina',
+        folder: '/hokupedia',
+        useUniqueFileName: true
+      });
+      uploadedFiles.push({
+        name: page.name,
+        url: image.url,
+        fileId: image.fileId,
+        format: page.format
+      });
+    }
+    return res.status(201).json({ pages: uploadedFiles });
+  } catch (error) {
+    console.error('Chapter archive upload failed:', error);
+    const cleanupResults = await Promise.allSettled(
+      uploadedFiles.map((file) => imageKit.deleteFile(file.fileId))
+    );
+    cleanupResults.forEach((result) => {
+      if (result.status === 'rejected') console.error('Could not clean up a partial chapter archive upload:', result.reason);
+    });
+    return res.status(502).json({ error: 'Não foi possível enviar todas as páginas do ZIP ao ImageKit.' });
+  }
+});
+
+app.delete('/api/uploads/:fileId', requireAuthenticatedUser, requireAdminUser, async (req, res) => {
+  if (!imageKit) {
+    return res.status(503).json({ error: 'Configure as chaves do ImageKit no servidor.' });
+  }
+  try {
+    const file = await imageKit.getFileDetails(req.params.fileId);
+    if (!file.filePath.startsWith('/hokupedia/')) {
+      return res.status(404).json({ error: 'Arquivo não encontrado na biblioteca da HokuPédia.' });
+    }
+    await imageKit.deleteFile(req.params.fileId);
+    return res.json({ deleted: true });
+  } catch (error) {
+    console.error('ImageKit file deletion failed:', error);
+    return res.status(502).json({ error: 'Não foi possível excluir a imagem temporária do ImageKit.' });
+  }
+});
+
 app.get('/api/works', async (req, res) => {
   try {
     const [workDocuments, chapterDocuments, pageDocuments] = await Promise.all([
@@ -241,10 +341,11 @@ app.get('/api/works', async (req, res) => {
       const pages = pagesByChapter.get(page.chapterId) || [];
       pages.push({
         id: page.$id,
-        name: page.name,
-        url: page.url,
-        fileId: page.fileId,
-        position: page.position
+        name: page.originalName,
+        url: page.imageUrl,
+        fileId: page.imageFileId,
+        format: page.format,
+        position: page.number - 1
       });
       pagesByChapter.set(page.chapterId, pages);
     }
@@ -256,7 +357,7 @@ app.get('/api/works', async (req, res) => {
       workChapters.push({
         id: chapter.$id,
         number: chapter.number,
-        title: chapter.title,
+        title: getWorkAttribute(chapter.title),
         language: chapter.language,
         pages
       });
@@ -265,11 +366,11 @@ app.get('/api/works', async (req, res) => {
     return res.json({
       works: workDocuments.map((work) => ({
         id: work.$id,
-        title: work.title,
-        author: work.author,
-        description: work.description,
-        cover: work.cover,
-        coverFileId: work.coverFileId,
+        title: getWorkAttribute(work.Title),
+        author: getWorkAttribute(work.Author),
+        description: getWorkAttribute(work.Description),
+        cover: getWorkAttribute(work.coverUrl),
+        coverFileId: '',
         chapters: (chaptersByWork.get(work.$id) || [])
           .sort((left, right) => left.number - right.number)
       }))
@@ -279,29 +380,36 @@ app.get('/api/works', async (req, res) => {
   }
 });
 
-app.post('/api/works', requireAuthenticatedUser, async (req, res) => {
+app.post('/api/works', requireAuthenticatedUser, requireAdminUser, async (req, res) => {
   const { title, author = '', description = '', cover = '', coverFileId = '' } = req.body || {};
   if (typeof title !== 'string' || !title.trim()
     || title.length > 255
     || [author, description, cover, coverFileId].some((value) => typeof value !== 'string')
-    || author.length > 255 || description.length > 10000 || cover.length > 2048 || coverFileId.length > 255) {
-    return res.status(400).json({ error: 'Informe o nome da obra.' });
+    || author.length > 255 || description.length > 10000 || cover.length > 2048 || coverFileId.length > 255
+    || !isImageKitAsset(cover)) {
+    return res.status(400).json({ error: 'Informe o nome da obra e envie uma capa válida ao ImageKit.' });
   }
   try {
     const document = await databases.createDocument(
       appwriteDatabaseId,
       worksCollectionId,
       ID.unique(),
-      { title: title.trim(), author, description, cover, coverFileId }
+      {
+        Title: title.trim(),
+        createBy: req.appwriteUser.$id,
+        Author: [author],
+        Description: [description],
+        coverUrl: [cover]
+      }
     );
     return res.status(201).json({
       work: {
         id: document.$id,
-        title: document.title,
-        author: document.author,
-        description: document.description,
-        cover: document.cover,
-        coverFileId: document.coverFileId,
+        title: getWorkAttribute(document.Title),
+        author: getWorkAttribute(document.Author),
+        description: getWorkAttribute(document.Description),
+        cover: getWorkAttribute(document.coverUrl),
+        coverFileId: '',
         chapters: []
       }
     });
@@ -310,28 +418,43 @@ app.post('/api/works', requireAuthenticatedUser, async (req, res) => {
   }
 });
 
-app.put('/api/works/:id', requireAuthenticatedUser, async (req, res) => {
+app.put('/api/works/:id', requireAuthenticatedUser, requireAdminUser, async (req, res) => {
   const { title, author = '', description = '', cover = '', coverFileId = '' } = req.body || {};
   if (typeof title !== 'string' || !title.trim()
     || title.length > 255
     || [author, description, cover, coverFileId].some((value) => typeof value !== 'string')
-    || author.length > 255 || description.length > 10000 || cover.length > 2048 || coverFileId.length > 255) {
-    return res.status(400).json({ error: 'Informe o nome da obra.' });
+    || author.length > 255 || description.length > 10000 || cover.length > 2048 || coverFileId.length > 255
+    || !isImageKitAsset(cover)) {
+    return res.status(400).json({ error: 'Informe o nome da obra e envie uma capa válida ao ImageKit.' });
   }
   try {
     const document = await databases.updateDocument(
       appwriteDatabaseId,
       worksCollectionId,
       req.params.id,
-      { title: title.trim(), author, description, cover, coverFileId }
+      {
+        Title: title.trim(),
+        Author: [author],
+        Description: [description],
+        coverUrl: [cover]
+      }
     );
-    return res.json({ work: document });
+    return res.json({
+      work: {
+        id: document.$id,
+        title: getWorkAttribute(document.Title),
+        author: getWorkAttribute(document.Author),
+        description: getWorkAttribute(document.Description),
+        cover: getWorkAttribute(document.coverUrl),
+        coverFileId: ''
+      }
+    });
   } catch (error) {
     return sendAppwriteError(res, error, 'Não foi possível atualizar a obra no Appwrite.');
   }
 });
 
-app.delete('/api/works/:id', requireAuthenticatedUser, async (req, res) => {
+app.delete('/api/works/:id', requireAuthenticatedUser, requireAdminUser, async (req, res) => {
   try {
     await databases.getDocument(appwriteDatabaseId, worksCollectionId, req.params.id);
     const chapters = await listAllDocuments(chaptersCollectionId, [Query.equal('workId', req.params.id)]);
@@ -353,7 +476,7 @@ app.delete('/api/works/:id', requireAuthenticatedUser, async (req, res) => {
   }
 });
 
-app.post('/api/works/:workId/chapters', requireAuthenticatedUser, async (req, res) => {
+app.post('/api/works/:workId/chapters', requireAuthenticatedUser, requireAdminUser, async (req, res) => {
   const { number, title = '', language = 'pt-BR', pages } = req.body || {};
   const validationError = getChapterValidationError(number, title, language, pages);
   if (validationError) return res.status(400).json({ error: validationError });
@@ -363,7 +486,15 @@ app.post('/api/works/:workId/chapters', requireAuthenticatedUser, async (req, re
       appwriteDatabaseId,
       chaptersCollectionId,
       ID.unique(),
-      { workId: req.params.workId, number, title, language }
+      {
+        workId: req.params.workId,
+        number,
+        title: [title],
+        language,
+        pageCount: pages.length,
+        status: 'published',
+        createBy: req.appwriteUser.$id
+      }
     );
     const createdPages = [];
     try {
@@ -374,10 +505,11 @@ app.post('/api/works/:workId/chapters', requireAuthenticatedUser, async (req, re
           ID.unique(),
           {
             chapterId: chapter.$id,
-            position,
-            name: page.name,
-            url: page.url,
-            fileId: page.fileId
+            number: position + 1,
+            originalName: page.name,
+            imageUrl: page.url,
+            imageFileId: page.fileId,
+            format: page.format
           }
         );
         createdPages.push(document);
@@ -393,14 +525,15 @@ app.post('/api/works/:workId/chapters', requireAuthenticatedUser, async (req, re
       chapter: {
         id: chapter.$id,
         number,
-        title,
+        title: getWorkAttribute(chapter.title),
         language,
         pages: createdPages.map((page) => ({
           id: page.$id,
-          name: page.name,
-          url: page.url,
-          fileId: page.fileId,
-          position: page.position
+          name: page.originalName,
+          url: page.imageUrl,
+          fileId: page.imageFileId,
+          format: page.format,
+          position: page.number - 1
         }))
       }
     });
@@ -409,7 +542,7 @@ app.post('/api/works/:workId/chapters', requireAuthenticatedUser, async (req, re
   }
 });
 
-app.put('/api/chapters/:id', requireAuthenticatedUser, async (req, res) => {
+app.put('/api/chapters/:id', requireAuthenticatedUser, requireAdminUser, async (req, res) => {
   const { number, title = '', language = 'pt-BR', pages } = req.body || {};
   const validationError = getChapterValidationError(number, title, language, pages);
   if (validationError) return res.status(400).json({ error: validationError });
@@ -419,42 +552,61 @@ app.put('/api/chapters/:id', requireAuthenticatedUser, async (req, res) => {
       Query.equal('chapterId', req.params.id)
     ]);
     const createdPages = [];
-    for (const [position, page] of pages.entries()) {
-      const document = await databases.createDocument(
+    let chapter;
+    try {
+      for (const [position, page] of pages.entries()) {
+        const document = await databases.createDocument(
+          appwriteDatabaseId,
+          pagesCollectionId,
+          ID.unique(),
+          {
+            chapterId: req.params.id,
+            number: position + 1,
+            originalName: page.name,
+            imageUrl: page.url,
+            imageFileId: page.fileId,
+            format: page.format
+          }
+        );
+        createdPages.push(document);
+      }
+      chapter = await databases.updateDocument(
         appwriteDatabaseId,
-        pagesCollectionId,
-        ID.unique(),
+        chaptersCollectionId,
+        req.params.id,
         {
-          chapterId: req.params.id,
-          position,
-          name: page.name,
-          url: page.url,
-          fileId: page.fileId
+          number,
+          title: [title],
+          language,
+          pageCount: pages.length,
+          status: 'published'
         }
       );
-      createdPages.push(document);
+    } catch (error) {
+      await Promise.allSettled(createdPages.map((page) => (
+        databases.deleteDocument(appwriteDatabaseId, pagesCollectionId, page.$id)
+      )));
+      throw error;
     }
-    const chapter = await databases.updateDocument(
-      appwriteDatabaseId,
-      chaptersCollectionId,
-      req.params.id,
-      { number, title, language }
-    );
-    await Promise.all(existingPages.map((page) => (
+    const cleanupResults = await Promise.allSettled(existingPages.map((page) => (
       databases.deleteDocument(appwriteDatabaseId, pagesCollectionId, page.$id)
     )));
+    cleanupResults.forEach((result) => {
+      if (result.status === 'rejected') console.error('Could not delete a replaced chapter page:', result.reason);
+    });
     return res.json({
       chapter: {
         id: chapter.$id,
         number: chapter.number,
-        title: chapter.title,
+        title: getWorkAttribute(chapter.title),
         language: chapter.language,
         pages: createdPages.map((page) => ({
           id: page.$id,
-          name: page.name,
-          url: page.url,
-          fileId: page.fileId,
-          position: page.position
+          name: page.originalName,
+          url: page.imageUrl,
+          fileId: page.imageFileId,
+          format: page.format,
+          position: page.number - 1
         }))
       }
     });
@@ -463,7 +615,7 @@ app.put('/api/chapters/:id', requireAuthenticatedUser, async (req, res) => {
   }
 });
 
-app.delete('/api/chapters/:id', requireAuthenticatedUser, async (req, res) => {
+app.delete('/api/chapters/:id', requireAuthenticatedUser, requireAdminUser, async (req, res) => {
   try {
     const pages = await listAllDocuments(pagesCollectionId, [
       Query.equal('chapterId', req.params.id)
@@ -800,8 +952,9 @@ app.post('/api/gemini', async (req, res) => {
 async function startServer() {
   requireAppwriteConfiguration();
   if (!Number.isSafeInteger(MAX_UPLOAD_BYTES) || MAX_UPLOAD_BYTES < 1
-    || !Number.isSafeInteger(MAX_CHAPTER_PAGES) || MAX_CHAPTER_PAGES < 1) {
-    throw new Error('MAX_IMAGE_BYTES e MAX_CHAPTER_PAGES devem ser inteiros positivos.');
+    || !Number.isSafeInteger(MAX_CHAPTER_PAGES) || MAX_CHAPTER_PAGES < 1
+    || !Number.isSafeInteger(MAX_CHAPTER_ARCHIVE_BYTES) || MAX_CHAPTER_ARCHIVE_BYTES < 1) {
+    throw new Error('MAX_IMAGE_BYTES, MAX_CHAPTER_PAGES e MAX_CHAPTER_ARCHIVE_BYTES devem ser inteiros positivos.');
   }
 
   const server = createServer(app);
