@@ -1,51 +1,46 @@
-const btnCadastro = document.getElementById("btnCadastro");
+import { account } from "../JS/JAVA/appwriteClient.js";
 
 const formLogin = document.getElementById("formLogin");
-const apiBaseUrl = window.location.protocol === "file:" ? "http://localhost:3001" : "";
+const feedback = document.getElementById("loginFeedback");
+const submitButton = formLogin?.querySelector('button[type="submit"]');
 
-/* Ir para cadastro */
-
-if (btnCadastro) {
-    btnCadastro.addEventListener("click", function () {
-        window.location.href = new URL("../HTML/Cadastro.html", document.baseURI).href;
-    });
+function showLoginFeedback(message, isError = false) {
+    if (!feedback) return;
+    feedback.textContent = message;
+    feedback.classList.toggle("is-error", isError);
 }
 
-
-/* Login */
-
-formLogin?.addEventListener("submit", async function (event) {
+formLogin?.addEventListener("submit", async (event) => {
 
     event.preventDefault();
 
-    const email = document.getElementById("email").value;
+    const email = document.getElementById("email").value.trim();
     const senha = document.getElementById("senha").value;
 
     if (email === "" || senha === "") {
-        alert("Preencha todos os campos.");
+        showLoginFeedback("Preencha todos os campos.", true);
         return;
     }
 
+    submitButton.disabled = true;
+    showLoginFeedback("Entrando...");
     try {
-        const resp = await fetch(`${apiBaseUrl}/api/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, senha })
-        });
-        const contentType = resp.headers.get('content-type') || '';
-        const data = contentType.includes('application/json') ? await resp.json() : null;
-        if (!data) {
-            throw new Error(`Resposta inesperada do servidor (HTTP ${resp.status}). Confirme que a API está ativa na porta 3001.`);
+        try {
+            await account.get();
+            await account.deleteSession({ sessionId: "current" });
+        } catch (error) {
+            if (error.code !== 401) throw error;
         }
-        if (!resp.ok) throw new Error(data.error || 'Erro no login');
 
-        alert('Login realizado com sucesso!');
-        sessionStorage.setItem('user', JSON.stringify(data.user));
-        window.location.href = '/';
-
+        await account.createEmailPasswordSession({ email, password: senha });
+        window.location.assign("/HTML/Biblioteca.html");
     } catch (err) {
         console.error(err);
-        alert('Falha no login: ' + err.message);
+        const message = err.code === 401
+            ? "E-mail ou senha incorretos."
+            : err.message || "Não foi possível entrar. Tente novamente.";
+        showLoginFeedback(`Falha no login: ${message}`, true);
+        submitButton.disabled = false;
     }
 
 });

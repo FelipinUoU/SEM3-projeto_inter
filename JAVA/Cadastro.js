@@ -1,71 +1,59 @@
 
-const formCadastro = document.getElementById("formCadastro");
-const btnLogin = document.getElementById("btnLogin");
-const apiBaseUrl = window.location.protocol === "file:" ? "http://localhost:3001" : "";
+import { account, ID } from "../JS/JAVA/appwriteClient.js";
 
-if (btnLogin) {
-    btnLogin.addEventListener("click", function () {
-        window.location.href = new URL("../HTML/Login.html", document.baseURI).href;
-    });
-}
+const formCadastro = document.getElementById("formCadastro");
 
 if (formCadastro) {
-    formCadastro.addEventListener("submit", async function (event) {
+    formCadastro.addEventListener("submit", async (event) => {
         event.preventDefault();
 
+        const nome = document.getElementById("nome").value.trim();
         const email = document.getElementById("email").value.trim();
-        const confirmarEmail = document.getElementById("confirmarEmail").value.trim();
-
+        const confirmarEmail =
+            document.getElementById("confirmarEmail").value.trim();
         const senha = document.getElementById("senha").value;
-        const confirmarSenha = document.getElementById("confirmarSenha").value;
+        const confirmarSenha =
+            document.getElementById("confirmarSenha").value;
 
-        // Verifica se os e-mails são iguais.
+        if (!nome) {
+            alert("Digite seu nome.");
+            return;
+        }
+
         if (email.toLowerCase() !== confirmarEmail.toLowerCase()) {
             alert("Os e-mails não são iguais.");
             return;
         }
 
-        // Verifica se as senhas são iguais.
+        if (senha.length < 8) {
+            alert("A senha deve ter pelo menos 8 caracteres.");
+            document.getElementById("senha").focus();
+            return;
+        }
+
         if (senha !== confirmarSenha) {
             alert("As senhas não são iguais.");
             return;
         }
 
         try {
-            const resp = await fetch(`${apiBaseUrl}/api/register`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    email,
-                    confirmarEmail,
-                    senha,
-                    confirmarSenha
-                })
+            await account.create({
+                userId: ID.unique(),
+                email,
+                password: senha,
+                name: nome
             });
 
-            const contentType = resp.headers.get("content-type") || "";
-            const data = contentType.includes("application/json") ? await resp.json() : null;
-
-            if (!data) {
-                throw new Error(`Resposta inesperada do servidor (HTTP ${resp.status}). Confirme que a API está ativa na porta 3001.`);
-            }
-
-            if (!resp.ok) {
-                throw new Error(data.mensagem || data.error || "Erro no cadastro.");
-            }
-
-            alert(data.mensagem || "Cadastro realizado com sucesso!");
-
+            alert("Cadastro realizado com sucesso!");
             formCadastro.reset();
-
-            // Redireciona para a tela de login.
-            window.location.href = new URL("../HTML/Login.html", document.baseURI).href;
+            window.location.href = "/HTML/Login.html";
 
         } catch (err) {
             console.error("Erro no cadastro:", err);
-            alert("Erro ao cadastrar: " + err.message);
+
+            alert(
+                `Erro ao cadastrar!\nCódigo: ${err.code ?? "desconhecido"}\nMensagem: ${err.message || "Tente novamente."}`
+            );
         }
     });
 }

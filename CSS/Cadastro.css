@@ -60,6 +60,7 @@ header {
 }
 
 .aba {
+    display: inline-block;
     border: none;
     background-color: #000;
     color: #d5bd00;
@@ -69,6 +70,7 @@ header {
     font-size: clamp(16px, 1.5vw, 22px);
     font-weight: bold;
     cursor: pointer;
+    text-decoration: none;
     transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
@@ -80,6 +82,11 @@ header {
     background-color: #d5bd00;
     color: #2b1a42;
     box-shadow: 0 0 0 2px rgba(213, 189, 0, 0.18);
+}
+
+.aba:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: 3px;
 }
 
 .linha {
@@ -118,6 +125,12 @@ header {
 .campo input:focus {
     border-color: #8c3cff;
     box-shadow: 0 0 0 3px rgba(140, 60, 255, 0.15);
+}
+
+.senha-requisito {
+    margin: -18px 0 20px 220px;
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 14px;
 }
 
 .botao-cadastrar {
@@ -169,6 +182,11 @@ header {
 
     .campo input {
         width: 100%;
+    }
+
+    .senha-requisito {
+        margin: -10px 0 18px;
+        text-align: center;
     }
 }
 

@@ -1,4 +1,4 @@
-﻿-- Seed data for development/testing
+﻿-- Legacy MySQL seed data; the Appwrite server does not load this file.
 
 INSERT INTO administradores (email, senha) VALUES ('admin@hokupedia.local', 'adminpass');
 

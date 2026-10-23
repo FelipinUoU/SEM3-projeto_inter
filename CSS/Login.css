@@ -60,6 +60,7 @@ header {
 }
 
 .aba {
+    display: inline-block;
     border: none;
     background-color: #000;
     color: #d5bd00;
@@ -69,6 +70,7 @@ header {
     font-size: clamp(16px, 1.5vw, 22px);
     font-weight: bold;
     cursor: pointer;
+    text-decoration: none;
     transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
@@ -80,6 +82,11 @@ header {
     background-color: #d5bd00;
     color: #2b1a42;
     box-shadow: 0 0 0 2px rgba(213, 189, 0, 0.18);
+}
+
+.aba:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: 3px;
 }
 
 .linha {
@@ -120,6 +127,17 @@ header {
     box-shadow: 0 0 0 3px rgba(140, 60, 255, 0.15);
 }
 
+.login-feedback {
+    min-height: 1.4em;
+    margin: -8px 0 12px;
+    color: #fff;
+    text-align: center;
+}
+
+.login-feedback.is-error {
+    color: #ffc2c2;
+}
+
 .botao-entrar {
     display: block;
     margin: 16px auto 0;
@@ -138,6 +156,11 @@ header {
 
 .botao-entrar:hover {
     transform: translateY(-1px) scale(1.02);
+}
+
+.botao-entrar:disabled {
+    cursor: wait;
+    opacity: 0.7;
 }
 
 @media (max-width: 640px) {
