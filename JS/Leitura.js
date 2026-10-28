@@ -145,15 +145,19 @@ function setChapterNavigation(work, chapter) {
     nextButton.classList.toggle("is-disabled", !next);
 }
 
-function loadStoredChapter() {
+async function loadStoredChapter() {
     if (!workId && !chapterId) return;
     if (!workId || !chapterId) {
         setStatus("O link do capítulo está incompleto.", "error");
+        refreshPages();
         return;
     }
 
     try {
-        const works = JSON.parse(localStorage.getItem("hokupedia.works.v1") || "[]");
+        const response = await fetch("/api/works");
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Não foi possível carregar as obras.");
+        const works = data.works;
         currentWork = works.find((work) => work.id === workId);
         currentChapter = currentWork?.chapters?.find((chapter) => chapter.id === chapterId);
         if (!currentWork || !currentChapter) {
@@ -161,8 +165,8 @@ function loadStoredChapter() {
         }
 
         const pages = currentChapter.pages || [];
-        if (!pages.length || pages.some((page) => typeof page.dataUrl !== "string" || !page.dataUrl.startsWith("data:image/"))) {
-            throw new Error("Este capítulo não tem imagens salvas. Edite o capítulo e selecione novamente as páginas.");
+        if (!pages.length || pages.some((page) => typeof page.url !== "string" || !page.url.startsWith("https://"))) {
+            throw new Error("Este capítulo não tem páginas válidas no ImageKit.");
         }
 
         readerViewport.replaceChildren(...pages.map((page, index) => {
@@ -171,7 +175,8 @@ function loadStoredChapter() {
             wrapper.dataset.page = String(index);
             const image = document.createElement("img");
             image.className = "manga-page";
-            image.src = page.dataUrl;
+            image.crossOrigin = "anonymous";
+            image.src = page.url;
             image.alt = `Página ${index + 1} de ${getChapterName(currentChapter, 0)}`;
             image.loading = index === 0 ? "eager" : "lazy";
             wrapper.append(image);
@@ -185,10 +190,12 @@ function loadStoredChapter() {
             history.push(`${workId}:${chapterId}`);
             localStorage.setItem(historyKey, JSON.stringify(history));
         }
+        refreshPages();
     } catch (error) {
-        console.error("Não foi possível abrir o capítulo salvo:", error);
+        console.error("Não foi possível abrir o capítulo do Appwrite:", error);
         readerViewport.replaceChildren();
         setStatus(error.message || "Não foi possível abrir este capítulo.", "error");
+        refreshPages();
     }
 }
 
@@ -550,8 +557,7 @@ async function translateCurrentPage() {
 }
 
 applySettingsToForm();
-loadStoredChapter();
-refreshPages();
+void loadStoredChapter();
 
 viewModeButton.addEventListener("click", (event) => {
     event.stopPropagation();

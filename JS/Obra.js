@@ -1,19 +1,26 @@
 import { createAuthorIcon } from "./authorIcon.js";
+import { account } from "./JAVA/appwriteClient.js";
 
-const storageKey = "hokupedia.works.v1";
 const readHistoryKey = "hokupedia.readChapters.v1";
-const seedWork = {
-    id: "demo-naruto",
-    title: "Naruto",
-    author: "Masashi Kishimoto",
-    description: "Acompanhe os capítulos desta obra.",
-    chapters: []
-};
 const chapterList = document.querySelector("#chapterList");
 const workTitle = document.querySelector("#workTitle");
 const workDescription = document.querySelector("#workDescription");
 const workAuthor = document.querySelector("#workAuthor");
 const workCover = document.querySelector("#workCover");
+const manageLink = document.querySelector(".manage-link");
+
+async function showAdminLink() {
+    try {
+        const user = await account.get();
+        if (user.email.trim().toLowerCase() === "hokupedia@gmail.com") {
+            manageLink.hidden = false;
+        }
+    } catch (error) {
+        if (error.code !== 401) {
+            console.error("Não foi possível verificar o acesso administrativo:", error);
+        }
+    }
+}
 
 function loadOpenedChapters() {
     try {
@@ -30,32 +37,30 @@ function loadOpenedChapters() {
     }
 }
 
-function loadWork() {
-    try {
-        const storedWorks = localStorage.getItem(storageKey);
-        if (storedWorks === null) return seedWork;
+async function loadWork() {
+    const response = await fetch("/api/works");
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Não foi possível carregar as obras.");
+    if (!Array.isArray(data.works)) throw new Error("A resposta do Appwrite contém uma lista de obras inválida.");
 
-        const works = JSON.parse(storedWorks);
-        if (!Array.isArray(works)) throw new Error("A lista local de obras é inválida.");
-
-        const requestedId = new URLSearchParams(window.location.search).get("obra");
-        const selectedWork = requestedId
-            ? works.find((work) => work.id === requestedId)
-            : works[0];
-        if (!selectedWork) return null;
-        if (typeof selectedWork.title !== "string" || !Array.isArray(selectedWork.chapters)) {
-            throw new Error("Os dados da obra selecionada são inválidos.");
-        }
-        return selectedWork;
-    } catch (error) {
-        console.error("Não foi possível carregar os dados da obra:", error);
-        return seedWork;
-    }
+    const requestedId = new URLSearchParams(window.location.search).get("obra");
+    return requestedId
+        ? data.works.find((work) => work.id === requestedId) || null
+        : data.works[0] || null;
 }
 
-function renderChapters() {
+async function renderChapters() {
     chapterList.replaceChildren();
-    const work = loadWork();
+    let work;
+    try {
+        work = await loadWork();
+    } catch (error) {
+        console.error("Não foi possível carregar os dados da obra:", error);
+        workTitle.textContent = "Erro ao carregar obra";
+        workDescription.textContent = error.message || "Não foi possível carregar os dados do Appwrite.";
+        workAuthor.textContent = "HokuPédia";
+        return;
+    }
 
     if (!work) {
         workTitle.textContent = "Obra não encontrada";
@@ -150,4 +155,5 @@ function renderChapters() {
     }
 }
 
+void showAdminLink();
 renderChapters();

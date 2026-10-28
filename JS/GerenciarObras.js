@@ -8,14 +8,6 @@ const languageNames = {
     en: "Inglês",
     es: "Espanhol"
 };
-const seedWorks = [{
-    id: "demo-naruto",
-    title: "Naruto",
-    author: "Masashi Kishimoto",
-    description: "Acompanhe os capítulos desta obra.",
-    chapters: []
-}];
-
 const workList = document.querySelector("#workList");
 const editorRegion = document.querySelector("#editorRegion");
 const managementPage = document.querySelector(".management-page");
@@ -27,43 +19,35 @@ let previewObjectUrls = [];
 let selectedCoverFile;
 let coverPreviewUrl;
 
-function createId() {
-    return globalThis.crypto?.randomUUID?.()
-        || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+async function apiRequest(url, options = {}) {
+    const { authenticated = false, ...requestOptions } = options;
+    const headers = new Headers(requestOptions.headers);
+    if (requestOptions.body && !(requestOptions.body instanceof Blob)) {
+        headers.set("Content-Type", "application/json");
+        requestOptions.body = JSON.stringify(requestOptions.body);
+    }
+    if (authenticated) {
+        const { jwt } = await account.createJWT();
+        headers.set("X-Appwrite-JWT", jwt);
+    }
+
+    const response = await fetch(url, { ...requestOptions, headers });
+    const contentType = response.headers.get("content-type") || "";
+    const data = contentType.includes("application/json") ? await response.json() : {};
+    if (!response.ok) throw new Error(data.error || `A solicitação falhou (HTTP ${response.status}).`);
+    if (!contentType.includes("application/json")) {
+        throw new Error(`Resposta inesperada do servidor (HTTP ${response.status}).`);
+    }
+    return data;
 }
 
-function loadWorks() {
-    try {
-        const stored = localStorage.getItem(storageKey);
-        if (stored === null) {
-            const initialWorks = structuredClone(seedWorks);
-            localStorage.setItem(storageKey, JSON.stringify(initialWorks));
-            return initialWorks;
-        }
-
-        const parsed = JSON.parse(stored);
-        if (!Array.isArray(parsed)
-            || parsed.some((work) => !work || typeof work.id !== "string"
-                || typeof work.title !== "string" || !Array.isArray(work.chapters))) {
-            throw new Error("Os dados de obras salvos neste navegador estão inválidos.");
-        }
-        return parsed;
-    } catch (error) {
-        console.error("Não foi possível carregar as obras salvas:", error);
-        showFeedback("Não foi possível carregar os dados locais. Verifique o armazenamento do navegador.", true);
-        return structuredClone(seedWorks);
-    }
-}
-
-function saveWorks() {
-    try {
-        localStorage.setItem(storageKey, JSON.stringify(works));
-        return true;
-    } catch (error) {
-        console.error("Não foi possível salvar as obras neste navegador:", error);
-        showFeedback("Não foi possível salvar. O armazenamento do navegador pode estar indisponível.", true);
-        return false;
-    }
+async function uploadImage(file) {
+    return apiRequest(`/api/uploads?filename=${encodeURIComponent(file.name)}`, {
+        method: "POST",
+        headers: { "Content-Type": file.type },
+        body: file,
+        authenticated: true
+    });
 }
 
 function showFeedback(message, isError = false) {
@@ -253,6 +237,7 @@ function renderWorkForm(work, targetRegion = editorRegion) {
     coverInput.name = "cover";
     coverInput.type = "file";
     coverInput.accept = [...imageTypes].join(",");
+    coverInput.required = !work?.cover;
 
     const fields = document.createElement("div");
     fields.className = "work-form-fields";
@@ -367,10 +352,10 @@ function renderChapterForm(work, chapter, targetRegion) {
     row.append(createLanguageSelect(chapter?.language || "pt-BR"));
     const formatField = document.createElement("div");
     formatField.className = "field";
-    formatField.append(document.createTextNode("Formatos aceitos"));
+    formatField.append(document.createTextNode("Formato do arquivo"));
     const formatText = document.createElement("div");
     formatText.className = "selected-files";
-    formatText.textContent = "Imagens: PNG, JPG, JPEG, WEBP, GIF ou AVIF";
+    formatText.textContent = "Envie um arquivo .zip com as imagens PNG, JPG, JPEG, WEBP, GIF ou AVIF.";
     formatField.append(formatText);
     row.append(formatField);
     form.append(row);
@@ -384,19 +369,18 @@ function renderChapterForm(work, chapter, targetRegion) {
     uploadIcon.textContent = "↑";
     uploadLabel.append(uploadIcon);
     const uploadStrong = document.createElement("strong");
-    uploadStrong.textContent = "Clique para adicionar as páginas";
+    uploadStrong.textContent = "Clique para selecionar um arquivo .zip";
     uploadLabel.append(uploadStrong);
     const uploadHint = document.createElement("span");
-    uploadHint.textContent = "Selecione uma ou mais imagens do capítulo";
+    uploadHint.textContent = "O ZIP deve conter apenas imagens e não pode ter senha.";
     uploadLabel.append(uploadHint);
 
     const fileInput = document.createElement("input");
     fileInput.className = "file-input";
     fileInput.id = "chapterPages";
-    fileInput.name = "pages";
+    fileInput.name = "archive";
     fileInput.type = "file";
-    fileInput.multiple = true;
-    fileInput.accept = [...imageTypes].join(",");
+    fileInput.accept = ".zip,application/zip,application/x-zip-compressed";
     form.append(uploadLabel, fileInput);
 
     const selectedFilesLabel = document.createElement("p");
@@ -408,14 +392,23 @@ function renderChapterForm(work, chapter, targetRegion) {
     selectedFilesLabel.textContent = existingNames.length
         ? `Arquivos registrados: ${existingNames.map((name) => name || "Página").join(", ")}`
         : "Nenhum arquivo selecionado.";
-    const previewGrid = document.createElement("div");
-    previewGrid.className = "page-preview-grid";
-    previewGrid.id = "pagePreview";
-    previewGrid.setAttribute("aria-label", "Pré-visualização das páginas selecionadas");
-    form.append(selectedFilesLabel, previewGrid, createFormActions());
+    form.append(selectedFilesLabel, createFormActions());
 
     fileInput.addEventListener("change", () => {
-        acceptSelectedFiles([...fileInput.files], fileInput, selectedFilesLabel, previewGrid, existingNames);
+        const [file] = fileInput.files;
+        if (!file) return;
+        if (!file.name.toLowerCase().endsWith(".zip")) {
+            fileInput.value = "";
+            selectedArchive = undefined;
+            selectedFilesLabel.textContent = existingNames.length
+                ? `Arquivos registrados: ${existingNames.join(", ")}`
+                : "Nenhum arquivo selecionado.";
+            showFeedback("Selecione somente um arquivo com extensão .zip.", true);
+            return;
+        }
+        selectedArchive = file;
+        selectedFilesLabel.textContent = `ZIP selecionado: ${file.name} (${(file.size / (1024 * 1024)).toFixed(1)} MB)`;
+        showFeedback("");
     });
 
     uploadLabel.addEventListener("dragover", (event) => {
@@ -427,72 +420,32 @@ function renderChapterForm(work, chapter, targetRegion) {
         event.preventDefault();
         uploadLabel.classList.remove("is-dragging");
         const files = [...(event.dataTransfer?.files || [])];
-        acceptSelectedFiles(files, fileInput, selectedFilesLabel, previewGrid, existingNames);
+        if (files.length > 1) {
+            selectedArchive = undefined;
+            fileInput.value = "";
+            selectedFilesLabel.textContent = "Selecione somente um arquivo .zip.";
+            showFeedback("Arraste somente um arquivo .zip por capítulo.", true);
+            return;
+        }
+        const [file] = files;
+        if (!file) return;
+        if (!file.name.toLowerCase().endsWith(".zip")) {
+            selectedArchive = undefined;
+            fileInput.value = "";
+            selectedFilesLabel.textContent = existingNames.length
+                ? `Arquivos registrados: ${existingNames.join(", ")}`
+                : "Nenhum arquivo selecionado.";
+            showFeedback("Arraste somente um arquivo com extensão .zip.", true);
+            return;
+        }
+        selectedArchive = file;
+        selectedFilesLabel.textContent = `ZIP selecionado: ${file.name} (${(file.size / (1024 * 1024)).toFixed(1)} MB)`;
+        showFeedback("");
     });
 
     panel.append(form);
     targetRegion.replaceChildren(panel);
-    renderPagePreviews(selectedFiles, previewGrid);
     document.querySelector("#chapterNumber").focus();
-}
-
-function revokePagePreviewUrls() {
-    for (const url of previewObjectUrls) URL.revokeObjectURL(url);
-    previewObjectUrls = [];
-}
-
-function acceptSelectedFiles(files, fileInput, selectedFilesLabel, previewGrid, existingNames) {
-    const invalidFile = files.find((file) => !imageTypes.has(file.type));
-    if (invalidFile) {
-        selectedFiles = [];
-        fileInput.value = "";
-        revokePagePreviewUrls();
-        previewGrid.replaceChildren();
-        selectedFilesLabel.textContent = "Nenhum arquivo selecionado.";
-        showFeedback(`O arquivo “${invalidFile.name}” não é uma imagem compatível.`, true);
-        return;
-    }
-
-    selectedFiles = files;
-    selectedFilesLabel.textContent = selectedFiles.length
-        ? `${selectedFiles.length} página${selectedFiles.length === 1 ? "" : "s"} selecionada${selectedFiles.length === 1 ? "" : "s"}`
-        : existingNames.length
-            ? `Arquivos registrados: ${existingNames.join(", ")}`
-            : "Nenhum arquivo selecionado.";
-    renderPagePreviews(selectedFiles, previewGrid);
-    showFeedback("");
-}
-
-function renderPagePreviews(files, previewGrid) {
-    revokePagePreviewUrls();
-    previewGrid.replaceChildren();
-
-    files.forEach((file, index) => {
-        const objectUrl = URL.createObjectURL(file);
-        previewObjectUrls.push(objectUrl);
-
-        const item = document.createElement("figure");
-        item.className = "page-preview";
-
-        const imageButton = document.createElement("button");
-        imageButton.className = "page-preview-open";
-        imageButton.type = "button";
-        imageButton.setAttribute("aria-label", `Ampliar pré-visualização da página ${index + 1}: ${file.name}`);
-        imageButton.dataset.previewSrc = objectUrl;
-        imageButton.dataset.previewAlt = `Pré-visualização ampliada da página ${index + 1}: ${file.name}`;
-        const image = document.createElement("img");
-        image.src = objectUrl;
-        image.alt = "";
-        image.loading = "lazy";
-        imageButton.append(image);
-        item.append(imageButton);
-
-        const caption = document.createElement("figcaption");
-        caption.textContent = `${String(index + 1).padStart(2, "0")} · ${file.name}`;
-        caption.title = file.name;
-        item.append(caption);
-        previewGrid.append(item);
-    });
 }
 
 function createEditorPanel(title) {
@@ -523,8 +476,7 @@ function createFormActions() {
 }
 
 function closeEditor() {
-    selectedFiles = [];
-    revokePagePreviewUrls();
+    selectedArchive = undefined;
     selectedCoverFile = undefined;
     if (coverPreviewUrl) URL.revokeObjectURL(coverPreviewUrl);
     coverPreviewUrl = undefined;
@@ -570,52 +522,47 @@ function setEditor(type, workId, chapterId = null) {
     renderChapterForm(work, chapter, chapterEditorRegion);
 }
 
-function fileToDataUrl(file) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.addEventListener("load", () => {
-            if (typeof reader.result === "string") resolve(reader.result);
-            else reject(new Error("O navegador não retornou os dados da imagem."));
-        }, { once: true });
-        reader.addEventListener("error", () => reject(reader.error || new Error("Não foi possível ler a imagem.")), { once: true });
-        reader.readAsDataURL(file);
-    });
-}
-
 async function handleWorkSubmit(form) {
     const formData = new FormData(form);
     const workId = form.dataset.workId;
     const existing = works.find((work) => work.id === workId);
     let cover = existing?.cover || "";
+    let coverFileId = existing?.coverFileId || "";
     if (selectedCoverFile) {
         try {
-            cover = await fileToDataUrl(selectedCoverFile);
+            ({ url: cover, fileId: coverFileId } = await uploadImage(selectedCoverFile));
         } catch (error) {
-            console.error("Não foi possível carregar a imagem da capa:", error);
-            showFeedback("Não foi possível ler a imagem da capa. Tente selecionar o arquivo novamente.", true);
+            console.error("Não foi possível enviar a imagem da capa:", error);
+            showFeedback(error.message || "Não foi possível enviar a imagem da capa.", true);
             return;
         }
     }
     const updated = {
-        id: existing?.id || createId(),
-        title: String(formData.get("title") || "").trim(),
+        title,
         author: String(formData.get("author") || "").trim(),
         description: String(formData.get("description") || "").trim(),
         cover,
-        chapters: existing?.chapters || []
+        coverFileId
     };
-    if (!updated.title) {
-        showFeedback("Informe o nome da obra.", true);
-        return;
-    }
 
-    works = existing
-        ? works.map((work) => work.id === workId ? updated : work)
-        : [updated, ...works];
-    if (!saveWorks()) return;
-    renderWorks();
-    closeEditor();
-    showFeedback(existing ? "Obra atualizada." : "Obra adicionada.");
+    try {
+        const result = await apiRequest(
+            existing ? `/api/works/${encodeURIComponent(workId)}` : "/api/works",
+            { method: existing ? "PUT" : "POST", body: updated, authenticated: true }
+        );
+        works = existing
+            ? works.map((work) => work.id === workId
+                ? { ...result.work, id: workId, chapters: work.chapters }
+                : work)
+            : [result.work, ...works];
+        renderWorks();
+        closeEditor();
+        showFeedback(existing ? "Obra atualizada no Appwrite." : "Obra adicionada ao Appwrite.");
+        selectedCoverFile = undefined;
+    } catch (error) {
+        console.error("Não foi possível salvar a obra:", error);
+        showFeedback(error.message || "Não foi possível salvar a obra.", true);
+    }
 }
 
 async function handleChapterSubmit(form) {
@@ -698,19 +645,35 @@ function handleAction(action, card, chapterRow) {
             break;
         case "delete-work":
             if (work && window.confirm(`Excluir a obra “${work.title}” e todos os seus capítulos?`)) {
-                works = works.filter((item) => item.id !== workId);
-                if (!saveWorks()) return;
-                renderWorks();
-                closeEditor();
-                showFeedback("Obra excluída deste navegador.");
+                try {
+                    await apiRequest(`/api/works/${encodeURIComponent(workId)}`, {
+                        method: "DELETE",
+                        authenticated: true
+                    });
+                    works = works.filter((item) => item.id !== workId);
+                    renderWorks();
+                    closeEditor();
+                    showFeedback("Obra excluída do Appwrite.");
+                } catch (error) {
+                    console.error("Não foi possível excluir a obra:", error);
+                    showFeedback(error.message || "Não foi possível excluir a obra.", true);
+                }
             }
             break;
         case "delete-chapter":
             if (work && window.confirm(`Excluir “${chapterRow.querySelector(".chapter-row-title").textContent}”?`)) {
-                work.chapters = work.chapters.filter((chapter) => chapter.id !== chapterId);
-                if (!saveWorks()) return;
-                renderWorks();
-                showFeedback("Capítulo excluído deste navegador.");
+                try {
+                    await apiRequest(`/api/chapters/${encodeURIComponent(chapterId)}`, {
+                        method: "DELETE",
+                        authenticated: true
+                    });
+                    work.chapters = work.chapters.filter((chapter) => chapter.id !== chapterId);
+                    renderWorks();
+                    showFeedback("Capítulo excluído do Appwrite.");
+                } catch (error) {
+                    console.error("Não foi possível excluir o capítulo:", error);
+                    showFeedback(error.message || "Não foi possível excluir o capítulo.", true);
+                }
             }
             break;
         case "close-editor":
@@ -720,7 +683,7 @@ function handleAction(action, card, chapterRow) {
         case "submit-form": {
             const form = managementPage.querySelector(".editor-region form");
             if (form && !form.reportValidity()) return;
-            if (form?.dataset.formType === "work") handleWorkSubmit(form);
+            if (form?.dataset.formType === "work") void handleWorkSubmit(form);
             if (form?.dataset.formType === "chapter") {
                 void handleChapterSubmit(form);
             }
@@ -744,37 +707,17 @@ managementPage.addEventListener("click", (event) => {
 
     const button = event.target.closest("button[data-action]");
     if (!button) return;
-    handleAction(
+    void handleAction(
         button.dataset.action,
         button.closest(".work-card"),
         button.closest(".chapter-row")
     );
 });
 
-function getImagePreviewDialog() {
-    let dialog = document.querySelector("#imagePreviewDialog");
-    if (dialog) return dialog;
-
-    dialog = document.createElement("dialog");
-    dialog.className = "image-preview-dialog";
-    dialog.id = "imagePreviewDialog";
-    const image = document.createElement("img");
-    image.className = "image-preview-large";
-    dialog.append(image);
-    dialog.addEventListener("click", (event) => {
-        if (event.target === dialog) dialog.close();
-    });
-    dialog.addEventListener("close", () => {
-        image.removeAttribute("src");
-        image.alt = "";
-    });
-    document.body.append(dialog);
-    return dialog;
-}
-managementPage.addEventListener("submit", (event) => {
+if (isAdmin) managementPage.addEventListener("submit", (event) => {
     event.preventDefault();
-    if (event.target.dataset.formType === "work") handleWorkSubmit(event.target);
-    if (event.target.dataset.formType === "chapter") handleChapterSubmit(event.target);
+    if (event.target.dataset.formType === "work") void handleWorkSubmit(event.target);
+    if (event.target.dataset.formType === "chapter") void handleChapterSubmit(event.target);
 });
 
 renderWorks();

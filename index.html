@@ -24,9 +24,9 @@
     <button class="menu-lateral-overlay" id="menuOverlay" type="button" aria-label="Fechar dashboard" hidden></button>
     <aside class="menu-lateral-dashboard" id="dashboard" aria-label="Navegação principal" aria-hidden="true" inert>
       <nav class="menu-lateral-items" aria-label="Navegação principal">
-        <button class="menu-lateral-item" type="button" data-href="/">Home</button>
-        <button class="menu-lateral-item" type="button" data-href="/HTML/Biblioteca.html">Biblioteca</button>
-        <button class="menu-lateral-item" type="button" data-href="/HTML/Login.html">Login</button>
+        <a class="menu-lateral-item" href="/">Home</a>
+        <a class="menu-lateral-item" href="/HTML/Biblioteca.html">Biblioteca</a>
+        <a class="menu-lateral-item" href="/HTML/CadLog.html?mode=login">Login</a>
       </nav>
     </aside>
 
@@ -127,6 +127,18 @@
                   <p>Manhwa</p>
                 </article>
               </div>
+            </div>
+            <button class="carrossel-botao" type="button" data-carousel-next aria-label="Próximas obras">›</button>
+          </div>
+        </section>
+
+        <section class="novidades" aria-labelledby="titulo-obras-comunidade">
+          <h2 id="titulo-obras-comunidade">Obras da Comunidade</h2>
+          <p id="communityWorksStatus" role="status" aria-live="polite"></p>
+          <div class="carrossel-controles" data-carousel>
+            <button class="carrossel-botao" type="button" data-carousel-previous aria-label="Obras anteriores">‹</button>
+            <div class="carrossel-janela">
+              <div class="obras-faixa" data-community-works></div>
             </div>
             <button class="carrossel-botao" type="button" data-carousel-next aria-label="Próximas obras">›</button>
           </div>

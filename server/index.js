@@ -1,19 +1,51 @@
 import dotenv from 'dotenv';
-dotenv.config();
-
 import { GoogleGenAI } from '@google/genai';
 import cors from 'cors';
 import express from 'express';
 import fs from 'fs';
+import { createServer } from 'http';
 import path from 'path';
-import mysql from 'mysql2/promise';
+import { fileURLToPath } from 'url';
+import { Account, Client, Databases, ID, Query } from 'node-appwrite';
+import ImageKit from 'imagekit';
+import { readChapterArchive } from './chapterArchive.js';
 
 const app = express();
+const rootDirectory = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+dotenv.config({ path: path.join(rootDirectory, '.env') });
+dotenv.config({ path: path.join(rootDirectory, 'Database', '.env') });
 const PORT = process.env.PORT || 3001;
-const SCHEMA_PATH = path.resolve('Database', 'schema.sql');
-const SEED_PATH = path.resolve('Database', 'seed.sql');
-const READER_DIRECTORY = path.resolve('public', 'reader');
+const READER_DIRECTORY = path.join(rootDirectory, 'public', 'reader');
 const READER_IMAGE_EXTENSIONS = new Set(['.avif', '.gif', '.jpeg', '.jpg', '.png', '.webp']);
+const UPLOAD_IMAGE_TYPES = new Set(['image/avif', 'image/gif', 'image/jpeg', 'image/png', 'image/webp']);
+const MAX_UPLOAD_BYTES = Number.parseInt(process.env.MAX_IMAGE_BYTES || '20971520', 10);
+const MAX_CHAPTER_PAGES = Number.parseInt(process.env.MAX_CHAPTER_PAGES || '500', 10);
+const MAX_CHAPTER_ARCHIVE_BYTES = Number.parseInt(process.env.MAX_CHAPTER_ARCHIVE_BYTES || '104857600', 10);
+const MAX_CHAPTER_UNPACKED_BYTES = 209715200;
+const ADMIN_EMAIL = 'hokupedia@gmail.com';
+const appwriteEndpoint = process.env.APPWRITE_ENDPOINT;
+const appwriteProjectId = process.env.APPWRITE_PROJECT_ID;
+const appwriteApiKey = process.env.APPWRITE_API_KEY;
+const appwriteDatabaseId = process.env.APPWRITE_DATABASE_ID;
+const worksCollectionId = process.env.APPWRITE_WORKS_COLLECTION_ID;
+const chaptersCollectionId = process.env.APPWRITE_CHAPTERS_COLLECTION_ID;
+const pagesCollectionId = process.env.APPWRITE_PAGES_COLLECTION_ID;
+const moderationRequestsCollectionId = process.env.APPWRITE_MODERATION_REQUESTS_COLLECTION_ID;
+const workRequestsCollectionId = process.env.APPWRITE_WORK_REQUESTS_COLLECTION_ID;
+const appwriteClient = new Client();
+if (appwriteEndpoint) appwriteClient.setEndpoint(appwriteEndpoint);
+if (appwriteProjectId) appwriteClient.setProject(appwriteProjectId);
+if (appwriteApiKey) appwriteClient.setKey(appwriteApiKey);
+const databases = new Databases(appwriteClient);
+const imageKit = process.env.IMAGEKIT_PUBLIC_KEY
+  && process.env.IMAGEKIT_PRIVATE_KEY
+  && process.env.IMAGEKIT_URL_ENDPOINT
+  ? new ImageKit({
+    publicKey: process.env.IMAGEKIT_PUBLIC_KEY,
+    privateKey: process.env.IMAGEKIT_PRIVATE_KEY,
+    urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT
+  })
+  : undefined;
 const gemini = process.env.GEMINI_API_KEY
   ? new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
   : undefined;
@@ -27,93 +59,144 @@ const groqApiKey = process.env.GROQ_API_KEY;
 const groqModel = process.env.GROQ_MODEL || 'llama-3.2-11b-vision-preview';
 const providerTimeoutMs = 180000;
 
-function readSqlStatements(filePath) {
-  return fs.readFileSync(filePath, 'utf8')
-    .replace(/^\uFEFF/, '')
-    .replace(/^\s*--.*$/gm, '')
-    .split(';')
-    .map((statement) => statement.trim())
-    .filter(statement => statement.length > 0 && !/^PRAGMA\b/i.test(statement));
-}
-
 app.use(express.json({ limit: '15mb' }));
 app.use(cors({ origin: '*' }));
-app.use('/HTML', express.static(path.resolve('HTML')));
-app.use('/CSS', express.static(path.resolve('CSS')));
-app.use('/JS', express.static(path.resolve('JS')));
-app.use('/reader', express.static(READER_DIRECTORY));
 
-const databaseName = process.env.DB_NAME || 'hokupedia';
-const mysqlConnectionOptions = {
-  host: process.env.DB_HOST || 'localhost',
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || 'root',
-};
-const pool = mysql.createPool({
-  ...mysqlConnectionOptions,
-  database: databaseName,
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0
-});
-
-async function ensureDatabase() {
-  const connection = await mysql.createConnection(mysqlConnectionOptions);
-  try {
-    await connection.query(
-      `CREATE DATABASE IF NOT EXISTS ${mysql.escapeId(databaseName)} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
-    );
-  } finally {
-    await connection.end();
+function requireAppwriteConfiguration() {
+  const missing = [
+    ['APPWRITE_ENDPOINT', appwriteEndpoint],
+    ['APPWRITE_PROJECT_ID', appwriteProjectId],
+    ['APPWRITE_API_KEY', appwriteApiKey],
+    ['APPWRITE_DATABASE_ID', appwriteDatabaseId],
+    ['APPWRITE_WORKS_COLLECTION_ID', worksCollectionId],
+    ['APPWRITE_CHAPTERS_COLLECTION_ID', chaptersCollectionId],
+    ['APPWRITE_PAGES_COLLECTION_ID', pagesCollectionId]
+  ].filter(([, value]) => !value).map(([name]) => name);
+  if (missing.length) {
+    throw new Error(`Configuração Appwrite ausente: ${missing.join(', ')}`);
   }
 }
 
-async function initDb() {
-  let connection;
-  try {
-    await ensureDatabase();
-    connection = await pool.getConnection();
-    for (const statement of readSqlStatements(SCHEMA_PATH)) {
-      await connection.query(statement);
-    }
+function getAppwriteStatus(error) {
+  return Number.isInteger(error?.code) && error.code >= 400 && error.code < 600
+    ? error.code
+    : 500;
+}
 
-    const [rows] = await connection.query("SHOW TABLES LIKE 'usuarios'");
-    if (rows.length > 0 && fs.existsSync(SEED_PATH)) {
-      const [countResult] = await connection.query('SELECT COUNT(*) as c FROM usuarios');
-      if (Number(countResult[0].c) === 0) {
-        await connection.beginTransaction();
-        try {
-          for (const statement of readSqlStatements(SEED_PATH)) {
-            await connection.query(statement);
-          }
-          await connection.commit();
-        } catch (err) {
-          console.error('Seed failed', err);
-          await connection.rollback();
-          throw err;
-        }
-      }
-    }
-    console.log('Conectado com sucesso ao MySQL e tabelas criadas!');
-  } catch (err) {
-    console.error('Erro ao inicializar o banco de dados MySQL:', err);
-    throw err;
-  } finally {
-    connection?.release();
+function sendAppwriteError(res, error, message) {
+  console.error(`${message}:`, error);
+  return res.status(getAppwriteStatus(error)).json({
+    error: error?.message || message
+  });
+}
+
+async function listAllDocuments(collectionId, filters = []) {
+  const documents = [];
+  let offset = 0;
+  let total = 0;
+  let lastPageSize = 0;
+  do {
+    const result = await databases.listDocuments(
+      appwriteDatabaseId,
+      collectionId,
+      [...filters, Query.limit(100), Query.offset(offset)]
+    );
+    documents.push(...result.documents);
+    total = result.total;
+    lastPageSize = result.documents.length;
+    offset += lastPageSize;
+  } while (offset < total && lastPageSize > 0);
+  return documents;
+}
+
+function isValidPage(page) {
+  if (!page || typeof page.name !== 'string' || page.name.length > 255
+    || typeof page.fileId !== 'string' || page.fileId.length > 255
+    || typeof page.url !== 'string' || page.url.length > 2048
+    || !UPLOAD_IMAGE_TYPES.has(page.format)) return false;
+  try {
+    const imageUrl = new URL(page.url);
+    const endpointUrl = new URL(process.env.IMAGEKIT_URL_ENDPOINT);
+    return imageUrl.protocol === 'https:' && imageUrl.origin === endpointUrl.origin;
+  } catch {
+    return false;
   }
+}
+
+function getChapterValidationError(number, title, language, pages) {
+  if (!Number.isInteger(number) || number < 1) return 'Informe um número de capítulo inteiro maior que zero.';
+  if (typeof title !== 'string' || title.length > 255 || typeof language !== 'string' || language.length > 16) {
+    return 'O título ou idioma do capítulo excede o tamanho permitido.';
+  }
+  if (!Array.isArray(pages) || pages.length === 0) return 'Selecione ao menos uma página para o capítulo.';
+  if (pages.length > MAX_CHAPTER_PAGES) return `O capítulo excede o limite de ${MAX_CHAPTER_PAGES} páginas.`;
+  if (pages.some((page) => !isValidPage(page))) return 'Uma ou mais páginas têm URL ou dados inválidos.';
+  return null;
+}
+
+async function requireAuthenticatedUser(req, res, next) {
+  const jwt = req.get('X-Appwrite-JWT');
+  if (!jwt) return res.status(401).json({ error: 'Faça login para alterar obras e imagens.' });
+  try {
+    const authenticatedClient = new Client()
+      .setEndpoint(appwriteEndpoint)
+      .setProject(appwriteProjectId)
+      .setJWT(jwt);
+    req.appwriteUser = await new Account(authenticatedClient).get();
+    return next();
+  } catch (error) {
+    if (error?.code === 401) {
+      return res.status(401).json({ error: 'Sua sessão expirou. Faça login novamente.' });
+    }
+    console.error('Appwrite authentication failed:', error);
+    return res.status(503).json({ error: 'Não foi possível validar sua sessão.' });
+  }
+}
+
+function requireAdminUser(req, res, next) {
+  if (req.appwriteUser?.email?.trim().toLowerCase() !== ADMIN_EMAIL) {
+    return res.status(403).json({ error: 'Acesso disponível somente para o administrador.' });
+  }
+  return next();
+}
+
+function isImageKitAsset(url) {
+  if (typeof url !== 'string' || !url.trim()) return false;
+  try {
+    const assetUrl = new URL(url);
+    const endpointUrl = new URL(process.env.IMAGEKIT_URL_ENDPOINT);
+    return assetUrl.protocol === 'https:' && assetUrl.origin === endpointUrl.origin;
+  } catch {
+    return false;
+  }
+}
+
+function getWorkAttribute(value) {
+  if (typeof value === 'string') return value;
+  return Array.isArray(value) && typeof value[0] === 'string' ? value[0] : '';
 }
 
 const screenRoutes = {
   '/CadLog': 'CadLog.html',
-  '/Cadastro': 'Cadastro.html',
-  '/Login': 'Login.html',
+  '/Cadastro': 'CadLog.html',
+  '/Login': 'CadLog.html',
   '/GerenciarObras': 'GerenciarObras.html',
   '/Obra': 'Obra.html'
 };
 
+app.get('/HTML/Cadastro.html', (req, res) => {
+  res.redirect(302, '/HTML/CadLog.html?mode=register');
+});
+app.get('/HTML/Login.html', (req, res) => {
+  res.redirect(302, '/HTML/CadLog.html?mode=login');
+});
+
 for (const [route, file] of Object.entries(screenRoutes)) {
   app.get(route, (req, res, next) => {
-    res.sendFile(path.resolve('HTML', file), (err) => {
+    const frontendDirectory = process.env.NODE_ENV === 'production'
+      ? path.join(rootDirectory, 'dist', 'HTML')
+      : path.join(rootDirectory, 'HTML');
+    res.sendFile(path.join(frontendDirectory, file), (err) => {
       if (err) next(err);
     });
   });
@@ -126,11 +209,475 @@ app.get('/Leitura', (req, res) => {
 
 app.get('/api/health', async (req, res) => {
   try {
-    await pool.query('SELECT 1');
-    res.json({ status: 'ok', database: 'connected' });
+    await databases.get(appwriteDatabaseId);
+    res.json({
+      status: 'ok',
+      database: 'connected',
+      imageStorage: imageKit ? 'configured' : 'missing_configuration'
+    });
   } catch (err) {
     console.error('Health check failed:', err);
     res.status(503).json({ status: 'error', database: 'disconnected' });
+  }
+});
+
+app.post('/api/uploads', requireAuthenticatedUser, requireAdminUser, express.raw({
+  type: [...UPLOAD_IMAGE_TYPES],
+  limit: MAX_UPLOAD_BYTES
+}), async (req, res) => {
+  if (!imageKit) {
+    return res.status(503).json({ error: 'Configure as chaves pública e privada e o endpoint do ImageKit no servidor.' });
+  }
+  if (!UPLOAD_IMAGE_TYPES.has(req.get('Content-Type')?.split(';')[0])) {
+    return res.status(415).json({ error: 'Formato de imagem não suportado.' });
+  }
+  if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+    return res.status(400).json({ error: 'Envie um arquivo de imagem válido.' });
+  }
+  const rawFileName = typeof req.query.filename === 'string' ? req.query.filename : 'imagem';
+  const fileName = path.basename(rawFileName).replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 180) || 'imagem';
+  try {
+    const uploaded = await imageKit.upload({
+      file: req.body,
+      fileName,
+      folder: '/hokupedia',
+      useUniqueFileName: true
+    });
+    return res.status(201).json({
+      name: fileName,
+      url: uploaded.url,
+      fileId: uploaded.fileId
+    });
+  } catch (error) {
+    console.error('ImageKit upload failed:', error);
+    return res.status(502).json({ error: 'Não foi possível enviar a imagem ao ImageKit.' });
+  }
+});
+
+app.post('/api/uploads/chapter-archive', requireAuthenticatedUser, requireAdminUser, express.raw({
+  type: ['application/zip', 'application/x-zip-compressed'],
+  limit: MAX_CHAPTER_ARCHIVE_BYTES
+}), async (req, res) => {
+  if (!imageKit) {
+    return res.status(503).json({ error: 'Configure as chaves do ImageKit no servidor.' });
+  }
+  const filename = typeof req.query.filename === 'string' ? req.query.filename : '';
+  if (!filename.toLowerCase().endsWith('.zip')) {
+    return res.status(415).json({ error: 'Envie um único arquivo .zip com as páginas do capítulo.' });
+  }
+  if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+    return res.status(400).json({ error: 'O arquivo ZIP está vazio ou não foi enviado corretamente.' });
+  }
+
+  let pages;
+  try {
+    pages = await readChapterArchive(req.body, {
+      maxImageBytes: MAX_UPLOAD_BYTES,
+      maxPages: MAX_CHAPTER_PAGES,
+      maxUnpackedBytes: MAX_CHAPTER_UNPACKED_BYTES
+    });
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+  if (pages.length === 0) {
+    return res.status(400).json({ error: 'O ZIP não contém páginas de imagem compatíveis.' });
+  }
+
+  const uploadedFiles = [];
+  try {
+    for (const page of pages) {
+      const image = await imageKit.upload({
+        file: page.buffer,
+        fileName: page.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 180) || 'pagina',
+        folder: '/hokupedia',
+        useUniqueFileName: true
+      });
+      uploadedFiles.push({
+        name: page.name,
+        url: image.url,
+        fileId: image.fileId,
+        format: page.format
+      });
+    }
+    return res.status(201).json({ pages: uploadedFiles });
+  } catch (error) {
+    console.error('Chapter archive upload failed:', error);
+    const cleanupResults = await Promise.allSettled(
+      uploadedFiles.map((file) => imageKit.deleteFile(file.fileId))
+    );
+    cleanupResults.forEach((result) => {
+      if (result.status === 'rejected') console.error('Could not clean up a partial chapter archive upload:', result.reason);
+    });
+    return res.status(502).json({ error: 'Não foi possível enviar todas as páginas do ZIP ao ImageKit.' });
+  }
+});
+
+app.delete('/api/uploads/:fileId', requireAuthenticatedUser, requireAdminUser, async (req, res) => {
+  if (!imageKit) {
+    return res.status(503).json({ error: 'Configure as chaves do ImageKit no servidor.' });
+  }
+  try {
+    const file = await imageKit.getFileDetails(req.params.fileId);
+    if (!file.filePath.startsWith('/hokupedia/')) {
+      return res.status(404).json({ error: 'Arquivo não encontrado na biblioteca da HokuPédia.' });
+    }
+    await imageKit.deleteFile(req.params.fileId);
+    return res.json({ deleted: true });
+  } catch (error) {
+    console.error('ImageKit file deletion failed:', error);
+    return res.status(502).json({ error: 'Não foi possível excluir a imagem temporária do ImageKit.' });
+  }
+});
+
+app.get('/api/works', async (req, res) => {
+  try {
+    const [workDocuments, chapterDocuments, pageDocuments] = await Promise.all([
+      listAllDocuments(worksCollectionId),
+      listAllDocuments(chaptersCollectionId),
+      listAllDocuments(pagesCollectionId)
+    ]);
+    const pagesByChapter = new Map();
+    for (const page of pageDocuments) {
+      const pages = pagesByChapter.get(page.chapterId) || [];
+      pages.push({
+        id: page.$id,
+        name: page.originalName,
+        url: page.imageUrl,
+        fileId: page.imageFileId,
+        format: page.format,
+        position: page.number - 1
+      });
+      pagesByChapter.set(page.chapterId, pages);
+    }
+    const chaptersByWork = new Map();
+    for (const chapter of chapterDocuments) {
+      const pages = (pagesByChapter.get(chapter.$id) || [])
+        .sort((left, right) => left.position - right.position);
+      const workChapters = chaptersByWork.get(chapter.workId) || [];
+      workChapters.push({
+        id: chapter.$id,
+        number: chapter.number,
+        title: getWorkAttribute(chapter.title),
+        language: chapter.language,
+        pages
+      });
+      chaptersByWork.set(chapter.workId, workChapters);
+    }
+    return res.json({
+      works: workDocuments.map((work) => ({
+        id: work.$id,
+        title: getWorkAttribute(work.Title),
+        author: getWorkAttribute(work.Author),
+        description: getWorkAttribute(work.Description),
+        cover: getWorkAttribute(work.coverUrl),
+        coverFileId: '',
+        chapters: (chaptersByWork.get(work.$id) || [])
+          .sort((left, right) => left.number - right.number)
+      }))
+    });
+  } catch (error) {
+    return sendAppwriteError(res, error, 'Não foi possível carregar as obras do Appwrite.');
+  }
+});
+
+app.post('/api/works', requireAuthenticatedUser, requireAdminUser, async (req, res) => {
+  const { title, author = '', description = '', cover = '', coverFileId = '' } = req.body || {};
+  if (typeof title !== 'string' || !title.trim()
+    || title.length > 255
+    || [author, description, cover, coverFileId].some((value) => typeof value !== 'string')
+    || author.length > 255 || description.length > 10000 || cover.length > 2048 || coverFileId.length > 255
+    || !isImageKitAsset(cover)) {
+    return res.status(400).json({ error: 'Informe o nome da obra e envie uma capa válida ao ImageKit.' });
+  }
+  try {
+    const document = await databases.createDocument(
+      appwriteDatabaseId,
+      worksCollectionId,
+      ID.unique(),
+      {
+        Title: title.trim(),
+        createBy: req.appwriteUser.$id,
+        Author: [author],
+        Description: [description],
+        coverUrl: [cover]
+      }
+    );
+    return res.status(201).json({
+      work: {
+        id: document.$id,
+        title: getWorkAttribute(document.Title),
+        author: getWorkAttribute(document.Author),
+        description: getWorkAttribute(document.Description),
+        cover: getWorkAttribute(document.coverUrl),
+        coverFileId: '',
+        chapters: []
+      }
+    });
+  } catch (error) {
+    return sendAppwriteError(res, error, 'Não foi possível salvar a obra no Appwrite.');
+  }
+});
+
+app.put('/api/works/:id', requireAuthenticatedUser, requireAdminUser, async (req, res) => {
+  const { title, author = '', description = '', cover = '', coverFileId = '' } = req.body || {};
+  if (typeof title !== 'string' || !title.trim()
+    || title.length > 255
+    || [author, description, cover, coverFileId].some((value) => typeof value !== 'string')
+    || author.length > 255 || description.length > 10000 || cover.length > 2048 || coverFileId.length > 255
+    || !isImageKitAsset(cover)) {
+    return res.status(400).json({ error: 'Informe o nome da obra e envie uma capa válida ao ImageKit.' });
+  }
+  try {
+    const document = await databases.updateDocument(
+      appwriteDatabaseId,
+      worksCollectionId,
+      req.params.id,
+      {
+        Title: title.trim(),
+        Author: [author],
+        Description: [description],
+        coverUrl: [cover]
+      }
+    );
+    return res.json({
+      work: {
+        id: document.$id,
+        title: getWorkAttribute(document.Title),
+        author: getWorkAttribute(document.Author),
+        description: getWorkAttribute(document.Description),
+        cover: getWorkAttribute(document.coverUrl),
+        coverFileId: ''
+      }
+    });
+  } catch (error) {
+    return sendAppwriteError(res, error, 'Não foi possível atualizar a obra no Appwrite.');
+  }
+});
+
+app.delete('/api/works/:id', requireAuthenticatedUser, requireAdminUser, async (req, res) => {
+  try {
+    await databases.getDocument(appwriteDatabaseId, worksCollectionId, req.params.id);
+    const chapters = await listAllDocuments(chaptersCollectionId, [Query.equal('workId', req.params.id)]);
+    const pagesByChapter = await Promise.all(chapters.map((chapter) => (
+      listAllDocuments(pagesCollectionId, [Query.equal('chapterId', chapter.$id)])
+    )));
+    for (const pages of pagesByChapter) {
+      await Promise.all(pages.map((page) => (
+        databases.deleteDocument(appwriteDatabaseId, pagesCollectionId, page.$id)
+      )));
+    }
+    await Promise.all(chapters.map((chapter) => (
+      databases.deleteDocument(appwriteDatabaseId, chaptersCollectionId, chapter.$id)
+    )));
+    await databases.deleteDocument(appwriteDatabaseId, worksCollectionId, req.params.id);
+    return res.json({ deleted: true });
+  } catch (error) {
+    return sendAppwriteError(res, error, 'Não foi possível excluir a obra do Appwrite.');
+  }
+});
+
+app.post('/api/works/:workId/chapters', requireAuthenticatedUser, requireAdminUser, async (req, res) => {
+  const { number, title = '', language = 'pt-BR', pages } = req.body || {};
+  const validationError = getChapterValidationError(number, title, language, pages);
+  if (validationError) return res.status(400).json({ error: validationError });
+  try {
+    await databases.getDocument(appwriteDatabaseId, worksCollectionId, req.params.workId);
+    const chapter = await databases.createDocument(
+      appwriteDatabaseId,
+      chaptersCollectionId,
+      ID.unique(),
+      {
+        workId: req.params.workId,
+        number,
+        title: [title],
+        language,
+        pageCount: pages.length,
+        status: 'published',
+        createBy: req.appwriteUser.$id
+      }
+    );
+    const createdPages = [];
+    try {
+      for (const [position, page] of pages.entries()) {
+        const document = await databases.createDocument(
+          appwriteDatabaseId,
+          pagesCollectionId,
+          ID.unique(),
+          {
+            chapterId: chapter.$id,
+            number: position + 1,
+            originalName: page.name,
+            imageUrl: page.url,
+            imageFileId: page.fileId,
+            format: page.format
+          }
+        );
+        createdPages.push(document);
+      }
+    } catch (error) {
+      await Promise.allSettled(createdPages.map((page) => (
+        databases.deleteDocument(appwriteDatabaseId, pagesCollectionId, page.$id)
+      )));
+      await databases.deleteDocument(appwriteDatabaseId, chaptersCollectionId, chapter.$id);
+      throw error;
+    }
+    return res.status(201).json({
+      chapter: {
+        id: chapter.$id,
+        number,
+        title: getWorkAttribute(chapter.title),
+        language,
+        pages: createdPages.map((page) => ({
+          id: page.$id,
+          name: page.originalName,
+          url: page.imageUrl,
+          fileId: page.imageFileId,
+          format: page.format,
+          position: page.number - 1
+        }))
+      }
+    });
+  } catch (error) {
+    return sendAppwriteError(res, error, 'Não foi possível salvar o capítulo no Appwrite.');
+  }
+});
+
+app.put('/api/chapters/:id', requireAuthenticatedUser, requireAdminUser, async (req, res) => {
+  const { number, title = '', language = 'pt-BR', pages } = req.body || {};
+  const validationError = getChapterValidationError(number, title, language, pages);
+  if (validationError) return res.status(400).json({ error: validationError });
+  try {
+    await databases.getDocument(appwriteDatabaseId, chaptersCollectionId, req.params.id);
+    const existingPages = await listAllDocuments(pagesCollectionId, [
+      Query.equal('chapterId', req.params.id)
+    ]);
+    const createdPages = [];
+    let chapter;
+    try {
+      for (const [position, page] of pages.entries()) {
+        const document = await databases.createDocument(
+          appwriteDatabaseId,
+          pagesCollectionId,
+          ID.unique(),
+          {
+            chapterId: req.params.id,
+            number: position + 1,
+            originalName: page.name,
+            imageUrl: page.url,
+            imageFileId: page.fileId,
+            format: page.format
+          }
+        );
+        createdPages.push(document);
+      }
+      chapter = await databases.updateDocument(
+        appwriteDatabaseId,
+        chaptersCollectionId,
+        req.params.id,
+        {
+          number,
+          title: [title],
+          language,
+          pageCount: pages.length,
+          status: 'published'
+        }
+      );
+    } catch (error) {
+      await Promise.allSettled(createdPages.map((page) => (
+        databases.deleteDocument(appwriteDatabaseId, pagesCollectionId, page.$id)
+      )));
+      throw error;
+    }
+    const cleanupResults = await Promise.allSettled(existingPages.map((page) => (
+      databases.deleteDocument(appwriteDatabaseId, pagesCollectionId, page.$id)
+    )));
+    cleanupResults.forEach((result) => {
+      if (result.status === 'rejected') console.error('Could not delete a replaced chapter page:', result.reason);
+    });
+    return res.json({
+      chapter: {
+        id: chapter.$id,
+        number: chapter.number,
+        title: getWorkAttribute(chapter.title),
+        language: chapter.language,
+        pages: createdPages.map((page) => ({
+          id: page.$id,
+          name: page.originalName,
+          url: page.imageUrl,
+          fileId: page.imageFileId,
+          format: page.format,
+          position: page.number - 1
+        }))
+      }
+    });
+  } catch (error) {
+    return sendAppwriteError(res, error, 'Não foi possível atualizar o capítulo no Appwrite.');
+  }
+});
+
+app.delete('/api/chapters/:id', requireAuthenticatedUser, requireAdminUser, async (req, res) => {
+  try {
+    const pages = await listAllDocuments(pagesCollectionId, [
+      Query.equal('chapterId', req.params.id)
+    ]);
+    await Promise.all(pages.map((page) => (
+      databases.deleteDocument(appwriteDatabaseId, pagesCollectionId, page.$id)
+    )));
+    await databases.deleteDocument(appwriteDatabaseId, chaptersCollectionId, req.params.id);
+    return res.json({ deleted: true });
+  } catch (error) {
+    return sendAppwriteError(res, error, 'Não foi possível excluir o capítulo do Appwrite.');
+  }
+});
+
+app.post('/api/pedido_moderacao', requireAuthenticatedUser, async (req, res) => {
+  if (!moderationRequestsCollectionId) {
+    return res.status(503).json({ error: 'Configure APPWRITE_MODERATION_REQUESTS_COLLECTION_ID para habilitar pedidos de moderação.' });
+  }
+  const { motivos, idiomas_preferencia: idiomasPreferencia } = req.body || {};
+  if (typeof motivos !== 'string' || typeof idiomasPreferencia !== 'string') {
+    return res.status(400).json({ error: 'Informe os motivos e os idiomas de preferência.' });
+  }
+  try {
+    const document = await databases.createDocument(
+      appwriteDatabaseId,
+      moderationRequestsCollectionId,
+      ID.unique(),
+      {
+        usuarioId: req.appwriteUser.$id,
+        motivos,
+        idiomasPreferencia,
+        status: 'PENDENTE'
+      }
+    );
+    return res.status(201).json({
+      pedido: {
+        id: document.$id,
+        usuario_id: document.usuarioId,
+        motivos: document.motivos,
+        idiomas_preferencia: document.idiomasPreferencia,
+        status: document.status
+      }
+    });
+  } catch (error) {
+    return sendAppwriteError(res, error, 'Não foi possível criar o pedido de moderação no Appwrite.');
+  }
+});
+
+app.post('/api/pedido_obra/:id/aprovar', requireAuthenticatedUser, requireAdminUser, async (req, res) => {
+  if (!workRequestsCollectionId) {
+    return res.status(503).json({ error: 'Configure APPWRITE_WORK_REQUESTS_COLLECTION_ID para habilitar pedidos de obra.' });
+  }
+  try {
+    const document = await databases.updateDocument(
+      appwriteDatabaseId,
+      workRequestsCollectionId,
+      req.params.id,
+      { status: 'APROVADO' }
+    );
+    return res.json({ pedido: document });
+  } catch (error) {
+    return sendAppwriteError(res, error, 'Não foi possível aprovar o pedido de obra no Appwrite.');
   }
 });
 
@@ -402,86 +949,20 @@ app.post('/api/gemini', async (req, res) => {
   });
 });
 
-app.post('/api/register', async (req, res) => {
-  const { nome = null, idade = null, email, senha } = req.body;
-  if (!email || !senha) {
-    return res.status(400).json({ error: 'email and senha required' });
-  }
-  try {
-    const [result] = await pool.execute(
-      'INSERT INTO usuarios (nome, idade, email, senha) VALUES (?, ?, ?, ?)',
-      [nome, idade, email, senha]
-    );
-    const [users] = await pool.query(
-      'SELECT id, nome, idade, email FROM usuarios WHERE id = ?',
-      [result.insertId]
-    );
-    res.status(201).json({ user: users[0] });
-  } catch (err) {
-    if (err.code === 'ER_DUP_ENTRY') {
-      return res.status(409).json({ error: 'Email already registered' });
-    }
-    console.error(err);
-    res.status(500).json({ error: 'Could not create user' });
-  }
-});
-
-app.post('/api/login', async (req, res) => {
-  const { email, senha } = req.body;
-  if (!email || !senha) return res.status(400).json({ error: 'email and senha required' });
-  try {
-    const [users] = await pool.query(
-      'SELECT id, nome, idade, email FROM usuarios WHERE email = ? AND senha = ?', 
-      [email, senha]
-    );
-    if (users.length === 0) return res.status(401).json({ error: 'Invalid credentials' });
-    res.json({ user: users[0] });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Login failed' });
-  }
-});
-
-// Simple endpoints to request moderation
-app.post('/api/pedido_moderacao', async (req, res) => {
-  const { usuario_id, motivos, idiomas_preferencia } = req.body;
-  try {
-    const [result] = await pool.execute(
-      'INSERT INTO pedido_moderacao (usuario_id, motivos, idiomas_preferencia) VALUES (?, ?, ?)', 
-      [usuario_id, motivos, idiomas_preferencia]
-    );
-    const [pedidos] = await pool.query('SELECT * FROM pedido_moderacao WHERE id = ?', [result.insertId]);
-    res.json({ pedido: pedidos[0] });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Could not create pedido' });
-  }
-});
-
-// Admin approves pedido_obra
-app.post('/api/pedido_obra/:id/aprovar', async (req, res) => {
-  const id = req.params.id;
-  try {
-    const [result] = await pool.execute(
-      "UPDATE pedido_obra SET status='APROVADO' WHERE id = ?",
-      [id]
-    );
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ error: 'Pedido not found' });
-    }
-    const [pedidos] = await pool.query('SELECT * FROM pedido_obra WHERE id = ?', [id]);
-    res.json({ pedido: pedidos[0] });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Could not update pedido' });
-  }
-});
-
 async function startServer() {
-  await initDb();
+  requireAppwriteConfiguration();
+  if (!Number.isSafeInteger(MAX_UPLOAD_BYTES) || MAX_UPLOAD_BYTES < 1
+    || !Number.isSafeInteger(MAX_CHAPTER_PAGES) || MAX_CHAPTER_PAGES < 1
+    || !Number.isSafeInteger(MAX_CHAPTER_ARCHIVE_BYTES) || MAX_CHAPTER_ARCHIVE_BYTES < 1) {
+    throw new Error('MAX_IMAGE_BYTES, MAX_CHAPTER_PAGES e MAX_CHAPTER_ARCHIVE_BYTES devem ser inteiros positivos.');
+  }
+
+  const server = createServer(app);
+  let vite;
+  let viteReady = false;
 
   if (process.env.NODE_ENV === 'production') {
-    const frontendPath = path.resolve('dist');
+    const frontendPath = path.join(rootDirectory, 'dist');
     app.use(express.static(frontendPath));
     app.get('*', (req, res, next) => {
       if (req.path.startsWith('/api/')) return next();
@@ -490,24 +971,64 @@ async function startServer() {
       });
     });
   } else {
-    const { createServer: createViteServer } = await import('vite');
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: 'spa'
+    app.use((req, res, next) => {
+      if (!viteReady) return res.status(503).send('Development server is starting.');
+      next();
     });
-    app.use(vite.middlewares);
   }
 
-  app.listen(PORT, () => {
-    console.log(`Server listening on http://localhost:${PORT}`);
-    console.log(`Connected to MySQL Database: ${databaseName}`);
-  });
+  try {
+    await new Promise((resolve, reject) => {
+      server.once('error', reject);
+      server.listen(PORT, () => {
+        server.off('error', reject);
+        resolve();
+      });
+    });
+
+    if (process.env.NODE_ENV !== 'production') {
+      const { createServer: createViteServer } = await import('vite');
+      vite = await createViteServer({
+        server: {
+          middlewareMode: true,
+          ws: { server }
+        },
+        appType: 'spa'
+      });
+      app.use(vite.middlewares);
+      viteReady = true;
+    }
+
+    app.use((error, req, res, next) => {
+      if (res.headersSent) return next(error);
+      if (error.type === 'entity.too.large') {
+        return res.status(413).json({ error: 'O arquivo excede o limite de tamanho configurado.' });
+      }
+      if (error.type === 'entity.parse.failed') {
+        return res.status(400).json({ error: 'O corpo da solicitação não contém JSON válido.' });
+      }
+      console.error('Unhandled server error:', error);
+      return res.status(500).json({ error: 'Erro interno do servidor.' });
+    });
+  } catch (error) {
+    if (vite) await vite.close();
+    if (server.listening) {
+      await new Promise((resolve, reject) => {
+        server.close((closeError) => closeError ? reject(closeError) : resolve());
+      });
+    }
+    throw error;
+  }
+
+  console.log(`Server listening on http://localhost:${PORT}`);
+  console.log('Connected to Appwrite.');
 }
 
 startServer().catch((err) => {
-  if (err.code === 'ER_DBACCESS_DENIED_ERROR' || err.code === 'ER_ACCESS_DENIED_ERROR') {
-    console.error(`MySQL user does not have permission to create or access database "${databaseName}". Create it manually or grant CREATE privileges.`);
+  if (err.code === 'EADDRINUSE') {
+    console.error(`Port ${PORT} is already in use. Stop the existing server or set PORT to a free port.`);
+  } else {
+    console.error('Could not start server:', err);
   }
-  console.error('Could not start server:', err);
   process.exitCode = 1;
-})
+});
