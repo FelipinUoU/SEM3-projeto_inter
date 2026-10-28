@@ -9,7 +9,7 @@ O Appwrite substitui o MySQL para autenticação e persistência de obras, capí
 ### Configuração
 
 1. Instale o **Node.js 22 LTS ou superior** e as dependências (`npm install`).
-2. Copie `.env.example` para `.env` na raiz do projeto e configure as variáveis `APPWRITE_*`, `IMAGEKIT_*` e, se usar, as chaves de IA. O servidor também carrega `Database/.env` como configuração local. Não versione nenhum desses arquivos.
+2. Copie `.env.example` para `.env` na raiz do projeto e configure as variáveis `APPWRITE_*`, `IMAGEKIT_*` e, se usar, pelo menos uma chave de IA válida (`GEMINI_API_KEY`, `OPENAI_API_KEY`, `QWEN_API_KEY` ou `GROQ_API_KEY`). Substitua os valores de exemplo; textos como `cole_sua_chave_aqui` não são chaves válidas. As chaves também podem ser definidas em `Database/.env`. Reinicie o servidor depois de alterar o arquivo. Não versione nenhum desses arquivos.
 3. No Appwrite, habilite autenticação por e-mail e senha e cadastre uma Web platform para o host da aplicação (por exemplo, `localhost` no desenvolvimento) e para o domínio de produção. O domínio configurado também precisa permitir o retorno dos links de recuperação para `/HTML/CadLog.html`. Crie uma API key com leitura e escrita de databases/documents e configure o database e as três collections com os IDs das variáveis. Crie estes atributos:
 
    | Collection | Atributos |

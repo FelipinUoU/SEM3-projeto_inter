@@ -1,6 +1,7 @@
 import { createAuthorIcon } from "./authorIcon.js";
+import { account } from "./JAVA/appwriteClient.js";
 
-const storageKey = "hokupedia.works.v1";
+const adminEmail = "hokupedia@gmail.com";
 const imageTypes = new Set(["image/avif", "image/gif", "image/jpeg", "image/png", "image/webp"]);
 const languageNames = {
     "pt-BR": "Português (Brasil)",
@@ -13,9 +14,8 @@ const editorRegion = document.querySelector("#editorRegion");
 const managementPage = document.querySelector(".management-page");
 const addWorkButton = document.querySelector("#addWorkButton");
 const feedback = document.querySelector("#feedback");
-let works = loadWorks();
-let selectedFiles = [];
-let previewObjectUrls = [];
+let works = [];
+let selectedArchive;
 let selectedCoverFile;
 let coverPreviewUrl;
 
@@ -48,6 +48,24 @@ async function uploadImage(file) {
         body: file,
         authenticated: true
     });
+}
+
+async function uploadChapterArchive(file) {
+    return apiRequest(`/api/uploads/chapter-archive?filename=${encodeURIComponent(file.name)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/zip" },
+        body: file,
+        authenticated: true
+    });
+}
+
+async function loadWorks() {
+    const data = await apiRequest("/api/works");
+    if (!Array.isArray(data.works)) {
+        throw new Error("A resposta do Appwrite contém uma lista de obras inválida.");
+    }
+    works = data.works;
+    renderWorks();
 }
 
 function showFeedback(message, isError = false) {
@@ -524,6 +542,11 @@ function setEditor(type, workId, chapterId = null) {
 
 async function handleWorkSubmit(form) {
     const formData = new FormData(form);
+    const title = String(formData.get("title") || "").trim();
+    if (!title) {
+        showFeedback("Informe o nome da obra.", true);
+        return;
+    }
     const workId = form.dataset.workId;
     const existing = works.find((work) => work.id === workId);
     let cover = existing?.cover || "";
@@ -575,50 +598,57 @@ async function handleChapterSubmit(form) {
     const chapterId = form.dataset.chapterId;
     const existing = work.chapters.find((item) => item.id === chapterId);
     const number = Number(formData.get("number"));
-    let pages = existing?.pages || [];
-    if (!selectedFiles.length && pages.some((page) => !page || typeof page !== "object" || !page.dataUrl)) {
-        showFeedback("Este capítulo foi salvo numa versão antiga. Selecione novamente as imagens antes de salvar.", true);
-        return;
-    }
-    if (selectedFiles.length) {
-        try {
-            pages = await Promise.all(selectedFiles.map(async (file) => ({
-                name: file.name,
-                dataUrl: await fileToDataUrl(file)
-            })));
-        } catch (error) {
-            console.error("Não foi possível ler as imagens do capítulo:", error);
-            showFeedback("Não foi possível ler uma ou mais imagens. Tente selecioná-las novamente.", true);
-            return;
-        }
-    }
     const title = String(formData.get("title") || "").trim();
     if (!Number.isInteger(number) || number < 1) {
         showFeedback("Informe um número de capítulo inteiro maior que zero.", true);
         return;
     }
+    let pages = existing?.pages || [];
+    if (selectedArchive) {
+        try {
+            ({ pages } = await uploadChapterArchive(selectedArchive));
+        } catch (error) {
+            console.error("Não foi possível enviar o arquivo do capítulo:", error);
+            showFeedback(error.message || "Não foi possível enviar o arquivo do capítulo.", true);
+            return;
+        }
+    }
+    if (pages.length === 0) {
+        showFeedback("Selecione um arquivo .zip com as páginas do capítulo.", true);
+        return;
+    }
 
-    const chapter = {
-        id: existing?.id || createId(),
-        number,
-        title,
-        language: String(formData.get("language") || "pt-BR"),
-        pages
-    };
-    work.chapters = existing
-        ? work.chapters.map((item) => item.id === chapterId ? chapter : item)
-        : [...work.chapters, chapter];
-
-    if (!saveWorks()) return;
-    renderWorks();
-    closeEditor();
-    selectedFiles = [];
-    showFeedback(existing
-        ? "Capítulo atualizado e páginas salvas neste navegador."
-        : "Capítulo adicionado e páginas salvas neste navegador.");
+    try {
+        const result = await apiRequest(
+            existing
+                ? `/api/chapters/${encodeURIComponent(chapterId)}`
+                : `/api/works/${encodeURIComponent(work.id)}/chapters`,
+            {
+                method: existing ? "PUT" : "POST",
+                body: {
+                    number,
+                    title,
+                    language: String(formData.get("language") || "pt-BR"),
+                    pages
+                },
+                authenticated: true
+            }
+        );
+        work.chapters = existing
+            ? work.chapters.map((chapter) => chapter.id === chapterId ? result.chapter : chapter)
+            : [...work.chapters, result.chapter].sort((left, right) => left.number - right.number);
+        renderWorks();
+        closeEditor();
+        showFeedback(existing
+            ? "Capítulo atualizado no Appwrite."
+            : "Capítulo adicionado ao Appwrite.");
+    } catch (error) {
+        console.error("Não foi possível salvar o capítulo:", error);
+        showFeedback(error.message || "Não foi possível salvar o capítulo.", true);
+    }
 }
 
-function handleAction(action, card, chapterRow) {
+async function handleAction(action, card, chapterRow) {
     const workId = card?.dataset.workId;
     const chapterId = chapterRow?.dataset.chapterId;
     const work = works.find((item) => item.id === workId);
@@ -696,15 +726,6 @@ function handleAction(action, card, chapterRow) {
 
 addWorkButton.addEventListener("click", () => handleAction("add-work"));
 managementPage.addEventListener("click", (event) => {
-    const previewButton = event.target.closest(".page-preview-open");
-    if (previewButton) {
-        const dialog = getImagePreviewDialog();
-        dialog.querySelector("img").src = previewButton.dataset.previewSrc;
-        dialog.querySelector("img").alt = previewButton.dataset.previewAlt;
-        dialog.showModal();
-        return;
-    }
-
     const button = event.target.closest("button[data-action]");
     if (!button) return;
     void handleAction(
@@ -714,10 +735,32 @@ managementPage.addEventListener("click", (event) => {
     );
 });
 
-if (isAdmin) managementPage.addEventListener("submit", (event) => {
+managementPage.addEventListener("submit", (event) => {
     event.preventDefault();
     if (event.target.dataset.formType === "work") void handleWorkSubmit(event.target);
     if (event.target.dataset.formType === "chapter") void handleChapterSubmit(event.target);
 });
 
-renderWorks();
+async function initializeManagementPage() {
+    try {
+        const user = await account.get();
+        if (user.email.trim().toLowerCase() !== adminEmail) {
+            window.location.replace("/");
+            return;
+        }
+        document.body.hidden = false;
+        document.body.style.display = "";
+        await loadWorks();
+    } catch (error) {
+        if (error.code === 401) {
+            window.location.replace("/HTML/CadLog.html?mode=login");
+            return;
+        }
+        document.body.hidden = false;
+        document.body.style.display = "";
+        console.error("Não foi possível inicializar o gerenciamento de obras:", error);
+        showFeedback(error.message || "Não foi possível carregar as obras.", true);
+    }
+}
+
+void initializeManagementPage();

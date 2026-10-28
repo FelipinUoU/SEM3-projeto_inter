@@ -13,7 +13,7 @@ import { readChapterArchive } from './chapterArchive.js';
 const app = express();
 const rootDirectory = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 dotenv.config({ path: path.join(rootDirectory, '.env') });
-dotenv.config({ path: path.join(rootDirectory, 'Database', '.env') });
+const databaseEnvironment = dotenv.config({ path: path.join(rootDirectory, 'Database', '.env') });
 const PORT = process.env.PORT || 3001;
 const READER_DIRECTORY = path.join(rootDirectory, 'public', 'reader');
 const READER_IMAGE_EXTENSIONS = new Set(['.avif', '.gif', '.jpeg', '.jpg', '.png', '.webp']);
@@ -46,16 +46,23 @@ const imageKit = process.env.IMAGEKIT_PUBLIC_KEY
     urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT
   })
   : undefined;
-const gemini = process.env.GEMINI_API_KEY
-  ? new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
+function getConfiguredApiKey(name) {
+  const candidates = [process.env[name], databaseEnvironment.parsed?.[name]];
+  return candidates
+    .map((value) => value?.trim())
+    .find((value) => value && !/^(?:cole_sua_chave|sua_chave|your(?:[_ -]|$)|<[^>]+>|\$\{[^}]+\})/i.test(value));
+}
+const geminiApiKey = getConfiguredApiKey('GEMINI_API_KEY');
+const openAIKey = getConfiguredApiKey('OPENAI_API_KEY');
+const qwenApiKey = getConfiguredApiKey('QWEN_API_KEY');
+const groqApiKey = getConfiguredApiKey('GROQ_API_KEY');
+const gemini = geminiApiKey
+  ? new GoogleGenAI({ apiKey: geminiApiKey })
   : undefined;
-const openAIKey = process.env.OPENAI_API_KEY;
 const openAIModel = process.env.OPENAI_MODEL || 'gpt-4o-mini';
-const qwenApiKey = process.env.QWEN_API_KEY;
 const qwenModel = process.env.QWEN_MODEL || 'qwen-vl-max';
 const qwenApiUrl = process.env.QWEN_API_URL
   || 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions';
-const groqApiKey = process.env.GROQ_API_KEY;
 const groqModel = process.env.GROQ_MODEL || 'llama-3.2-11b-vision-preview';
 const providerTimeoutMs = 180000;
 
@@ -885,7 +892,7 @@ app.post('/api/gemini', async (req, res) => {
   ];
   if (providers.length === 0) {
     return res.status(503).json({
-      error: { message: 'Configure GEMINI_API_KEY, OPENAI_API_KEY, QWEN_API_KEY e/ou GROQ_API_KEY no arquivo .env e reinicie o servidor.' }
+      error: { message: 'Configure ao menos uma chave de API válida para Gemini, OpenAI, Qwen ou Groq no arquivo .env e reinicie o servidor. Valores de exemplo como "cole_sua_chave_aqui" não são aceitos.' }
     });
   }
 
@@ -935,8 +942,11 @@ app.post('/api/gemini', async (req, res) => {
         const status = Number.isInteger(error.status) && error.status >= 400 && error.status < 600
           ? error.status
           : 502;
-        failures.push(`${provider.name} (HTTP ${status}): ${error.message || 'erro sem detalhes'}`);
-        console.error(`${provider.name} AI request failed (HTTP ${status}):`, error.message);
+        const message = status === 401 || status === 403
+          ? 'a chave de API foi recusada ou não tem permissão. Verifique a chave no arquivo .env.'
+          : error.message || 'erro sem detalhes';
+        failures.push(`${provider.name} (HTTP ${status}): ${message}`);
+        console.error(`${provider.name} AI request failed (HTTP ${status}).`);
         break;
       }
     }
