@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#29272f">
+    <title>Meu perfil | HokuPédia</title>
+    <link rel="stylesheet" href="../CSS/Perfil.css">
+    <link rel="stylesheet" href="../CSS/MenuLat.css">
+</head>
+<body>
+    <header>
+        <button
+            class="menu-lateral-button"
+            id="menuBtn"
+            type="button"
+            aria-label="Abrir dashboard"
+            aria-expanded="false"
+            aria-controls="dashboard">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <div class="logo">HokuPédia</div>
+    </header>
+
+    <button class="menu-lateral-overlay" id="menuOverlay" type="button" aria-label="Fechar dashboard" hidden></button>
+
+    <aside class="menu-lateral-dashboard" id="dashboard" aria-label="Navegação principal" aria-hidden="true" inert>
+        <nav class="menu-lateral-items" aria-label="Navegação principal">
+            <a class="menu-lateral-item" href="/">Home</a>
+            <a class="menu-lateral-item" href="/HTML/Biblioteca.html">Biblioteca</a>
+            <a class="menu-lateral-item" href="/HTML/Perfil.html" aria-current="page">Meu perfil</a>
+            <a class="menu-lateral-item" href="/HTML/CadLog.html?mode=login">Login</a>
+        </nav>
+    </aside>
+
+    <main class="profile-page">
+        <input class="profile-mode-toggle" id="editMode" type="checkbox" aria-label="Alternar edição do perfil">
+
+        <section class="profile-card" aria-label="Configurações do perfil">
+            <div class="profile-details">
+                <div class="profile-view-fields" aria-label="Dados do perfil">
+                    <input id="profileName" type="text" placeholder="Nome" aria-label="Nome" readonly>
+                    <input id="profileEmail" type="email" placeholder="Email" aria-label="E-mail" readonly>
+                    <input type="text" value="••••••••" aria-label="Senha cadastrada" readonly>
+                </div>
+
+                <form class="profile-edit-fields" id="profileEditForm" aria-label="Editar dados do perfil">
+                    <input id="editName" name="name" type="text" placeholder="Alterar Nome" aria-label="Alterar nome" autocomplete="name" maxlength="128">
+                    <input id="currentEmail" name="currentEmail" type="email" placeholder="Email que será mudado" aria-label="E-mail atual" autocomplete="email">
+                    <input id="newEmail" name="newEmail" type="email" placeholder="Novo email registrado" aria-label="Novo e-mail" autocomplete="email">
+                    <input id="currentPassword" name="currentPassword" type="password" placeholder="Senha atual (necessária para alterações)" aria-label="Senha atual" autocomplete="current-password">
+                    <input id="newPassword" name="newPassword" type="password" placeholder="Nova Senha" aria-label="Nova senha" autocomplete="new-password" minlength="8" maxlength="256">
+                    <input id="confirmNewPassword" name="confirmNewPassword" type="password" placeholder="Confirmar Nova Senha" aria-label="Confirmar nova senha" autocomplete="new-password" minlength="8" maxlength="256">
+                </form>
+                <p class="profile-feedback" id="profileFeedback" role="status" aria-live="polite"></p>
+            </div>
+
+            <aside class="profile-photo" aria-label="Foto do perfil">
+                <img src="../Img/PerfilExemplo.svg" alt="Foto atual do perfil">
+                <div class="photo-actions">
+                    <input class="photo-input" id="profilePhotoInput" type="file" accept="image/avif,image/gif,image/jpeg,image/png,image/webp" aria-label="Selecionar nova foto de perfil">
+                    <label class="photo-add" for="profilePhotoInput">Adicionar foto</label>
+                    <button class="photo-remove" id="removePhotoButton" type="button">Remover foto</button>
+                </div>
+            </aside>
+
+            <div class="profile-actions">
+                <label class="profile-button profile-edit-button" for="editMode">
+                    <span class="edit-label">Editar</span>
+                    <span class="cancel-label">Cancelar edição</span>
+                </label>
+                <button class="profile-button profile-save-button" type="submit" form="profileEditForm">Salvar Alterações</button>
+                <button class="profile-button profile-delete-button" type="button">Excluir Conta</button>
+            </div>
+        </section>
+    </main>
+
+    <script type="module" src="../JAVA/MenuLat.js"></script>
+    <script type="module" src="../JS/Perfil.js"></script>
+</body>
+</html>

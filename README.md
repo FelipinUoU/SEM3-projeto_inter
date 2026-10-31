@@ -4,7 +4,7 @@ Biblioteca comunitária de leitura de mangás e HQs, com tradução de quadros p
 
 ## Appwrite, ImageKit e servidor
 
-O Appwrite substitui o MySQL para autenticação e persistência de obras, capítulos e páginas. O ImageKit armazena capas e páginas; a chave privada permanece no servidor. Não é necessário executar um serviço MySQL.
+O Appwrite substitui o MySQL para autenticação e persistência de obras, capítulos, páginas e preferências do perfil. O ImageKit armazena capas, páginas e fotos de perfil; a chave privada permanece no servidor. Não é necessário executar um serviço MySQL.
 
 ### Configuração
 
@@ -25,7 +25,7 @@ O Appwrite substitui o MySQL para autenticação e persistência de obras, capí
 4. No painel do ImageKit, configure a chave pública, a chave privada e a URL endpoint. Permita no CORS do ImageKit o domínio da aplicação (incluindo `localhost:3001`) para o leitor poder carregar páginas no canvas usado pela tradução. `VITE_APPWRITE_ENDPOINT` e `VITE_APPWRITE_PROJECT_ID` são valores públicos e devem ficar no `.env` da raiz para o Vite. Nunca use o prefixo `VITE_` em chaves privadas.
 5. Execute `npm run server` e abra `http://localhost:3001`. A rota `http://localhost:3001/api/health` confirma a conexão com o Appwrite e informa se o ImageKit está configurado.
 
-Cadastro, login e recuperação de senha usam Appwrite Auth na tela unificada `HTML/CadLog.html`. A recuperação envia um código de 6 dígitos por e-mail, válido por 15 minutos, que é inserido na mesma tela junto com a nova senha. Alterações no catálogo e uploads exigem uma sessão Appwrite válida. O limite padrão é 20 MB por imagem, 100 MB por ZIP e 500 páginas por capítulo; ajuste `MAX_IMAGE_BYTES`, `MAX_CHAPTER_ARCHIVE_BYTES` e `MAX_CHAPTER_PAGES` no servidor se necessário. Ao excluir obras/capítulos, os documentos do Appwrite são removidos, mas os arquivos enviados permanecem na biblioteca ImageKit para evitar exclusões remotas indevidas; remova arquivos órfãos pelo painel do ImageKit.
+Cadastro, login e recuperação de senha usam Appwrite Auth na tela unificada `HTML/CadLog.html`. A tela `HTML/Perfil.html` permite atualizar nome, e-mail, senha e foto; a URL e o ID da foto ficam nas preferências da conta Appwrite, e a imagem é armazenada no ImageKit. O upload do avatar exige sessão, aceita imagens de até 5 MB e cada usuário só pode excluir as próprias fotos. Alterar e-mail ou senha exige a senha atual; após alterar o e-mail, confirme-o para validar a conta. A recuperação envia um código de 6 dígitos por e-mail, válido por 15 minutos, que é inserido na mesma tela junto com a nova senha. Alterações no catálogo e uploads exigem uma sessão Appwrite válida. O limite padrão é 20 MB por imagem, 100 MB por ZIP e 500 páginas por capítulo; ajuste `MAX_IMAGE_BYTES`, `MAX_CHAPTER_ARCHIVE_BYTES` e `MAX_CHAPTER_PAGES` no servidor se necessário. Ao excluir obras/capítulos, os documentos do Appwrite são removidos, mas os arquivos enviados permanecem na biblioteca ImageKit para evitar exclusões remotas indevidas; remova arquivos órfãos pelo painel do ImageKit.
 
 Contas que estavam no MySQL e obras/páginas anteriormente gravadas no `localStorage` não são importadas automaticamente. Cadastre as contas no Appwrite e reenvie as imagens pelo gerenciamento; mantenha cópias dos dados antigos antes de desativar o MySQL ou limpar os dados locais.
 
