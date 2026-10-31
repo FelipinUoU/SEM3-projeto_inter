@@ -75,8 +75,8 @@ body {
 }
 
 .barra-pesquisa input:focus-visible {
-  outline: 2px solid #fff;
-  outline-offset: 2px;
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.75);
 }
 
 .barra-pesquisa button {
@@ -84,15 +84,15 @@ body {
   height: 40px;
   border: 1px solid rgba(255, 255, 255, 0.5);
   border-radius: 0 20px 20px 0;
-  background: #f4f4f4;
-  color: #1b1c20;
+  background: transparent;
+  color: #fff;
   font-size: 24px;
   line-height: 1;
   cursor: pointer;
 }
 
 .barra-pesquisa button:hover {
-  background: #d7d7d7;
+  background: rgba(255, 255, 255, 0.12);
 }
 
 @media (max-width: 700px) {
@@ -122,12 +122,8 @@ body {
   width: min(100% - 30px, 1100px);
   margin: 30px auto 0;
   padding: 18px 0 12px;
-  background: #34313b;
-  text-align: center;
-}
-
-.novidades {
   background: #2b2c34;
+  text-align: center;
 }
 
 .novidades h2,
@@ -210,14 +206,22 @@ body {
   text-align: center;
 }
 
+.catalogo-status {
+  margin: 30px auto;
+  text-align: center;
+}
+
 .carrossel-botao {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 42px;
   height: 42px;
   border: 0;
-  border-radius: 50%;
+  border-radius: 10px;
   background: #08080b;
   color: #918a9f;
-  font: 36px/1 Arial, sans-serif;
+  font: 36px Arial, sans-serif;
   cursor: pointer;
   transition: background-color 0.18s ease, color 0.18s ease, opacity 0.18s ease;
 }

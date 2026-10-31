@@ -39,12 +39,21 @@ const catalogSections = document.querySelectorAll(".catalogo > section");
 const searchForm = document.querySelector(".barra-pesquisa");
 const searchInput = searchForm?.querySelector('input[type="search"]');
 const emptyCatalogMessage = document.querySelector(".catalogo-vazio");
+const homeCatalogStatus = document.getElementById("homeCatalogStatus");
+const homeCarouselTracks = [
+    document.querySelector('[aria-labelledby="titulo-novidades"] .obras-faixa'),
+    document.querySelector('[aria-labelledby="titulo-obras-comunidade"] .obras-faixa'),
+    document.querySelector('[aria-labelledby="titulo-capnovos"] .obras-faixa'),
+    document.querySelector('[aria-labelledby="titulo-recomendados"] .obras-faixa')
+];
+
 const carouselStates = Array.from(document.querySelectorAll("[data-carousel]"), (carousel) => ({
     carousel,
     track: carousel.querySelector(".obras-faixa"),
     previous: carousel.querySelector("[data-carousel-previous]"),
     next: carousel.querySelector("[data-carousel-next]"),
-    selectedIndex: 0
+    selectedIndex: 0,
+    startIndex: 0
 }));
 let selectedCategory = "all";
 
@@ -59,8 +68,20 @@ function updateCarousel(state, resetSelection = false) {
     state.track.style.setProperty("--carousel-slots", String(Math.max(visibleSlots, 1)));
     state.track.classList.toggle("is-short", visibleCards.length <= slots);
     state.selectedIndex = resetSelection
-        ? Math.floor(visibleCards.length / 2)
-        : Math.min(state.selectedIndex, Math.max(visibleCards.length - 1, 0));
+        ? 0
+        : Math.max(0, Math.min(state.selectedIndex, Math.max(visibleCards.length - 1, 0)));
+    const maxStart = Math.max(0, visibleCards.length - slots);
+    const navigationMaxStart = maxStart + (maxStart % 2);
+    state.startIndex = resetSelection
+        ? 0
+        : Math.max(0, Math.min(state.startIndex, navigationMaxStart));
+
+    if (state.selectedIndex < state.startIndex) {
+        state.startIndex = Math.floor(state.selectedIndex / 2) * 2;
+    } else if (state.selectedIndex >= state.startIndex + visibleSlots) {
+        const requiredStart = state.selectedIndex - visibleSlots + 1;
+        state.startIndex = Math.min(Math.ceil(requiredStart / 2) * 2, navigationMaxStart);
+    }
 
     cards.forEach((card) => {
         const index = visibleCards.indexOf(card);
@@ -69,28 +90,68 @@ function updateCarousel(state, resetSelection = false) {
         card.tabIndex = isSelected ? 0 : -1;
     });
 
-    const centeredStart = Math.max(0, state.selectedIndex - Math.floor(visibleSlots / 2));
-    const maxStart = Math.max(0, visibleCards.length - slots);
-    const startIndex = Math.min(centeredStart, maxStart);
     if (visibleCards.length > slots && visibleCards[0]) {
         const gap = Number.parseFloat(window.getComputedStyle(state.track).columnGap) || 0;
         const cardWidth = visibleCards[0].getBoundingClientRect().width;
-        state.track.style.transform = `translateX(-${startIndex * (cardWidth + gap)}px)`;
+        state.track.style.transform = `translateX(-${state.startIndex * (cardWidth + gap)}px)`;
     } else {
         state.track.style.transform = "";
     }
 
-    state.previous.disabled = visibleCards.length < 2 || state.selectedIndex === 0;
-    state.next.disabled = visibleCards.length < 2 || state.selectedIndex >= visibleCards.length - 1;
+    state.previous.disabled = visibleCards.length < 2 || state.startIndex === 0;
+    state.next.disabled = visibleCards.length < 2;
+}
+
+function createWorkCard(work, subtitle) {
+    const card = document.createElement("article");
+    card.className = "obra-card";
+    card.dataset.workId = work.id;
+    card.dataset.category = "all";
+    card.dataset.href = `/HTML/Obra.html?obra=${encodeURIComponent(work.id)}`;
+    card.tabIndex = 0;
+
+    if (work.cover) {
+        const cover = document.createElement("img");
+        cover.src = work.cover;
+        cover.alt = `Capa de ${work.title}`;
+        card.append(cover);
+    }
+
+    const title = document.createElement("h3");
+    title.textContent = work.title;
+    card.append(title);
+
+    const details = document.createElement("p");
+    details.textContent = subtitle || "Obra publicada";
+    card.append(details);
+    return card;
+}
+
+function getLatestPublishedChapter(work) {
+    return (Array.isArray(work.chapters) ? work.chapters : [])
+        .filter((chapter) => chapter.status === "published")
+        .sort((left, right) => Date.parse(right.createdAt || "") - Date.parse(left.createdAt || ""))
+        .at(0);
+}
+
+function sortWorksByCreationDate(works) {
+    return [...works].sort((left, right) => {
+        const leftDate = Date.parse(left.createdAt || "");
+        const rightDate = Date.parse(right.createdAt || "");
+        return (Number.isFinite(rightDate) ? rightDate : 0)
+            - (Number.isFinite(leftDate) ? leftDate : 0);
+    });
 }
 
 carouselStates.forEach((state) => {
     state.previous.addEventListener("click", () => {
-        state.selectedIndex -= 1;
+        state.startIndex -= 2;
+        state.selectedIndex = state.startIndex;
         updateCarousel(state);
     });
     state.next.addEventListener("click", () => {
-        state.selectedIndex += 1;
+        state.startIndex += 2;
+        state.selectedIndex = state.startIndex;
         updateCarousel(state);
     });
 
@@ -122,7 +183,9 @@ function filterCatalog() {
 
     const catalogCards = getCatalogCards();
     catalogCards.forEach((card) => {
-        const matchesCategory = selectedCategory === "all" || card.dataset.category === selectedCategory;
+        const matchesCategory = selectedCategory === "all"
+            || card.dataset.category === "all"
+            || card.dataset.category === selectedCategory;
         const matchesSearch = card.textContent.toLocaleLowerCase("pt-BR").includes(query);
         card.hidden = !matchesCategory || !matchesSearch;
     });
@@ -134,49 +197,61 @@ function filterCatalog() {
     carouselStates.forEach((state) => updateCarousel(state, true));
 
     if (emptyCatalogMessage) {
-        emptyCatalogMessage.hidden = Array.from(catalogCards).some((card) => !card.hidden);
+        emptyCatalogMessage.hidden = catalogCards.length === 0
+            || Array.from(catalogCards).some((card) => !card.hidden);
     }
 }
 
-async function loadCommunityWorks() {
-    const track = document.querySelector("[data-community-works]");
-    const status = document.getElementById("communityWorksStatus");
-    if (!track || !status) return;
+async function loadHomeWorks() {
+    if (!homeCatalogStatus || homeCarouselTracks.some((track) => !track)) {
+        console.error("Não foi possível inicializar as seções de obras da página inicial.");
+        return;
+    }
+
+    homeCarouselTracks.forEach((track) => track.replaceChildren());
+    catalogSections.forEach((section) => {
+        section.hidden = true;
+    });
+    homeCatalogStatus.textContent = "Carregando obras...";
+    homeCatalogStatus.hidden = false;
 
     try {
         const response = await fetch("/api/works");
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || "Não foi possível carregar as obras.");
-        if (!Array.isArray(data.works)) throw new Error("A resposta do servidor contém uma lista de obras inválida.");
-
-        track.replaceChildren();
-        for (const work of data.works) {
-            const card = document.createElement("article");
-            card.className = "obra-card";
-            card.dataset.workId = work.id;
-            card.dataset.category = "manga";
-            card.dataset.href = `/HTML/Obra.html?obra=${encodeURIComponent(work.id)}`;
-            card.tabIndex = 0;
-
-            const cover = document.createElement("img");
-            cover.src = work.cover || "/Img/Capa.jpg";
-            cover.alt = `Capa de ${work.title}`;
-            card.append(cover);
-
-            const title = document.createElement("h3");
-            title.textContent = work.title;
-            card.append(title);
-
-            const author = document.createElement("p");
-            author.textContent = work.author || "Obra da comunidade";
-            card.append(author);
-            track.append(card);
+        if (!Array.isArray(data.works)) {
+            throw new Error("A resposta do servidor contém uma lista de obras inválida.");
         }
-        status.textContent = data.works.length ? "" : "Nenhuma obra cadastrada pela comunidade.";
+
+        const works = sortWorksByCreationDate(data.works);
+        const newestFirst = works.map((work) => createWorkCard(work, work.author));
+        const communityWorks = works.map((work) => createWorkCard(work, work.author));
+        const newestChaptersFirst = [...works].sort((left, right) => {
+            const leftDate = Date.parse(getLatestPublishedChapter(left)?.createdAt || "");
+            const rightDate = Date.parse(getLatestPublishedChapter(right)?.createdAt || "");
+            return (Number.isFinite(rightDate) ? rightDate : 0)
+                - (Number.isFinite(leftDate) ? leftDate : 0);
+        });
+        const newChapters = newestChaptersFirst.map((work) => {
+            const chapter = getLatestPublishedChapter(work);
+            const chapterDetails = chapter
+                ? `Capítulo ${chapter.number}${chapter.title ? ` — ${chapter.title}` : ""}`
+                : "Sem capítulos publicados";
+            return createWorkCard(work, chapterDetails);
+        });
+        const recommendations = works.map((work) => createWorkCard(work, work.author));
+
+        [newestFirst, communityWorks, newChapters, recommendations].forEach((cards, index) => {
+            homeCarouselTracks[index].replaceChildren(...cards);
+        });
+
+        homeCatalogStatus.textContent = works.length ? "" : "Nenhuma obra publicada foi encontrada.";
+        homeCatalogStatus.hidden = works.length > 0;
         filterCatalog();
     } catch (error) {
-        console.error("Não foi possível carregar as obras da comunidade:", error);
-        status.textContent = error.message || "Não foi possível carregar as obras da comunidade.";
+        console.error("Não foi possível carregar as obras da página inicial:", error);
+        homeCatalogStatus.textContent = error.message || "Não foi possível carregar as obras.";
+        homeCatalogStatus.hidden = false;
     }
 }
 
@@ -196,9 +271,7 @@ searchForm?.addEventListener("submit", (event) => {
 });
 searchInput?.addEventListener("input", filterCatalog);
 
-
-filterCatalog();
-void loadCommunityWorks();
+if (homeCatalogStatus) void loadHomeWorks();
 window.addEventListener("resize", () => {
     carouselStates.forEach((state) => updateCarousel(state));
 });

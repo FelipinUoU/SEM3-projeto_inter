@@ -6,17 +6,28 @@
     <meta name="theme-color" content="#29272f">
     <title>Gerenciar obras | HokuPédia</title>
     <link rel="stylesheet" href="../CSS/GerenciarObras.css">
+    <link rel="stylesheet" href="../CSS/MenuLat.css">
 </head>
 <body hidden style="display: none">
-    <header class="site-header">
-        <a class="brand" href="/" aria-label="HokuPédia — tela inicial">
-            <span class="brand-mark" aria-hidden="true">H</span>
-            <span>HokuPédia</span>
-        </a>
-        <a class="back-link" href="/HTML/Obra.html">Voltar ao Hub de Obra</a>
+    <header class="menu-lateral-header">
+        <button class="menu-lateral-button" id="menuBtn" type="button" aria-label="Abrir dashboard" aria-expanded="false" aria-controls="dashboard">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <h1 class="menu-lateral-logo">HokuPédia</h1>
+        <a class="header-login" href="/HTML/CadLog.html?mode=login">Login</a>
     </header>
+    <button class="menu-lateral-overlay" id="menuOverlay" type="button" aria-label="Fechar dashboard" hidden></button>
+    <aside class="menu-lateral-dashboard" id="dashboard" aria-label="Navegação principal" aria-hidden="true" inert>
+        <nav class="menu-lateral-items" aria-label="Navegação principal">
+            <a class="menu-lateral-item" href="/">Home</a>
+            <a class="menu-lateral-item" href="/HTML/Biblioteca.html">Biblioteca</a>
+        </nav>
+    </aside>
 
     <main class="management-page">
+        <a class="back-link" href="/HTML/Obra.html">Voltar ao Hub de Obra</a>
         <div class="page-heading">
             <div>
                 <p class="eyebrow">Painel da comunidade</p>
@@ -37,6 +48,7 @@
         <section class="work-list" id="workList" aria-label="Obras cadastradas"></section>
     </main>
 
+    <script type="module" src="../JAVA/MenuLat.js"></script>
     <script type="module" src="../JS/GerenciarObras.js"></script>
 </body>
 </html>
