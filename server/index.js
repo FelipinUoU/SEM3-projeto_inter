@@ -419,6 +419,8 @@ app.get('/api/works', async (req, res) => {
         number: chapter.number,
         title: getWorkAttribute(chapter.title),
         language: chapter.language,
+        status: chapter.status,
+        createdAt: chapter.$createdAt,
         pages
       });
       chaptersByWork.set(chapter.workId, workChapters);
@@ -430,6 +432,7 @@ app.get('/api/works', async (req, res) => {
         author: getWorkAttribute(work.Author),
         description: getWorkAttribute(work.Description),
         cover: getWorkAttribute(work.coverUrl),
+        createdAt: work.$createdAt,
         coverFileId: '',
         chapters: (chaptersByWork.get(work.$id) || [])
           .sort((left, right) => left.number - right.number)
