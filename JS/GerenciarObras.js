@@ -168,7 +168,7 @@ function renderWorkCard(work) {
             chapterAuthor.className = "chapter-row-author";
             chapterAuthor.append(createAuthorIcon());
             const authorName = document.createElement("span");
-            authorName.textContent = "MeridinhaFDP";
+            authorName.textContent = chapter.author || "Usuário desconhecido";
             chapterAuthor.append(authorName);
             row.append(chapterAuthor);
 

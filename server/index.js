@@ -6,7 +6,7 @@ import fs from 'fs';
 import { createServer } from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { Account, Client, Databases, ID, Query } from 'node-appwrite';
+import { Account, Client, Databases, ID, Query, Users } from 'node-appwrite';
 import ImageKit from 'imagekit';
 import { readChapterArchive } from './chapterArchive.js';
 
@@ -37,6 +37,7 @@ if (appwriteEndpoint) appwriteClient.setEndpoint(appwriteEndpoint);
 if (appwriteProjectId) appwriteClient.setProject(appwriteProjectId);
 if (appwriteApiKey) appwriteClient.setKey(appwriteApiKey);
 const databases = new Databases(appwriteClient);
+const users = new Users(appwriteClient);
 const imageKit = process.env.IMAGEKIT_PUBLIC_KEY
   && process.env.IMAGEKIT_PRIVATE_KEY
   && process.env.IMAGEKIT_URL_ENDPOINT
@@ -181,6 +182,17 @@ function isImageKitAsset(url) {
 function getWorkAttribute(value) {
   if (typeof value === 'string') return value;
   return Array.isArray(value) && typeof value[0] === 'string' ? value[0] : '';
+}
+
+async function getChapterAuthorName(userId) {
+  if (typeof userId !== 'string' || !userId) return 'Usuário desconhecido';
+  try {
+    const user = await users.get(userId);
+    return user.name || 'Usuário desconhecido';
+  } catch (error) {
+    if (error?.code === 404) return 'Usuário desconhecido';
+    throw error;
+  }
 }
 
 const screenRoutes = {
@@ -343,6 +355,12 @@ app.get('/api/works', async (req, res) => {
       listAllDocuments(chaptersCollectionId),
       listAllDocuments(pagesCollectionId)
     ]);
+    const chapterAuthorIds = [...new Set(
+      chapterDocuments.map((chapter) => chapter.createBy).filter(Boolean)
+    )];
+    const chapterAuthors = new Map(await Promise.all(
+      chapterAuthorIds.map(async (userId) => [userId, await getChapterAuthorName(userId)])
+    ));
     const pagesByChapter = new Map();
     for (const page of pageDocuments) {
       const pages = pagesByChapter.get(page.chapterId) || [];
@@ -366,6 +384,7 @@ app.get('/api/works', async (req, res) => {
         number: chapter.number,
         title: getWorkAttribute(chapter.title),
         language: chapter.language,
+        author: chapterAuthors.get(chapter.createBy) || 'Usuário desconhecido',
         pages
       });
       chaptersByWork.set(chapter.workId, workChapters);
@@ -534,6 +553,7 @@ app.post('/api/works/:workId/chapters', requireAuthenticatedUser, requireAdminUs
         number,
         title: getWorkAttribute(chapter.title),
         language,
+        author: req.appwriteUser.name || 'Usuário desconhecido',
         pages: createdPages.map((page) => ({
           id: page.$id,
           name: page.originalName,
@@ -554,7 +574,12 @@ app.put('/api/chapters/:id', requireAuthenticatedUser, requireAdminUser, async (
   const validationError = getChapterValidationError(number, title, language, pages);
   if (validationError) return res.status(400).json({ error: validationError });
   try {
-    await databases.getDocument(appwriteDatabaseId, chaptersCollectionId, req.params.id);
+    const existingChapter = await databases.getDocument(
+      appwriteDatabaseId,
+      chaptersCollectionId,
+      req.params.id
+    );
+    const author = await getChapterAuthorName(existingChapter.createBy);
     const existingPages = await listAllDocuments(pagesCollectionId, [
       Query.equal('chapterId', req.params.id)
     ]);
@@ -607,6 +632,7 @@ app.put('/api/chapters/:id', requireAuthenticatedUser, requireAdminUser, async (
         number: chapter.number,
         title: getWorkAttribute(chapter.title),
         language: chapter.language,
+        author,
         pages: createdPages.map((page) => ({
           id: page.$id,
           name: page.originalName,
