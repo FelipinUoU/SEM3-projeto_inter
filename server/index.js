@@ -19,7 +19,6 @@ const READER_DIRECTORY = path.join(rootDirectory, 'public', 'reader');
 const READER_IMAGE_EXTENSIONS = new Set(['.avif', '.gif', '.jpeg', '.jpg', '.png', '.webp']);
 const UPLOAD_IMAGE_TYPES = new Set(['image/avif', 'image/gif', 'image/jpeg', 'image/png', 'image/webp']);
 const MAX_UPLOAD_BYTES = Number.parseInt(process.env.MAX_IMAGE_BYTES || '20971520', 10);
-const MAX_PROFILE_AVATAR_BYTES = 5 * 1024 * 1024;
 const MAX_CHAPTER_PAGES = Number.parseInt(process.env.MAX_CHAPTER_PAGES || '500', 10);
 const MAX_CHAPTER_ARCHIVE_BYTES = Number.parseInt(process.env.MAX_CHAPTER_ARCHIVE_BYTES || '104857600', 10);
 const MAX_CHAPTER_UNPACKED_BYTES = 209715200;
@@ -262,58 +261,6 @@ app.post('/api/uploads', requireAuthenticatedUser, requireAdminUser, express.raw
   }
 });
 
-app.post('/api/profile/avatar', requireAuthenticatedUser, express.raw({
-  type: [...UPLOAD_IMAGE_TYPES],
-  limit: MAX_PROFILE_AVATAR_BYTES
-}), async (req, res) => {
-  if (!imageKit) {
-    return res.status(503).json({ error: 'Configure as chaves do ImageKit no servidor para enviar sua foto.' });
-  }
-  if (!UPLOAD_IMAGE_TYPES.has(req.get('Content-Type')?.split(';')[0])) {
-    return res.status(415).json({ error: 'Formato de imagem não suportado.' });
-  }
-  if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
-    return res.status(400).json({ error: 'Envie uma foto de perfil válida.' });
-  }
-
-  const rawFileName = typeof req.query.filename === 'string' ? req.query.filename : 'avatar';
-  const fileName = path.basename(rawFileName).replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 180) || 'avatar';
-  const folder = `/hokupedia/avatars/${req.appwriteUser.$id}`;
-  try {
-    const uploaded = await imageKit.upload({
-      file: req.body,
-      fileName,
-      folder,
-      useUniqueFileName: true
-    });
-    return res.status(201).json({
-      url: uploaded.url,
-      fileId: uploaded.fileId
-    });
-  } catch (error) {
-    console.error('Profile avatar upload failed:', error);
-    return res.status(502).json({ error: 'Não foi possível enviar a foto de perfil.' });
-  }
-});
-
-app.delete('/api/profile/avatar/:fileId', requireAuthenticatedUser, async (req, res) => {
-  if (!imageKit) {
-    return res.status(503).json({ error: 'Configure as chaves do ImageKit no servidor.' });
-  }
-  try {
-    const file = await imageKit.getFileDetails(req.params.fileId);
-    const userAvatarFolder = `/hokupedia/avatars/${req.appwriteUser.$id}/`;
-    if (!file.filePath.startsWith(userAvatarFolder)) {
-      return res.status(404).json({ error: 'Foto de perfil não encontrada.' });
-    }
-    await imageKit.deleteFile(req.params.fileId);
-    return res.json({ deleted: true });
-  } catch (error) {
-    console.error('Profile avatar deletion failed:', error);
-    return res.status(502).json({ error: 'Não foi possível excluir a foto de perfil.' });
-  }
-});
-
 app.post('/api/uploads/chapter-archive', requireAuthenticatedUser, requireAdminUser, express.raw({
   type: ['application/zip', 'application/x-zip-compressed'],
   limit: MAX_CHAPTER_ARCHIVE_BYTES
@@ -419,8 +366,6 @@ app.get('/api/works', async (req, res) => {
         number: chapter.number,
         title: getWorkAttribute(chapter.title),
         language: chapter.language,
-        status: chapter.status,
-        createdAt: chapter.$createdAt,
         pages
       });
       chaptersByWork.set(chapter.workId, workChapters);
@@ -432,7 +377,6 @@ app.get('/api/works', async (req, res) => {
         author: getWorkAttribute(work.Author),
         description: getWorkAttribute(work.Description),
         cover: getWorkAttribute(work.coverUrl),
-        createdAt: work.$createdAt,
         coverFileId: '',
         chapters: (chaptersByWork.get(work.$id) || [])
           .sort((left, right) => left.number - right.number)

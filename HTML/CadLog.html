@@ -29,10 +29,14 @@
         </button>
 
         <div class="logo">
-            HokuPédia
+            <a href="/" aria-label="Ir para a página inicial">HokuPédia</a>
         </div>
 
-        <a class="header-login" href="/HTML/CadLog.html?mode=login">Login</a>
+        <div class="boxbody">
+            <a href="/HTML/Perfil.html" aria-label="Abrir perfil">
+                <img class="profile-avatar" src="../Img/Perfil/PerfilExemplo.svg" alt="Avatar do perfil">
+            </a>
+        </div>
     </header>
 
     <button class="menu-lateral-overlay" id="menuOverlay" type="button" aria-label="Fechar dashboard" hidden></button>
@@ -41,11 +45,7 @@
         <nav class="menu-lateral-items" aria-label="Navegação principal">
             <a class="menu-lateral-item" href="/">Home</a>
             <a class="menu-lateral-item" href="/HTML/Biblioteca.html">Biblioteca</a>
-<<<<<<< HEAD
-            <a class="menu-lateral-item" href="/HTML/Perfil.html">Meu perfil</a>
             <a class="menu-lateral-item" href="/HTML/CadLog.html?mode=login">Login</a>
-=======
->>>>>>> 6145097bdebfc784a647fc2f955fd474459f431e
         </nav>
     </aside>
 
@@ -228,7 +228,6 @@
 
     <script type="module" src="../JAVA/MenuLat.js"></script>
     <script type="module" src="../JAVA/CadLog.js"></script>
-    <script type="module" src="../JS/PerfilAvatar.js"></script>
 
 </body>
 
