@@ -20,6 +20,7 @@ export default defineConfig({
     rolldownOptions: {
       input: {
         index: resolve(process.cwd(), 'index.html'),
+        catalogo: resolve(process.cwd(), 'HTML/Catalogo.html'),
         biblioteca: resolve(process.cwd(), 'HTML/Biblioteca.html'),
         cadLog: resolve(process.cwd(), 'HTML/CadLog.html'),
         perfil: resolve(process.cwd(), 'HTML/Perfil.html'),

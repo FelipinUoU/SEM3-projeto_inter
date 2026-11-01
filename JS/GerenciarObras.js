@@ -223,6 +223,54 @@ function createField({ id, label, name, value = "", type = "text", placeholder =
     return wrapper;
 }
 
+function normalizeWorkFormat(value) {
+    const normalized = String(value || "")
+        .trim()
+        .toLocaleLowerCase("pt-BR")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z]/g, "");
+
+    if (["hq", "hqs", "quadrinho", "quadrinhos"].includes(normalized)) return "hq";
+    if (["manhwa", "manhwas"].includes(normalized)) return "manhwa";
+    if (["manga", "mangas"].includes(normalized)) return "manga";
+    return "";
+}
+
+function createWorkFormatField(selected = "") {
+    const wrapper = document.createElement("label");
+    wrapper.className = "field";
+    wrapper.htmlFor = "workFormat";
+    wrapper.append(document.createTextNode("Formato"));
+
+    const select = document.createElement("select");
+    select.id = "workFormat";
+    select.name = "formato";
+    select.required = true;
+
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = "Selecione o formato";
+    placeholder.disabled = true;
+    placeholder.selected = !selected;
+    select.append(placeholder);
+
+    for (const [value, label] of [
+        ["hq", "HQs"],
+        ["manhwa", "Manhwas"],
+        ["manga", "Mangás"]
+    ]) {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = label;
+        option.selected = selected === value;
+        select.append(option);
+    }
+
+    wrapper.append(select);
+    return wrapper;
+}
+
 function renderWorkForm(work, targetRegion = editorRegion) {
     const isEditing = Boolean(work);
     const panel = createEditorPanel(isEditing ? "Editar Obra" : "Adicionar Obra");
@@ -274,6 +322,14 @@ function renderWorkForm(work, targetRegion = editorRegion) {
             name: "author",
             value: work?.author || "",
             placeholder: "Nome do autor"
+        }),
+        createWorkFormatField(normalizeWorkFormat(work?.formato)),
+        createField({
+            id: "workGender",
+            label: "Gêneros",
+            name: "gender",
+            value: Array.isArray(work?.gender) ? work.gender.join(", ") : work?.gender || "",
+            placeholder: "Ex.: Ação, Aventura"
         }),
         createField({
             id: "workDescription",
@@ -563,6 +619,8 @@ async function handleWorkSubmit(form) {
     const updated = {
         title,
         author: String(formData.get("author") || "").trim(),
+        gender: String(formData.get("gender") || "").trim(),
+        formato: String(formData.get("formato") || ""),
         description: String(formData.get("description") || "").trim(),
         cover,
         coverFileId
