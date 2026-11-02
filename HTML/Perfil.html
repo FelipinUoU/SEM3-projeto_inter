@@ -79,6 +79,26 @@
         </section>
     </main>
 
+    <dialog class="account-delete-dialog" id="accountDeleteDialog" aria-labelledby="accountDeleteTitle">
+        <form class="account-delete-form" id="accountDeleteForm">
+            <h2 id="accountDeleteTitle">Excluir sua conta?</h2>
+            <p>Tem certeza de que deseja excluir sua conta? Essa ação é permanente. Para entrar novamente, você precisará cadastrar uma nova conta.</p>
+            <label for="accountDeletePassword">Digite sua senha para confirmar</label>
+            <input
+                id="accountDeletePassword"
+                name="password"
+                type="password"
+                autocomplete="current-password"
+                maxlength="256"
+                required>
+            <p class="account-delete-feedback" id="accountDeleteFeedback" role="status" aria-live="polite"></p>
+            <div class="account-delete-actions">
+                <button class="account-delete-cancel" id="cancelAccountDelete" type="button">Cancelar</button>
+                <button class="account-delete-confirm" id="confirmAccountDelete" type="submit">Excluir conta</button>
+            </div>
+        </form>
+    </dialog>
+
     <script type="module" src="../JAVA/MenuLat.js"></script>
     <script type="module" src="../JS/Perfil.js"></script>
 </body>

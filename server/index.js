@@ -6,7 +6,7 @@ import fs from 'fs';
 import { createServer } from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { Account, Client, Databases, ID, Query } from 'node-appwrite';
+import { Account, Client, Databases, ID, Query, Users } from 'node-appwrite';
 import ImageKit from 'imagekit';
 import { readChapterArchive } from './chapterArchive.js';
 
@@ -37,6 +37,7 @@ if (appwriteEndpoint) appwriteClient.setEndpoint(appwriteEndpoint);
 if (appwriteProjectId) appwriteClient.setProject(appwriteProjectId);
 if (appwriteApiKey) appwriteClient.setKey(appwriteApiKey);
 const databases = new Databases(appwriteClient);
+const users = new Users(appwriteClient);
 const imageKit = process.env.IMAGEKIT_PUBLIC_KEY
   && process.env.IMAGEKIT_PRIVATE_KEY
   && process.env.IMAGEKIT_URL_ENDPOINT
@@ -225,6 +226,45 @@ app.get('/api/health', async (req, res) => {
   } catch (err) {
     console.error('Health check failed:', err);
     res.status(503).json({ status: 'error', database: 'disconnected' });
+  }
+});
+
+app.delete('/api/account', requireAuthenticatedUser, async (req, res) => {
+  const password = req.body?.password;
+  if (typeof password !== 'string' || password.length === 0 || password.length > 256) {
+    return res.status(400).json({ error: 'Informe sua senha para confirmar a exclusão.' });
+  }
+  if (!appwriteApiKey) {
+    return res.status(503).json({ error: 'A exclusão de contas não está configurada no servidor.' });
+  }
+
+  const verificationClient = new Client()
+    .setEndpoint(appwriteEndpoint)
+    .setProject(appwriteProjectId);
+  const verificationAccount = new Account(verificationClient);
+  let verificationSession;
+  try {
+    verificationSession = await verificationAccount.createEmailPasswordSession({
+      email: req.appwriteUser.email,
+      password
+    });
+  } catch (error) {
+    if (error?.code === 401) {
+      return res.status(401).json({ error: 'A senha informada está incorreta.' });
+    }
+    return sendAppwriteError(res, error, 'Não foi possível verificar sua senha.');
+  }
+
+  if (verificationSession.userId !== req.appwriteUser.$id) {
+    await verificationAccount.deleteSession({ sessionId: verificationSession.$id });
+    return res.status(403).json({ error: 'Não foi possível confirmar a identidade da conta.' });
+  }
+
+  try {
+    await users.delete(req.appwriteUser.$id);
+    return res.status(204).end();
+  } catch (error) {
+    return sendAppwriteError(res, error, 'Não foi possível excluir a conta.');
   }
 });
 

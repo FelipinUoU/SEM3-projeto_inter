@@ -134,6 +134,10 @@ async function updateAuthHeader() {
         }
 
         document.querySelectorAll('.menu-lateral-item[href*="CadLog.html"]').forEach((link) => {
+            if (window.location.pathname === "/HTML/Perfil.html") {
+                link.remove();
+                return;
+            }
             link.href = "/HTML/Perfil.html";
             link.textContent = "Meu perfil";
             link.removeAttribute("aria-current");

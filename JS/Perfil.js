@@ -12,6 +12,13 @@ const loginLink = document.getElementById("profileLoginLink");
 const photoInput = document.getElementById("profilePhotoInput");
 const removePhotoButton = document.querySelector(".photo-remove");
 const saveButton = document.querySelector(".profile-save-button");
+const deleteAccountButton = document.querySelector(".profile-delete-button");
+const deleteAccountDialog = document.getElementById("accountDeleteDialog");
+const deleteAccountForm = document.getElementById("accountDeleteForm");
+const deleteAccountPassword = document.getElementById("accountDeletePassword");
+const deleteAccountFeedback = document.getElementById("accountDeleteFeedback");
+const confirmDeleteButton = document.getElementById("confirmAccountDelete");
+const cancelDeleteButton = document.getElementById("cancelAccountDelete");
 let user;
 let avatarKey;
 let savedAvatar = defaultAvatar;
@@ -20,6 +27,7 @@ let photoChanged = false;
 
 editMode.disabled = true;
 saveButton.disabled = true;
+deleteAccountButton.disabled = true;
 
 function showFeedback(message, isError = false) {
     profileFeedback.textContent = message;
@@ -52,6 +60,7 @@ async function loadProfile() {
         setProfileFields(user);
         editMode.disabled = false;
         saveButton.disabled = false;
+        deleteAccountButton.disabled = false;
 
         try {
             const storedAvatar = localStorage.getItem(avatarKey);
@@ -212,4 +221,69 @@ removePhotoButton.addEventListener("click", () => {
 });
 
 saveButton.addEventListener("click", saveProfile);
+
+deleteAccountButton.addEventListener("click", () => {
+    if (!user) return;
+    deleteAccountFeedback.textContent = "";
+    deleteAccountPassword.value = "";
+    deleteAccountDialog.showModal();
+    deleteAccountPassword.focus();
+});
+
+cancelDeleteButton.addEventListener("click", () => deleteAccountDialog.close());
+deleteAccountDialog.addEventListener("close", () => {
+    deleteAccountPassword.value = "";
+    deleteAccountFeedback.textContent = "";
+});
+
+deleteAccountForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!user) return;
+
+    confirmDeleteButton.disabled = true;
+    cancelDeleteButton.disabled = true;
+    deleteAccountFeedback.textContent = "Verificando senha e excluindo a conta...";
+
+    try {
+        const jwt = await account.createJWT();
+        const response = await fetch("/api/account", {
+            method: "DELETE",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Appwrite-JWT": jwt.jwt
+            },
+            body: JSON.stringify({ password: deleteAccountPassword.value })
+        });
+
+        if (!response.ok) {
+            const result = await response.json();
+            throw new Error(response.status === 401
+                ? "A senha informada está incorreta. Confira e tente novamente."
+                : result.error || "Não foi possível excluir sua conta.");
+        }
+
+        try {
+            localStorage.removeItem(avatarKey);
+        } catch (error) {
+            console.error("Não foi possível remover a foto local após excluir a conta:", error);
+        }
+        document.getElementById("accountDeleteTitle").textContent = "Conta excluída com sucesso";
+        deleteAccountDialog.querySelector(".account-delete-form > p").textContent =
+            "Sua conta foi excluída. Você será redirecionado para a página inicial.";
+        deleteAccountPassword.hidden = true;
+        deleteAccountForm.querySelector('label[for="accountDeletePassword"]').hidden = true;
+        deleteAccountForm.querySelector(".account-delete-actions").hidden = true;
+        deleteAccountFeedback.textContent = "Conta excluída com sucesso.";
+        deleteAccountFeedback.classList.add("is-success");
+        window.setTimeout(() => window.location.assign("/"), 2000);
+    } catch (error) {
+        console.error("Não foi possível excluir a conta:", error);
+        deleteAccountFeedback.textContent = error.message || "Não foi possível excluir sua conta. Tente novamente.";
+        deleteAccountFeedback.classList.remove("is-success");
+        confirmDeleteButton.disabled = false;
+        cancelDeleteButton.disabled = false;
+        deleteAccountPassword.focus();
+    }
+});
+
 loadProfile();
