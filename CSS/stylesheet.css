@@ -21,6 +21,17 @@ body {
   margin: 14px auto 0;
 }
 
+.menu-lateral-header .menu-lateral-logo {
+  flex: 0 1 auto;
+  white-space: nowrap;
+}
+
+.menu-lateral-header .barra-pesquisa {
+  flex: 0 1 372px;
+  max-width: 400px;
+  margin-left: auto;
+}
+
 .menu-lateral-header .boxbody {
   margin-left: 0;
 }
@@ -55,6 +66,50 @@ body {
   border-color: #fff;
 }
 
+.barra-pesquisa {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.barra-pesquisa input {
+  width: min(100%, 330px);
+  height: 40px;
+  padding: 0 16px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-right: 0;
+  border-radius: 20px 0 0 20px;
+  background: #303238;
+  color: #fff;
+  font: inherit;
+}
+
+.barra-pesquisa input::placeholder {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.barra-pesquisa input:focus-visible {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.75);
+}
+
+.barra-pesquisa button {
+  width: 42px;
+  height: 40px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 0 20px 20px 0;
+  background: transparent;
+  color: #fff;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.barra-pesquisa button:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
 @media (max-width: 700px) {
   .inicio-layout {
     flex-direction: column;
@@ -66,9 +121,56 @@ body {
     flex-wrap: wrap;
   }
 
+  .inicio-layout .barra-pesquisa {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .inicio-layout .barra-pesquisa input {
+    width: 100%;
+  }
+
+  body > header.menu-lateral-header {
+    gap: 10px;
+    padding-right: 12px;
+    padding-left: 10px;
+  }
+
+  .menu-lateral-header .menu-lateral-logo {
+    margin-left: 6px;
+  }
+
+  .menu-lateral-header .barra-pesquisa {
+    flex: 1 1 120px;
+    min-width: 0;
+    max-width: none;
+    margin-left: auto;
+  }
+
+  .menu-lateral-header .barra-pesquisa input {
+    min-width: 0;
+  }
 }
 
 @media (max-width: 480px) {
+  body > header.menu-lateral-header {
+    gap: 8px;
+  }
+
+  .menu-lateral-header .menu-lateral-logo {
+    margin-left: 0;
+    font-size: clamp(14px, 4vw, 16px);
+  }
+
+  .menu-lateral-header .barra-pesquisa {
+    flex-basis: 100px;
+  }
+
+  .menu-lateral-header .barra-pesquisa button {
+    width: 36px;
+    flex: 0 0 36px;
+  }
+
   .menu-lateral-header .boxbody {
     width: 32px;
     height: 32px;

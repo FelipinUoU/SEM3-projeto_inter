@@ -1,8 +1,5 @@
 const catalogGrid = document.querySelector("#catalogGrid");
 const catalogStatus = document.querySelector("#catalogStatus");
-const catalogSearch = document.querySelector("#catalogSearch");
-const headerSearchForm = document.querySelector(".menu-lateral-header .barra-pesquisa");
-const headerSearch = headerSearchForm?.querySelector('input[type="search"]');
 const genreToggle = document.querySelector("#genreToggle");
 const genrePanel = document.querySelector("#genrePanel");
 const genreFilters = document.querySelector("#genreFilters");
@@ -13,9 +10,6 @@ const clearFormatFilter = document.querySelector("#clearFormatFilter");
 let works = [];
 let selectedGenre = new URLSearchParams(window.location.search).get("genero") || "";
 let selectedFormat = new URLSearchParams(window.location.search).get("formato") || "";
-const initialSearch = new URLSearchParams(window.location.search).get("q") || "";
-catalogSearch.value = initialSearch;
-if (headerSearch) headerSearch.value = initialSearch;
 
 function normalizeWorkFormat(value) {
     const normalized = String(value || "")
@@ -130,17 +124,14 @@ function createWorkCard(work, index) {
 }
 
 function renderWorks() {
-    const query = catalogSearch.value.trim().toLocaleLowerCase("pt-BR");
     catalogFormatFilter.hidden = !selectedFormat;
     catalogFormatLabel.textContent = selectedFormat
         ? `Formato selecionado: ${getFormatLabel(selectedFormat)}`
         : "";
     const filteredWorks = works.filter((work) => {
-        const matchesQuery = [work.title, work.author, work.description]
-            .some((value) => String(value || "").toLocaleLowerCase("pt-BR").includes(query));
         const matchesGenre = !selectedGenre || getGenres(work).includes(selectedGenre);
         const matchesFormat = !selectedFormat || normalizeWorkFormat(work.formato) === selectedFormat;
-        return matchesQuery && matchesGenre && matchesFormat;
+        return matchesGenre && matchesFormat;
     });
 
     if (filteredWorks.length === 0) {
@@ -188,22 +179,6 @@ genreToggle.addEventListener("click", () => {
     const expanded = genreToggle.getAttribute("aria-expanded") === "true";
     genreToggle.setAttribute("aria-expanded", String(!expanded));
     genrePanel.hidden = expanded;
-});
-
-catalogSearch.addEventListener("input", renderWorks);
-headerSearch?.addEventListener("input", () => {
-    catalogSearch.value = headerSearch.value;
-    renderWorks();
-});
-headerSearchForm?.addEventListener("submit", (event) => {
-    event.preventDefault();
-    const search = new URLSearchParams(window.location.search);
-    if (headerSearch.value.trim()) search.set("q", headerSearch.value.trim());
-    else search.delete("q");
-    const query = search.toString();
-    window.history.replaceState(null, "", query ? `${window.location.pathname}?${query}` : window.location.pathname);
-    catalogSearch.value = headerSearch.value;
-    renderWorks();
 });
 
 clearFormatFilter.addEventListener("click", () => {

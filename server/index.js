@@ -222,6 +222,7 @@ function isImageKitAsset(url) {
 }
 
 async function findImageKitFileIdByUrl(assetUrl) {
+  if (!imageKit) throw new Error('ImageKit não está configurado no servidor.');
   const asset = new URL(assetUrl);
   const endpoint = new URL(process.env.IMAGEKIT_URL_ENDPOINT);
   let assetPath = decodeURIComponent(asset.pathname);
@@ -229,14 +230,15 @@ async function findImageKitFileIdByUrl(assetUrl) {
   if (endpointPath && assetPath.startsWith(`${endpointPath}/`)) {
     assetPath = assetPath.slice(endpointPath.length);
   }
+  const fileName = path.posix.basename(assetPath).replace(/[\\"]/g, '\\$&');
   const files = await imageKit.listFiles({
-    searchQuery: path.posix.basename(assetPath),
+    searchQuery: `"${fileName}"`,
     limit: 100
   });
   return files.find((file) => file.url === assetUrl && file.filePath.startsWith('/hokupedia/'))?.fileId;
 }
 
-async function deleteImageKitFile(fileId, allowedFolderPrefix) {
+async function deleteImageKitFile(fileId, allowedFolderPrefix, expectedUrl) {
   let file;
   try {
     file = await imageKit.getFileDetails(fileId);
@@ -246,6 +248,9 @@ async function deleteImageKitFile(fileId, allowedFolderPrefix) {
   }
   if (!file.filePath.startsWith(allowedFolderPrefix)) {
     throw new Error('O arquivo não pertence à pasta autorizada do ImageKit.');
+  }
+  if (expectedUrl && file.url !== expectedUrl) {
+    throw new Error('O arquivo do ImageKit não corresponde à URL registrada para esta imagem.');
   }
   await imageKit.deleteFile(fileId);
 }
@@ -837,10 +842,57 @@ app.delete('/api/works/:id', requireAuthenticatedUser, requireModeratorUser, asy
   let deletionStep = 'carregar capítulos da obra';
   try {
     const chapters = await listAllDocuments(chaptersCollectionId, [Query.equal('workId', req.params.id)]);
+    const pagesByChapter = new Map();
+    const imageKitFiles = new Map();
+    const coverUrl = getWorkAttribute(work.coverUrl);
+    const registerImageKitFile = (fileId, expectedUrl) => {
+      if (imageKitFiles.has(fileId)) {
+        const existingUrl = imageKitFiles.get(fileId);
+        if (existingUrl && expectedUrl && existingUrl !== expectedUrl) {
+          throw new Error('O mesmo arquivo do ImageKit está vinculado a URLs diferentes.');
+        }
+        if (!existingUrl && expectedUrl) imageKitFiles.set(fileId, expectedUrl);
+        return;
+      }
+      imageKitFiles.set(fileId, expectedUrl);
+    };
+    if (typeof work.coverFileId === 'string' && work.coverFileId) {
+      registerImageKitFile(work.coverFileId, coverUrl || undefined);
+    }
+    if (isImageKitAsset(coverUrl)) {
+      deletionStep = 'localizar a capa no ImageKit';
+      const coverFileId = await findImageKitFileIdByUrl(coverUrl);
+      if (coverFileId) registerImageKitFile(coverFileId, coverUrl);
+    }
+
     for (const chapter of chapters) {
       deletionStep = `carregar páginas do capítulo ${chapter.$id}`;
       const pages = await listAllDocuments(pagesCollectionId, [Query.equal('chapterId', chapter.$id)]);
+      pagesByChapter.set(chapter.$id, pages);
       for (const page of pages) {
+        if (typeof page.imageFileId === 'string' && page.imageFileId) {
+          registerImageKitFile(
+            page.imageFileId,
+            typeof page.imageUrl === 'string' ? page.imageUrl : undefined
+          );
+        } else if (isImageKitAsset(page.imageUrl)) {
+          deletionStep = `localizar a imagem da página ${page.$id} no ImageKit`;
+          const fileId = await findImageKitFileIdByUrl(page.imageUrl);
+          if (fileId) registerImageKitFile(fileId, page.imageUrl);
+        }
+      }
+    }
+
+    if (imageKitFiles.size > 0 && !imageKit) {
+      throw new Error('ImageKit não está configurado; configure as credenciais antes de excluir esta obra.');
+    }
+    for (const [fileId, expectedUrl] of imageKitFiles) {
+      deletionStep = `excluir arquivo ${fileId} do ImageKit`;
+      await deleteImageKitFile(fileId, '/hokupedia/', expectedUrl);
+    }
+
+    for (const chapter of chapters) {
+      for (const page of pagesByChapter.get(chapter.$id) || []) {
         deletionStep = `excluir página ${page.$id}`;
         try {
           await databases.deleteDocument(appwriteDatabaseId, pagesCollectionId, page.$id);
@@ -863,10 +915,11 @@ app.delete('/api/works/:id', requireAuthenticatedUser, requireModeratorUser, asy
     } catch (error) {
       if (!isAppwriteNotFound(error)) throw error;
     }
-    return res.json({ deleted: true });
+    return res.json({ deleted: true, deletedImageCount: imageKitFiles.size });
   } catch (error) {
     console.error(`Não foi possível ${deletionStep}:`, error);
-    return res.status(getAppwriteStatus(error)).json({
+    const status = deletionStep.includes('ImageKit') ? 502 : getAppwriteStatus(error);
+    return res.status(status).json({
       error: `Falha ao ${deletionStep}: ${error?.message || 'erro inesperado do Appwrite.'}`
     });
   }

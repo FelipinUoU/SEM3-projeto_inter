@@ -15,17 +15,15 @@
             <span></span>
             <span></span>
         </button>
-        <h1 class="menu-lateral-logo"><a class="menu-brand-link" href="/" aria-label="Ir para a página inicial"><span class="menu-brand-mark" aria-hidden="true">H</span><span>HokuPédia</span></a></h1>
-        <form class="barra-pesquisa" role="search" action="/HTML/Catalogo.html">
-            <button type="submit" aria-label="Pesquisar">
-                <svg aria-hidden="true" viewBox="0 0 24 24">
-                    <circle cx="10.8" cy="10.8" r="6.8"></circle>
-                    <path d="m16 16 5 5"></path>
-                </svg>
-            </button>
-            <input type="search" name="q" placeholder="Pesquisar..." aria-label="Pesquisar no catálogo">
+        <h1 class="menu-lateral-logo">HokuPédia</h1>
+        <form class="work-search" role="search" autocomplete="off">
+            <label class="work-search__label" for="work-search-input">Buscar obra por nome</label>
+            <input id="work-search-input" type="search" name="q" placeholder="Buscar obra..." aria-autocomplete="list" aria-controls="work-search-results" aria-expanded="false">
+            <div class="work-search__results" id="work-search-results" role="listbox" aria-live="polite" hidden></div>
         </form>
-        <a class="header-login" href="/HTML/CadLog.html?mode=login">Login</a>
+        <a class="header-avatar" href="/HTML/Perfil.html" aria-label="Meu perfil">
+            <img src="../Img/Perfil/PerfilExemplo.svg" alt="">
+        </a>
     </header>
 
     <button class="menu-lateral-overlay" id="menuOverlay" type="button" aria-label="Fechar navegação" hidden></button>
@@ -55,14 +53,6 @@
                     <p class="catalog-eyebrow">Descubra sua próxima leitura</p>
                     <h2 id="catalogTitle">Catálogo</h2>
                 </div>
-                <label class="catalog-search">
-                    <span class="visually-hidden">Buscar obras</span>
-                    <svg aria-hidden="true" viewBox="0 0 24 24">
-                        <circle cx="10.8" cy="10.8" r="6.8"></circle>
-                        <path d="m16 16 5 5"></path>
-                    </svg>
-                    <input id="catalogSearch" type="search" placeholder="Buscar obra ou autor">
-                </label>
             </div>
             <p class="catalog-format-filter" id="catalogFormatFilter" hidden>
                 <span id="catalogFormatLabel"></span>
@@ -74,6 +64,7 @@
     </main>
 
     <script type="module" src="../JAVA/MenuLat.js"></script>
+    <script type="module" src="../JS/WorkSearch.js"></script>
     <script type="module" src="../JS/Catalogo.js"></script>
 </body>
 </html>

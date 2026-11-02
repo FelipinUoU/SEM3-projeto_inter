@@ -16,16 +16,13 @@
             <span></span>
             <span></span>
         </button>
-        <h1 class="menu-lateral-logo"><a class="menu-brand-link" href="/" aria-label="Ir para a página inicial"><span class="menu-brand-mark" aria-hidden="true">H</span><span>HokuPédia</span></a></h1>
-        <form class="barra-pesquisa" role="search" action="/HTML/Catalogo.html">
-            <button type="submit" aria-label="Pesquisar">
-                <svg aria-hidden="true" viewBox="0 0 24 24">
-                    <circle cx="10.8" cy="10.8" r="6.8"></circle>
-                    <path d="m16 16 5 5"></path>
-                </svg>
-            </button>
-            <input type="search" name="q" placeholder="Pesquisar..." aria-label="Pesquisar no catálogo">
+        <h1 class="menu-lateral-logo"><a href="/" aria-label="Ir para a página inicial">HokuPédia</a></h1>
+        <form class="work-search" role="search" autocomplete="off">
+            <label class="work-search__label" for="work-search-input">Buscar obra por nome</label>
+            <input id="work-search-input" type="search" name="q" placeholder="Buscar obra..." aria-autocomplete="list" aria-controls="work-search-results" aria-expanded="false">
+            <div class="work-search__results" id="work-search-results" role="listbox" aria-live="polite" hidden></div>
         </form>
+        <a class="back-link" id="workApprovalLink" href="/HTML/Homologacao.html" hidden>Homologação</a>
         <a class="header-login" href="/HTML/CadLog.html?mode=login">Login</a>
     </header>
     <button class="menu-lateral-overlay" id="menuOverlay" type="button" aria-label="Fechar dashboard" hidden></button>
@@ -41,6 +38,7 @@
     <main class="management-page">
         <div class="page-heading">
             <div>
+                <p class="eyebrow">Painel da comunidade</p>
                 <h1 id="pageTitle">Gerenciamento de obras</h1>
             </div>
             <button class="add-work-button" id="addWorkButton" type="button">
@@ -83,6 +81,9 @@
         </section>
 
         <section id="workManagementRegion" hidden>
+            <p class="storage-note">
+                Obras, capítulos e imagens são salvos no Appwrite.
+            </p>
             <p class="feedback" id="feedback" role="status" aria-live="polite"></p>
             <section class="editor-region" id="editorRegion" aria-live="polite"></section>
             <section class="work-list" id="workList" aria-label="Obras cadastradas"></section>
@@ -90,6 +91,7 @@
     </main>
 
     <script type="module" src="../JAVA/MenuLat.js"></script>
+    <script type="module" src="../JS/WorkSearch.js"></script>
     <script type="module" src="../JS/GerenciarObras.js"></script>
 </body>
 </html>

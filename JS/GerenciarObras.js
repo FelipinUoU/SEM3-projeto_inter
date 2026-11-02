@@ -72,6 +72,7 @@ const editorRegion = document.querySelector("#editorRegion");
 const managementPage = document.querySelector(".management-page");
 const addWorkButton = document.querySelector("#addWorkButton");
 const feedback = document.querySelector("#feedback");
+const workApprovalLink = document.querySelector("#workApprovalLink");
 const pageTitle = document.querySelector("#pageTitle");
 const workManagementRegion = document.querySelector("#workManagementRegion");
 const moderationRequestRegion = document.querySelector("#moderationRequestRegion");
@@ -1123,7 +1124,7 @@ async function handleAction(action, card, chapterRow, actionButton) {
         case "delete-work":
             if (work && await confirmInPage({
                 title: "Excluir obra?",
-                message: `Excluir “${work.title}” e todos os seus capítulos? Esta ação não pode ser desfeita.`,
+                message: `Excluir “${work.title}”, todos os capítulos e todas as imagens (capa e páginas) do ImageKit? Esta ação não pode ser desfeita.`,
                 confirmLabel: "Excluir obra",
                 destructive: true
             })) {
@@ -1136,7 +1137,7 @@ async function handleAction(action, card, chapterRow, actionButton) {
                     works = works.filter((item) => item.id !== workId);
                     renderWorks();
                     closeEditor();
-                    showFeedback("Obra excluída do Appwrite.");
+                    showFeedback("Obra, capítulos e imagens excluídos do Appwrite e do ImageKit.");
                 } catch (error) {
                     console.error("Não foi possível excluir a obra:", error);
                     showFeedback(getDeleteErrorMessage(error, "obra"), true);
@@ -1271,6 +1272,11 @@ async function initializeManagementPage() {
         addWorkButton.innerHTML = isAdmin
             ? '<span aria-hidden="true">＋</span> Adicionar Obra'
             : '<span aria-hidden="true">＋</span> Solicitar Obra';
+        workApprovalLink.hidden = !isAdmin;
+        if (!isAdmin) {
+            document.querySelector(".storage-note").textContent =
+                "Você pode editar as obras e os capítulos criados por você. Novas obras passam por homologação do administrador.";
+        }
         await loadWorks();
         if (!isAdmin) await loadWorkRequest();
     } catch (error) {
