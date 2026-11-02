@@ -31,117 +31,44 @@
     </aside>
 
     <main class="page-shell">
+      <p class="library-status" id="libraryStatus" role="status" aria-live="polite"></p>
       <section class="library-section">
-        <h2>Ultimas Leituras</h2>
+        <h2>Últimas leituras</h2>
 
         <div class="feature-row">
-          <div class="thumb-grid">
-            <article class="scene-card scene-blue">
-              <div class="cloud cloud-left"></div>
-              <div class="hill hill-back"></div>
-              <div class="hill hill-front"></div>
-            </article>
+          <div class="thumb-grid recent-grid" id="latestReadGrid" aria-live="polite"></div>
 
-            <article class="scene-card scene-blue">
-              <div class="cloud cloud-center"></div>
-              <div class="hill hill-back"></div>
-              <div class="hill hill-front"></div>
-            </article>
+          <aside class="summary-panel">
+            <div class="summary-copy">
+              <button class="nickname-edit-button" id="nicknameEditButton" type="button" aria-controls="nicknameInput" aria-expanded="false">
+                <span id="nicknameText">Nickname</span>
+                <svg class="nickname-edit-icon" aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+                  <path d="M14.06 9.02 15 9.96 5.92 19H5v-.92l9.06-9.06M17.66 3c-.26 0-.53.1-.73.3l-1.83 1.83 3.77 3.77 1.83-1.83a1.03 1.03 0 0 0 0-1.46l-2.31-2.31a1.03 1.03 0 0 0-.73-.3ZM14.06 6.54 3 17.6V21h3.4L17.46 9.94l-3.4-3.4Z"/>
+                </svg>
+              </button>
+              <input class="nickname-input" id="nicknameInput" type="text" placeholder="Digite seu nickname" autocomplete="nickname" aria-label="Nickname" hidden>
+              <p id="readingCount">0 obras lidas</p>
+            </div>
 
-            <article class="scene-card scene-blue">
-              <div class="cloud cloud-right"></div>
-              <div class="hill hill-back"></div>
-              <div class="hill hill-front"></div>
-            </article>
-          </div>
-
+            <div class="summary-badge">
+              <img class="badge-avatar" src="../Img/Perfil/PerfilExemplo.svg" alt="Avatar de exemplo">
+            </div>
+          </aside>
         </div>
       </section>
 
       <section class="library-section">
         <h2>Histórico</h2>
-
-        <div class="thumb-grid historic-grid">
-          <article class="scene-card scene-blue">
-            <div class="cloud cloud-left"></div>
-            <div class="hill hill-back"></div>
-            <div class="hill hill-front"></div>
-          </article>
-
-          <article class="scene-card scene-blue">
-            <div class="cloud cloud-center"></div>
-            <div class="hill hill-back"></div>
-            <div class="hill hill-front"></div>
-          </article>
-
-          <article class="scene-card scene-blue">
-            <div class="cloud cloud-right"></div>
-            <div class="hill hill-back"></div>
-            <div class="hill hill-front"></div>
-          </article>
-
-          <article class="scene-card scene-blue">
-            <div class="cloud cloud-left"></div>
-            <div class="hill hill-back"></div>
-            <div class="hill hill-front"></div>
-          </article>
-
-          <article class="scene-card scene-blue">
-            <div class="cloud cloud-center"></div>
-            <div class="hill hill-back"></div>
-            <div class="hill hill-front"></div>
-          </article>
-
-          <article class="scene-card scene-blue">
-            <div class="cloud cloud-right"></div>
-            <div class="hill hill-back"></div>
-            <div class="hill hill-front"></div>
-          </article>
-        </div>
+        <div class="thumb-grid historic-grid" id="readingHistoryGrid" aria-live="polite"></div>
       </section>
 
       <section class="library-section">
         <h2>Favoritos</h2>
 
-        <div class="thumb-grid favorites-grid">
-          <article class="scene-card scene-blue">
-            <div class="cloud cloud-left"></div>
-            <div class="hill hill-back"></div>
-            <div class="hill hill-front"></div>
-          </article>
-
-          <article class="scene-card scene-blue">
-            <div class="cloud cloud-center"></div>
-            <div class="hill hill-back"></div>
-            <div class="hill hill-front"></div>
-          </article>
-
-          <article class="scene-card scene-blue">
-            <div class="cloud cloud-right"></div>
-            <div class="hill hill-back"></div>
-            <div class="hill hill-front"></div>
-          </article>
-
-          <article class="scene-card scene-blue">
-            <div class="cloud cloud-left"></div>
-            <div class="hill hill-back"></div>
-            <div class="hill hill-front"></div>
-          </article>
-
-          <article class="scene-card scene-blue">
-            <div class="cloud cloud-center"></div>
-            <div class="hill hill-back"></div>
-            <div class="hill hill-front"></div>
-          </article>
-
-          <article class="scene-card scene-blue">
-            <div class="cloud cloud-right"></div>
-            <div class="hill hill-back"></div>
-            <div class="hill hill-front"></div>
-          </article>
-        </div>
+        <div class="thumb-grid favorites-grid" id="favoritesGrid" aria-live="polite"></div>
       </section>
     </main>
     <script type="module" src="../JAVA/MenuLat.js"></script>
+    <script type="module" src="../JAVA/Biblioteca.js"></script>
   </body>
 </html>

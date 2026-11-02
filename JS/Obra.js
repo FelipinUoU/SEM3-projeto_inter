@@ -1,8 +1,12 @@
 import { createAuthorIcon } from "./authorIcon.js";
-import { account } from "./JAVA/appwriteClient.js";
 import "../JAVA/AuthHeader.js";
+import {
+    getCurrentLibraryUser,
+    loadAnonymousReadChapters,
+    loadUserLibrary,
+    toggleFavorite
+} from "./userLibrary.js";
 
-const readHistoryKey = "hokupedia.readChapters.v1";
 const chapterList = document.querySelector("#chapterList");
 const workTitle = document.querySelector("#workTitle");
 const workDescription = document.querySelector("#workDescription");
@@ -11,6 +15,10 @@ const workFormat = document.querySelector("#workFormat");
 const workGenres = document.querySelector("#workGenres");
 const workCover = document.querySelector("#workCover");
 const manageLink = document.querySelector(".manage-link");
+const favoriteButton = document.querySelector("#favoriteButton");
+const favoriteFeedback = document.querySelector("#favoriteFeedback");
+let currentWork;
+let currentUser;
 
 function getGenres(work) {
     const value = work.gender ?? work.Gender ?? [];
@@ -38,33 +46,57 @@ function getWorkFormat(value) {
     return null;
 }
 
-async function showAdminLink() {
+async function showManageLink() {
     try {
-        const user = await account.get();
-        if (user.email.trim().toLowerCase() === "hokupedia@gmail.com") {
+        const isAdmin = currentUser?.email?.trim().toLowerCase() === "hokupedia@gmail.com"
+            || currentUser?.labels?.includes("admin");
+        const isModerator = isAdmin || currentUser?.labels?.includes("moderator");
+        if (manageLink && isModerator) {
             manageLink.hidden = false;
         }
     } catch (error) {
-        if (error.code !== 401) {
-            console.error("Não foi possível verificar o acesso administrativo:", error);
-        }
+        console.error("Não foi possível verificar o acesso administrativo:", error);
     }
 }
 
 function loadOpenedChapters() {
     try {
-        const stored = localStorage.getItem(readHistoryKey);
-        if (stored === null) return new Set();
-        const parsed = JSON.parse(stored);
-        if (!Array.isArray(parsed) || parsed.some((key) => typeof key !== "string")) {
-            throw new Error("O histórico local de leitura está inválido.");
-        }
-        return new Set(parsed);
+        const chapters = currentUser
+            ? loadUserLibrary(currentUser.$id).readChapters
+            : loadAnonymousReadChapters();
+        return new Set(chapters);
     } catch (error) {
         console.error("Não foi possível carregar o histórico de leitura:", error);
+        favoriteFeedback.textContent = "Não foi possível carregar os dados locais da biblioteca.";
         return new Set();
     }
 }
+
+function updateFavoriteButton(isFavorite) {
+    favoriteButton.disabled = false;
+    favoriteButton.textContent = isFavorite ? "★ Remover dos favoritos" : "☆ Adicionar aos favoritos";
+    favoriteButton.setAttribute("aria-pressed", String(isFavorite));
+    favoriteButton.classList.toggle("is-favorite", isFavorite);
+}
+
+favoriteButton.addEventListener("click", () => {
+    if (!currentUser) {
+        window.location.assign("/HTML/CadLog.html?mode=login");
+        return;
+    }
+    if (!currentWork) return;
+
+    try {
+        const isFavorite = toggleFavorite(currentUser.$id, currentWork.id);
+        updateFavoriteButton(isFavorite);
+        favoriteFeedback.textContent = isFavorite
+            ? "Obra adicionada aos favoritos."
+            : "Obra removida dos favoritos.";
+    } catch (error) {
+        console.error("Não foi possível atualizar os favoritos:", error);
+        favoriteFeedback.textContent = "Não foi possível salvar esta alteração. Tente novamente.";
+    }
+});
 
 async function loadWork() {
     const response = await fetch("/api/works");
@@ -82,12 +114,13 @@ async function renderChapters() {
     chapterList.replaceChildren();
     let work;
     try {
-        work = await loadWork();
+        [work, currentUser] = await Promise.all([loadWork(), getCurrentLibraryUser()]);
     } catch (error) {
         console.error("Não foi possível carregar os dados da obra:", error);
         workTitle.textContent = "Erro ao carregar obra";
         workDescription.textContent = error.message || "Não foi possível carregar os dados do Appwrite.";
         workAuthor.textContent = "HokuPédia";
+        favoriteButton.disabled = true;
         return;
     }
 
@@ -99,9 +132,11 @@ async function renderChapters() {
         emptyState.className = "empty-state";
         emptyState.textContent = "Nenhuma obra cadastrada. Adicione uma obra pelo gerenciamento.";
         chapterList.append(emptyState);
+        favoriteButton.disabled = true;
         return;
     }
 
+    currentWork = work;
     workTitle.textContent = work.title;
     workDescription.textContent = work.description || "Sem descrição.";
     workAuthor.textContent = work.author || "Autor não informado";
@@ -132,6 +167,19 @@ async function renderChapters() {
         workCover.removeAttribute("aria-hidden");
     }
     document.title = `${work.title} — Hub de Obra | HokuPédia`;
+    if (!currentUser) {
+        favoriteButton.textContent = "Entrar para favoritar";
+        favoriteButton.disabled = false;
+        favoriteButton.setAttribute("aria-pressed", "false");
+    } else {
+        try {
+            updateFavoriteButton(loadUserLibrary(currentUser.$id).favorites.includes(work.id));
+        } catch (error) {
+            console.error("Não foi possível carregar os favoritos:", error);
+            favoriteButton.disabled = true;
+            favoriteFeedback.textContent = "Não foi possível carregar os favoritos desta conta.";
+        }
+    }
 
     if (work.chapters.length === 0) {
         const emptyState = document.createElement("p");
@@ -189,7 +237,7 @@ async function renderChapters() {
         author.append(createAuthorIcon());
 
         const authorName = document.createElement("span");
-        authorName.textContent = "MeridinhaFDP";
+        authorName.textContent = chapter.author || "Usuário desconhecido";
         author.append(authorName);
         link.append(author);
 
@@ -203,5 +251,4 @@ async function renderChapters() {
     }
 }
 
-void showAdminLink();
-renderChapters();
+renderChapters().then(showManageLink);

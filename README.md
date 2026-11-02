@@ -10,7 +10,7 @@ O Appwrite substitui o MySQL para autenticação e persistência de obras, capí
 
 1. Instale o **Node.js 22 LTS ou superior** e as dependências (`npm install`).
 2. Copie `.env.example` para `.env` na raiz do projeto e configure as variáveis `APPWRITE_*`, `IMAGEKIT_*` e, se usar, pelo menos uma chave de IA válida (`GEMINI_API_KEY`, `OPENAI_API_KEY`, `QWEN_API_KEY` ou `GROQ_API_KEY`). Substitua os valores de exemplo; textos como `cole_sua_chave_aqui` não são chaves válidas. As chaves também podem ser definidas em `Database/.env`. Reinicie o servidor depois de alterar o arquivo. Não versione nenhum desses arquivos.
-3. No Appwrite, habilite autenticação por e-mail e senha e cadastre uma Web platform para o host da aplicação (por exemplo, `localhost` no desenvolvimento) e para o domínio de produção. O domínio configurado também precisa permitir o retorno dos links de recuperação para `/HTML/CadLog.html`. Crie uma API key com leitura e escrita de databases/documents e configure o database e as três collections com os IDs das variáveis. Crie estes atributos:
+3. No Appwrite, habilite autenticação por e-mail e senha e cadastre uma Web platform para o host da aplicação (por exemplo, `localhost` no desenvolvimento) e para o domínio de produção. O domínio configurado também precisa permitir o retorno dos links de recuperação para `/HTML/CadLog.html`. Crie uma API key com leitura e escrita de databases/documents e leitura de usuários, e configure o database e as três collections com os IDs das variáveis. Crie estes atributos:
 
    | Collection | Atributos |
    | --- | --- |
@@ -37,7 +37,7 @@ Contas que estavam no MySQL e obras/páginas anteriormente gravadas no `localSto
 
 A rota `http://localhost:3001/Leitura` também abre o leitor principal. A tela está em `HTML/Leitura.html`, com estilos em `CSS/Leitura.css` e lógica em `JS/Leitura.js`. As imagens de demonstração ficam em `public/reader`.
 
-Obras e capítulos ficam no Appwrite; capas e páginas ficam no ImageKit. Preferências de idioma, capitalização e fonte da tradução, assim como o histórico de leitura, continuam no armazenamento local do navegador.
+Obras e capítulos ficam no Appwrite; capas e páginas ficam no ImageKit. Preferências de idioma, capitalização e fonte da tradução continuam no armazenamento local do navegador. O histórico (incluindo o último capítulo aberto de cada obra) e os favoritos da biblioteca também são locais, mas ficam separados pelo identificador da conta Appwrite neste navegador; não são sincronizados entre dispositivos.
 
 O servidor mantém as chaves de IA fora do cliente e tenta os provedores configurados nesta ordem: Gemini, OpenAI, Qwen e Groq. Para OpenAI, o modelo padrão é `gpt-4o-mini`; use `OPENAI_MODEL` para escolher outro modelo compatível com entrada de imagens e saída JSON. Para Qwen, o padrão é `qwen-vl-max`; ajuste `QWEN_MODEL` e `QWEN_API_URL` para outro modelo ou endpoint compatível. Para Groq, o padrão é `llama-3.2-11b-vision-preview`; ajuste `GROQ_MODEL` se necessário. Se todos os provedores falharem, o leitor mostra os detalhes sem expor as chaves.
 

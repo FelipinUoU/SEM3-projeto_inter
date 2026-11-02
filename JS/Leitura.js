@@ -1,3 +1,5 @@
+import { getCurrentLibraryUser, recordReadChapter } from "./userLibrary.js";
+
 const viewModeButton = document.getElementById("view-mode-btn");
 const viewDropdown = document.getElementById("view-dropdown");
 const readerViewport = document.getElementById("reader-viewport");
@@ -146,9 +148,17 @@ function setChapterNavigation(work, chapter) {
 }
 
 async function loadStoredChapter() {
-    if (!workId && !chapterId) return;
+    readerViewport.replaceChildren();
+    readerViewport.setAttribute("aria-busy", "true");
+    setStatus(workId && chapterId ? "Carregando capítulo..." : "Selecione um capítulo para começar.");
+    if (!workId && !chapterId) {
+        readerViewport.setAttribute("aria-busy", "false");
+        refreshPages();
+        return;
+    }
     if (!workId || !chapterId) {
         setStatus("O link do capítulo está incompleto.", "error");
+        readerViewport.setAttribute("aria-busy", "false");
         refreshPages();
         return;
     }
@@ -183,17 +193,21 @@ async function loadStoredChapter() {
             return wrapper;
         }));
         setChapterNavigation(currentWork, currentChapter);
-
-        const historyKey = "hokupedia.readChapters.v1";
-        const history = JSON.parse(localStorage.getItem(historyKey) || "[]");
-        if (Array.isArray(history) && !history.includes(`${workId}:${chapterId}`)) {
-            history.push(`${workId}:${chapterId}`);
-            localStorage.setItem(historyKey, JSON.stringify(history));
-        }
+        readerViewport.setAttribute("aria-busy", "false");
+        setStatus("");
         refreshPages();
+
+        try {
+            const user = await getCurrentLibraryUser();
+            recordReadChapter(user?.$id || null, workId, chapterId);
+        } catch (error) {
+            console.error("Não foi possível salvar o histórico da biblioteca:", error);
+            setStatus("O capítulo abriu, mas não foi possível salvar seu progresso nesta conta.", "error");
+        }
     } catch (error) {
         console.error("Não foi possível abrir o capítulo do Appwrite:", error);
         readerViewport.replaceChildren();
+        readerViewport.setAttribute("aria-busy", "false");
         setStatus(error.message || "Não foi possível abrir este capítulo.", "error");
         refreshPages();
     }
