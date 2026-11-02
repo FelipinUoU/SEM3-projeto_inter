@@ -102,7 +102,7 @@ function sendWorkSaveError(res, error, message) {
   if (typeof error?.message === 'string' && /Unknown attribute: ["']?gender/i.test(error.message)) {
     console.error(`${message}:`, error);
     return res.status(500).json({
-      error: 'A coleção de obras do Appwrite não possui o atributo opcional "gender" (String, até 255 caracteres). Crie-o na coleção configurada em APPWRITE_WORKS_COLLECTION_ID e aguarde ficar disponível.'
+      error: 'A coleção de obras do Appwrite não possui o atributo opcional "gender" (String, até 2048 caracteres). Crie-o na coleção configurada em APPWRITE_WORKS_COLLECTION_ID e aguarde ficar disponível.'
     });
   }
   return sendAppwriteError(res, error, message);
@@ -461,7 +461,7 @@ app.post('/api/works', requireAuthenticatedUser, requireAdminUser, async (req, r
     || title.length > 255
     || !['hq', 'manhwa', 'manga'].includes(formato)
     || [author, gender, description, cover, coverFileId].some((value) => typeof value !== 'string')
-    || author.length > 255 || gender.length > 255 || description.length > 10000 || cover.length > 2048 || coverFileId.length > 255
+    || author.length > 255 || gender.length > 2048 || description.length > 10000 || cover.length > 2048 || coverFileId.length > 255
     || !isImageKitAsset(cover)) {
     return res.status(400).json({ error: 'Informe o nome e formato da obra e envie uma capa válida ao ImageKit.' });
   }
@@ -504,7 +504,7 @@ app.put('/api/works/:id', requireAuthenticatedUser, requireAdminUser, async (req
     || title.length > 255
     || !['hq', 'manhwa', 'manga'].includes(formato)
     || [author, gender, description, cover, coverFileId].some((value) => typeof value !== 'string')
-    || author.length > 255 || gender.length > 255 || description.length > 10000 || cover.length > 2048 || coverFileId.length > 255
+    || author.length > 255 || gender.length > 2048 || description.length > 10000 || cover.length > 2048 || coverFileId.length > 255
     || !isImageKitAsset(cover)) {
     return res.status(400).json({ error: 'Informe o nome e formato da obra e envie uma capa válida ao ImageKit.' });
   }
