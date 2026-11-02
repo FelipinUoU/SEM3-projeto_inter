@@ -230,8 +230,9 @@ async function findImageKitFileIdByUrl(assetUrl) {
   if (endpointPath && assetPath.startsWith(`${endpointPath}/`)) {
     assetPath = assetPath.slice(endpointPath.length);
   }
+  const fileName = path.posix.basename(assetPath).replace(/[\\"]/g, '\\$&');
   const files = await imageKit.listFiles({
-    searchQuery: path.posix.basename(assetPath),
+    searchQuery: `"${fileName}"`,
     limit: 100
   });
   return files.find((file) => file.url === assetUrl && file.filePath.startsWith('/hokupedia/'))?.fileId;
