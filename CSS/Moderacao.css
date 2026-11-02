@@ -31,44 +31,6 @@ a {
     text-decoration: none;
 }
 
-.workflow-header {
-    display: flex;
-    height: 74px;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 22px;
-    background: #050505;
-}
-
-.workflow-brand,
-.workflow-profile {
-    display: inline-flex;
-    align-items: center;
-}
-
-.workflow-brand {
-    gap: 14px;
-    font-size: 19px;
-}
-
-.workflow-brand svg {
-    width: 35px;
-    height: 35px;
-    fill: none;
-    stroke: currentColor;
-    stroke-linecap: round;
-    stroke-width: 2;
-}
-
-.workflow-profile svg {
-    width: 30px;
-    height: 30px;
-    fill: none;
-    stroke: currentColor;
-    stroke-linecap: round;
-    stroke-width: 2;
-}
-
 .moderation-main {
     width: min(100% - 48px, 1160px);
     margin: 76px auto 80px;
@@ -194,9 +156,7 @@ a {
 }
 
 .workflow-action:focus-visible,
-.management-link:focus-visible,
-.workflow-brand:focus-visible,
-.workflow-profile:focus-visible {
+.management-link:focus-visible {
     outline: 2px solid #fff;
     outline-offset: 4px;
 }
@@ -649,20 +609,6 @@ a {
 }
 
 @media (max-width: 680px) {
-    .workflow-header {
-        height: 58px;
-        padding: 0 16px;
-    }
-
-    .workflow-brand {
-        font-size: 16px;
-    }
-
-    .workflow-brand svg {
-        width: 30px;
-        height: 30px;
-    }
-
     .moderation-main {
         width: min(100% - 28px, 1160px);
         margin-top: 42px;

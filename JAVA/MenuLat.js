@@ -332,11 +332,13 @@ categoryFilters.forEach((filter) => {
     });
 });
 
-searchForm?.addEventListener("submit", (event) => {
-    event.preventDefault();
-    filterCatalog();
-});
-searchInput?.addEventListener("input", filterCatalog);
+if (homeCatalogStatus) {
+    searchForm?.addEventListener("submit", (event) => {
+        event.preventDefault();
+        filterCatalog();
+    });
+    searchInput?.addEventListener("input", filterCatalog);
+}
 
 if (homeCatalogStatus) void loadHomeWorks();
 window.addEventListener("resize", () => {

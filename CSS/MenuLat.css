@@ -33,6 +33,35 @@ body > header .logo a:focus-visible,
     outline-offset: 4px;
 }
 
+.menu-brand-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    color: inherit;
+    font: 700 18px/1 Arial, sans-serif;
+    letter-spacing: normal;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.menu-brand-link:focus-visible {
+    outline: 2px solid #d5bd00;
+    outline-offset: 4px;
+}
+
+.menu-brand-mark {
+    display: grid;
+    width: 34px;
+    height: 34px;
+    flex: 0 0 34px;
+    place-items: center;
+    border-radius: 10px;
+    background: #f0b84b;
+    color: #29231a;
+    font-size: 19px;
+    font-weight: 700;
+}
+
 .boxbody {
     width: 38px;
     height: 38px;
@@ -294,6 +323,72 @@ body > header .logo a:focus-visible,
     background: #fff;
 }
 
+.menu-lateral-header .menu-lateral-logo {
+    flex: 0 1 auto;
+    white-space: nowrap;
+}
+
+.barra-pesquisa {
+    display: flex;
+    min-height: 44px;
+    align-items: center;
+    gap: 10px;
+    padding: 0 13px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.22);
+}
+
+.menu-lateral-header .barra-pesquisa {
+    flex: 0 1 372px;
+    max-width: 400px;
+    margin-left: auto;
+}
+
+.barra-pesquisa button {
+    display: grid;
+    width: 19px;
+    height: 19px;
+    flex: 0 0 19px;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #c9c7d0;
+    cursor: pointer;
+}
+
+.barra-pesquisa button svg {
+    width: 19px;
+    height: 19px;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-width: 1.8;
+}
+
+.barra-pesquisa input {
+    width: 100%;
+    min-width: 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: #f7f6fa;
+    font: 15px Arial, sans-serif;
+}
+
+.barra-pesquisa input::placeholder {
+    color: #b7b4bf;
+}
+
+.barra-pesquisa:focus-within {
+    border-color: rgba(255, 255, 255, 0.45);
+}
+
+.barra-pesquisa:focus-within button {
+    color: #f7f6fa;
+}
+
 .menu-lateral-button:focus-visible,
 .menu-lateral-item:focus-visible {
     outline: 2px solid transparent;
@@ -317,6 +412,53 @@ body > header .logo a:focus-visible,
     border: 0;
     background: rgba(0, 0, 0, 0.45);
     cursor: pointer;
+}
+
+@media (max-width: 700px) {
+    body > header.menu-lateral-header {
+        gap: 10px;
+        padding-right: 12px;
+        padding-left: 10px;
+    }
+
+    .menu-lateral-header .menu-lateral-logo {
+        margin-left: 6px;
+    }
+
+    .menu-lateral-header .barra-pesquisa {
+        flex: 1 1 120px;
+        min-width: 0;
+        max-width: none;
+        margin-left: auto;
+    }
+}
+
+@media (max-width: 480px) {
+    body > header.menu-lateral-header {
+        gap: 8px;
+    }
+
+    .menu-lateral-header .menu-lateral-logo {
+        margin-left: 0;
+        font-size: clamp(14px, 4vw, 16px);
+    }
+
+    .menu-brand-link {
+        gap: 8px;
+        font-size: clamp(13px, 3.8vw, 15px);
+    }
+
+    .menu-brand-mark {
+        width: 29px;
+        height: 29px;
+        flex-basis: 29px;
+        border-radius: 8px;
+        font-size: 17px;
+    }
+
+    .menu-lateral-header .barra-pesquisa {
+        flex-basis: 100px;
+    }
 }
 
 .menu-lateral-overlay[hidden] {
