@@ -13,7 +13,6 @@ import { readChapterArchive } from './chapterArchive.js';
 const app = express();
 const rootDirectory = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 dotenv.config({ path: path.join(rootDirectory, '.env') });
-const databaseEnvironment = dotenv.config({ path: path.join(rootDirectory, 'Database', '.env') });
 const PORT = process.env.PORT || 3001;
 const READER_DIRECTORY = path.join(rootDirectory, 'public', 'reader');
 const READER_IMAGE_EXTENSIONS = new Set(['.avif', '.gif', '.jpeg', '.jpg', '.png', '.webp']);
@@ -47,24 +46,22 @@ const imageKit = process.env.IMAGEKIT_PUBLIC_KEY
     urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT
   })
   : undefined;
-function getConfiguredApiKey(name) {
-  const candidates = [process.env[name], databaseEnvironment.parsed?.[name]];
-  return candidates
-    .map((value) => value?.trim())
-    .find((value) => value && !/^(?:cole_sua_chave|sua_chave|your(?:[_ -]|$)|<[^>]+>|\$\{[^}]+\})/i.test(value));
+function getConfiguredApiKeys(name) {
+  const keyPattern = new RegExp(`^${name}(?:_(\\d+))?$`, 'i');
+  const configuredKeys = Object.entries(process.env)
+    .map(([key, value]) => ({ key, value: value?.trim() }))
+    .filter(({ key, value }) => keyPattern.test(key)
+      && value
+      && !/^(?:cole_sua_chave|sua_chave|your(?:[_ -]|$)|<[^>]+>|\$\{[^}]+\})/i.test(value))
+    .sort((left, right) => {
+      const leftIndex = Number(left.key.match(/_(\d+)$/)?.[1] || 1);
+      const rightIndex = Number(right.key.match(/_(\d+)$/)?.[1] || 1);
+      return leftIndex - rightIndex;
+    })
+    .map(({ value }) => value);
+  return [...new Set(configuredKeys)];
 }
-const geminiApiKey = getConfiguredApiKey('GEMINI_API_KEY');
-const openAIKey = getConfiguredApiKey('OPENAI_API_KEY');
-const qwenApiKey = getConfiguredApiKey('QWEN_API_KEY');
-const groqApiKey = getConfiguredApiKey('GROQ_API_KEY');
-const gemini = geminiApiKey
-  ? new GoogleGenAI({ apiKey: geminiApiKey })
-  : undefined;
-const openAIModel = process.env.OPENAI_MODEL || 'gpt-4o-mini';
-const qwenModel = process.env.QWEN_MODEL || 'qwen-vl-max';
-const qwenApiUrl = process.env.QWEN_API_URL
-  || 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions';
-const groqModel = process.env.GROQ_MODEL || 'llama-3.2-11b-vision-preview';
+const geminiApiKeys = getConfiguredApiKeys('GEMINI_API_KEY');
 const providerTimeoutMs = 180000;
 
 app.use(express.json({ limit: '15mb' }));
@@ -89,6 +86,10 @@ function getAppwriteStatus(error) {
   return Number.isInteger(error?.code) && error.code >= 400 && error.code < 600
     ? error.code
     : 500;
+}
+
+function isAppwriteNotFound(error) {
+  return error?.code === 404 || error?.type === 'document_not_found';
 }
 
 function sendAppwriteError(res, error, message) {
@@ -171,11 +172,40 @@ async function requireAuthenticatedUser(req, res, next) {
   }
 }
 
+function hasUserLabel(user, label) {
+  return Array.isArray(user?.labels) && user.labels.includes(label);
+}
+
+function isAdminUser(user) {
+  return user?.email?.trim().toLowerCase() === ADMIN_EMAIL || hasUserLabel(user, 'admin');
+}
+
+function requireModeratorUser(req, res, next) {
+  if (!isAdminUser(req.appwriteUser) && !hasUserLabel(req.appwriteUser, 'moderator')) {
+    return res.status(403).json({ error: 'Acesso disponível somente para moderadores.' });
+  }
+  return next();
+}
+
 function requireAdminUser(req, res, next) {
-  if (req.appwriteUser?.email?.trim().toLowerCase() !== ADMIN_EMAIL) {
+  if (!isAdminUser(req.appwriteUser)) {
     return res.status(403).json({ error: 'Acesso disponível somente para o administrador.' });
   }
   return next();
+}
+
+function ownsDocument(user, document) {
+  return document?.createBy === user?.$id;
+}
+
+async function getUserDisplayName(userId) {
+  try {
+    const user = await users.get(userId);
+    return user.name || user.email || 'Usuário';
+  } catch (error) {
+    if (error?.code === 404) return 'Conta indisponível';
+    throw error;
+  }
 }
 
 function isImageKitAsset(url) {
@@ -210,6 +240,7 @@ const screenRoutes = {
   '/Cadastro': 'CadLog.html',
   '/Login': 'CadLog.html',
   '/GerenciarObras': 'GerenciarObras.html',
+  '/Homologacao': 'Homologacao.html',
   '/Obra': 'Obra.html'
 };
 
@@ -289,7 +320,7 @@ app.delete('/api/account', requireAuthenticatedUser, async (req, res) => {
   }
 });
 
-app.post('/api/uploads', requireAuthenticatedUser, requireAdminUser, express.raw({
+app.post('/api/uploads', requireAuthenticatedUser, requireModeratorUser, express.raw({
   type: [...UPLOAD_IMAGE_TYPES],
   limit: MAX_UPLOAD_BYTES
 }), async (req, res) => {
@@ -322,7 +353,7 @@ app.post('/api/uploads', requireAuthenticatedUser, requireAdminUser, express.raw
   }
 });
 
-app.post('/api/uploads/chapter-archive', requireAuthenticatedUser, requireAdminUser, express.raw({
+app.post('/api/uploads/chapter-archive', requireAuthenticatedUser, requireModeratorUser, express.raw({
   type: ['application/zip', 'application/x-zip-compressed'],
   limit: MAX_CHAPTER_ARCHIVE_BYTES
 }), async (req, res) => {
@@ -425,6 +456,7 @@ app.get('/api/works', async (req, res) => {
     }
     const chaptersByWork = new Map();
     for (const chapter of chapterDocuments) {
+      if (String(chapter.status || '').toUpperCase() === 'REPROVADO') continue;
       const pages = (pagesByChapter.get(chapter.$id) || [])
         .sort((left, right) => left.position - right.position);
       const workChapters = chaptersByWork.get(chapter.workId) || [];
@@ -445,10 +477,10 @@ app.get('/api/works', async (req, res) => {
         id: work.$id,
         title: getWorkAttribute(work.Title),
         author: getWorkAttribute(work.Author),
-        description: getWorkAttribute(work.Description),
-        cover: getWorkAttribute(work.coverUrl),
         gender: work.gender ?? work.Gender ?? work.Genres ?? work.Genre ?? '',
         formato: work.formato ?? '',
+        description: getWorkAttribute(work.Description),
+        cover: getWorkAttribute(work.coverUrl),
         createdAt: work.$createdAt,
         coverFileId: '',
         chapters: (chaptersByWork.get(work.$id) || [])
@@ -460,13 +492,82 @@ app.get('/api/works', async (req, res) => {
   }
 });
 
+app.get('/api/management/works', requireAuthenticatedUser, requireModeratorUser, async (req, res) => {
+  try {
+    const userId = req.appwriteUser.$id;
+    const isAdmin = isAdminUser(req.appwriteUser);
+    const [workDocuments, chapterDocuments] = await Promise.all([
+      listAllDocuments(worksCollectionId, isAdmin ? [] : [Query.equal('createBy', userId)]),
+      listAllDocuments(chaptersCollectionId, [Query.equal('createBy', userId)])
+    ]);
+    const workIds = new Set(workDocuments.map((work) => work.$id));
+    const managedChapters = chapterDocuments.filter((chapter) => (
+      workIds.has(chapter.workId)
+      && String(chapter.status || '').toUpperCase() !== 'REPROVADO'
+    ));
+    const authorIds = [...new Set(managedChapters.map((chapter) => chapter.createBy).filter(Boolean))];
+    const authorNames = new Map(await Promise.all(authorIds.map(async (authorId) => (
+      [authorId, await getUserDisplayName(authorId)]
+    ))));
+    const chapterIds = managedChapters.map((chapter) => chapter.$id);
+    const pageDocuments = chapterIds.length
+      ? await listAllDocuments(pagesCollectionId, [Query.equal('chapterId', chapterIds)])
+      : [];
+    const pagesByChapter = new Map();
+    for (const page of pageDocuments) {
+      const pages = pagesByChapter.get(page.chapterId) || [];
+      pages.push({
+        id: page.$id,
+        name: page.originalName,
+        url: page.imageUrl,
+        fileId: page.imageFileId,
+        format: page.format,
+        position: page.number - 1
+      });
+      pagesByChapter.set(page.chapterId, pages);
+    }
+    const chaptersByWork = new Map();
+    for (const chapter of managedChapters) {
+      const chapters = chaptersByWork.get(chapter.workId) || [];
+      chapters.push({
+        id: chapter.$id,
+        number: chapter.number,
+        title: getWorkAttribute(chapter.title),
+        language: chapter.language,
+        createBy: chapter.createBy,
+        authorName: authorNames.get(chapter.createBy) || 'Moderador',
+        pages: (pagesByChapter.get(chapter.$id) || [])
+          .sort((left, right) => left.position - right.position)
+      });
+      chaptersByWork.set(chapter.workId, chapters);
+    }
+    return res.json({
+      works: workDocuments.map((work) => ({
+        id: work.$id,
+        title: getWorkAttribute(work.Title),
+        author: getWorkAttribute(work.Author),
+        gender: work.gender ?? work.Gender ?? work.Genres ?? work.Genre ?? '',
+        formato: work.formato ?? '',
+        description: getWorkAttribute(work.Description),
+        cover: getWorkAttribute(work.coverUrl),
+        coverFileId: '',
+        createBy: work.createBy,
+        chapters: (chaptersByWork.get(work.$id) || [])
+          .sort((left, right) => left.number - right.number)
+      }))
+    });
+  } catch (error) {
+    return sendAppwriteError(res, error, 'Não foi possível carregar as obras para gerenciamento.');
+  }
+});
+
 app.post('/api/works', requireAuthenticatedUser, requireAdminUser, async (req, res) => {
   const { title, author = '', gender = '', formato, description = '', cover = '', coverFileId = '' } = req.body || {};
   if (typeof title !== 'string' || !title.trim()
     || title.length > 255
     || !['hq', 'manhwa', 'manga'].includes(formato)
     || [author, gender, description, cover, coverFileId].some((value) => typeof value !== 'string')
-    || author.length > 255 || gender.length > 2048 || description.length > 10000 || cover.length > 2048 || coverFileId.length > 255
+    || !author.trim() || author.length > 255 || gender.length > 2048 || description.length > 10000 || cover.length > 2048 || coverFileId.length > 255
     || !isImageKitAsset(cover)) {
     return res.status(400).json({ error: 'Informe o nome e formato da obra e envie uma capa válida ao ImageKit.' });
   }
@@ -478,7 +579,7 @@ app.post('/api/works', requireAuthenticatedUser, requireAdminUser, async (req, r
       {
         Title: title.trim(),
         createBy: req.appwriteUser.$id,
-        Author: [author],
+        Author: [author.trim()],
         gender: gender.trim(),
         formato,
         Description: [description],
@@ -495,6 +596,7 @@ app.post('/api/works', requireAuthenticatedUser, requireAdminUser, async (req, r
         description: getWorkAttribute(document.Description),
         cover: getWorkAttribute(document.coverUrl),
         coverFileId: '',
+        createBy: document.createBy,
         chapters: []
       }
     });
@@ -503,24 +605,28 @@ app.post('/api/works', requireAuthenticatedUser, requireAdminUser, async (req, r
   }
 });
 
-app.put('/api/works/:id', requireAuthenticatedUser, requireAdminUser, async (req, res) => {
+app.put('/api/works/:id', requireAuthenticatedUser, requireModeratorUser, async (req, res) => {
   const { title, author = '', gender = '', formato, description = '', cover = '', coverFileId = '' } = req.body || {};
   if (typeof title !== 'string' || !title.trim()
     || title.length > 255
     || !['hq', 'manhwa', 'manga'].includes(formato)
     || [author, gender, description, cover, coverFileId].some((value) => typeof value !== 'string')
-    || author.length > 255 || gender.length > 2048 || description.length > 10000 || cover.length > 2048 || coverFileId.length > 255
+    || !author.trim() || author.length > 255 || gender.length > 2048 || description.length > 10000 || cover.length > 2048 || coverFileId.length > 255
     || !isImageKitAsset(cover)) {
     return res.status(400).json({ error: 'Informe o nome e formato da obra e envie uma capa válida ao ImageKit.' });
   }
   try {
+    const currentWork = await databases.getDocument(appwriteDatabaseId, worksCollectionId, req.params.id);
+    if (!ownsDocument(req.appwriteUser, currentWork)) {
+      return res.status(403).json({ error: 'Você só pode editar obras criadas pela sua conta.' });
+    }
     const document = await databases.updateDocument(
       appwriteDatabaseId,
       worksCollectionId,
       req.params.id,
       {
         Title: title.trim(),
-        Author: [author],
+        Author: [author.trim()],
         gender: gender.trim(),
         formato,
         Description: [description],
@@ -536,7 +642,8 @@ app.put('/api/works/:id', requireAuthenticatedUser, requireAdminUser, async (req
         formato: document.formato ?? '',
         description: getWorkAttribute(document.Description),
         cover: getWorkAttribute(document.coverUrl),
-        coverFileId: ''
+        coverFileId: '',
+        createBy: document.createBy
       }
     });
   } catch (error) {
@@ -544,34 +651,65 @@ app.put('/api/works/:id', requireAuthenticatedUser, requireAdminUser, async (req
   }
 });
 
-app.delete('/api/works/:id', requireAuthenticatedUser, requireAdminUser, async (req, res) => {
+app.delete('/api/works/:id', requireAuthenticatedUser, requireModeratorUser, async (req, res) => {
+  let work;
   try {
-    await databases.getDocument(appwriteDatabaseId, worksCollectionId, req.params.id);
+    work = await databases.getDocument(appwriteDatabaseId, worksCollectionId, req.params.id);
+  } catch (error) {
+    if (isAppwriteNotFound(error)) return res.json({ deleted: true, alreadyDeleted: true });
+    return sendAppwriteError(res, error, 'Não foi possível localizar a obra para exclusão.');
+  }
+  if (!ownsDocument(req.appwriteUser, work) && !isAdminUser(req.appwriteUser)) {
+    return res.status(403).json({ error: 'Você só pode excluir obras criadas pela sua conta.' });
+  }
+
+  let deletionStep = 'carregar capítulos da obra';
+  try {
     const chapters = await listAllDocuments(chaptersCollectionId, [Query.equal('workId', req.params.id)]);
-    const pagesByChapter = await Promise.all(chapters.map((chapter) => (
-      listAllDocuments(pagesCollectionId, [Query.equal('chapterId', chapter.$id)])
-    )));
-    for (const pages of pagesByChapter) {
-      await Promise.all(pages.map((page) => (
-        databases.deleteDocument(appwriteDatabaseId, pagesCollectionId, page.$id)
-      )));
+    for (const chapter of chapters) {
+      deletionStep = `carregar páginas do capítulo ${chapter.$id}`;
+      const pages = await listAllDocuments(pagesCollectionId, [Query.equal('chapterId', chapter.$id)]);
+      for (const page of pages) {
+        deletionStep = `excluir página ${page.$id}`;
+        try {
+          await databases.deleteDocument(appwriteDatabaseId, pagesCollectionId, page.$id);
+        } catch (error) {
+          if (!isAppwriteNotFound(error)) throw error;
+        }
+      }
     }
-    await Promise.all(chapters.map((chapter) => (
-      databases.deleteDocument(appwriteDatabaseId, chaptersCollectionId, chapter.$id)
-    )));
-    await databases.deleteDocument(appwriteDatabaseId, worksCollectionId, req.params.id);
+    for (const chapter of chapters) {
+      deletionStep = `excluir capítulo ${chapter.$id}`;
+      try {
+        await databases.deleteDocument(appwriteDatabaseId, chaptersCollectionId, chapter.$id);
+      } catch (error) {
+        if (!isAppwriteNotFound(error)) throw error;
+      }
+    }
+    deletionStep = 'excluir a obra';
+    try {
+      await databases.deleteDocument(appwriteDatabaseId, worksCollectionId, req.params.id);
+    } catch (error) {
+      if (!isAppwriteNotFound(error)) throw error;
+    }
     return res.json({ deleted: true });
   } catch (error) {
-    return sendAppwriteError(res, error, 'Não foi possível excluir a obra do Appwrite.');
+    console.error(`Não foi possível ${deletionStep}:`, error);
+    return res.status(getAppwriteStatus(error)).json({
+      error: `Falha ao ${deletionStep}: ${error?.message || 'erro inesperado do Appwrite.'}`
+    });
   }
 });
 
-app.post('/api/works/:workId/chapters', requireAuthenticatedUser, requireAdminUser, async (req, res) => {
+app.post('/api/works/:workId/chapters', requireAuthenticatedUser, requireModeratorUser, async (req, res) => {
   const { number, title = '', language = 'pt-BR', pages } = req.body || {};
   const validationError = getChapterValidationError(number, title, language, pages);
   if (validationError) return res.status(400).json({ error: validationError });
   try {
-    await databases.getDocument(appwriteDatabaseId, worksCollectionId, req.params.workId);
+    const work = await databases.getDocument(appwriteDatabaseId, worksCollectionId, req.params.workId);
+    if (!ownsDocument(req.appwriteUser, work)) {
+      return res.status(403).json({ error: 'Você só pode adicionar capítulos às suas próprias obras.' });
+    }
     const chapter = await databases.createDocument(
       appwriteDatabaseId,
       chaptersCollectionId,
@@ -618,6 +756,8 @@ app.post('/api/works/:workId/chapters', requireAuthenticatedUser, requireAdminUs
         title: getWorkAttribute(chapter.title),
         language,
         author: req.appwriteUser.name || 'Usuário desconhecido',
+        status: chapter.status,
+        createBy: chapter.createBy,
         pages: createdPages.map((page) => ({
           id: page.$id,
           name: page.originalName,
@@ -633,7 +773,7 @@ app.post('/api/works/:workId/chapters', requireAuthenticatedUser, requireAdminUs
   }
 });
 
-app.put('/api/chapters/:id', requireAuthenticatedUser, requireAdminUser, async (req, res) => {
+app.put('/api/chapters/:id', requireAuthenticatedUser, requireModeratorUser, async (req, res) => {
   const { number, title = '', language = 'pt-BR', pages } = req.body || {};
   const validationError = getChapterValidationError(number, title, language, pages);
   if (validationError) return res.status(400).json({ error: validationError });
@@ -643,6 +783,9 @@ app.put('/api/chapters/:id', requireAuthenticatedUser, requireAdminUser, async (
       chaptersCollectionId,
       req.params.id
     );
+    if (!ownsDocument(req.appwriteUser, existingChapter)) {
+      return res.status(403).json({ error: 'Você só pode editar capítulos criados pela sua conta.' });
+    }
     const author = await getChapterAuthorName(existingChapter.createBy);
     const existingPages = await listAllDocuments(pagesCollectionId, [
       Query.equal('chapterId', req.params.id)
@@ -697,6 +840,8 @@ app.put('/api/chapters/:id', requireAuthenticatedUser, requireAdminUser, async (
         title: getWorkAttribute(chapter.title),
         language: chapter.language,
         author,
+        status: chapter.status,
+        createBy: chapter.createBy,
         pages: createdPages.map((page) => ({
           id: page.$id,
           name: page.originalName,
@@ -712,8 +857,12 @@ app.put('/api/chapters/:id', requireAuthenticatedUser, requireAdminUser, async (
   }
 });
 
-app.delete('/api/chapters/:id', requireAuthenticatedUser, requireAdminUser, async (req, res) => {
+app.delete('/api/chapters/:id', requireAuthenticatedUser, requireModeratorUser, async (req, res) => {
   try {
+    const chapter = await databases.getDocument(appwriteDatabaseId, chaptersCollectionId, req.params.id);
+    if (!ownsDocument(req.appwriteUser, chapter)) {
+      return res.status(403).json({ error: 'Você só pode excluir capítulos criados pela sua conta.' });
+    }
     const pages = await listAllDocuments(pagesCollectionId, [
       Query.equal('chapterId', req.params.id)
     ]);
@@ -727,21 +876,59 @@ app.delete('/api/chapters/:id', requireAuthenticatedUser, requireAdminUser, asyn
   }
 });
 
+app.get('/api/pedido_moderacao/me', requireAuthenticatedUser, async (req, res) => {
+  if (!moderationRequestsCollectionId) {
+    return res.status(503).json({ error: 'Configure APPWRITE_MODERATION_REQUESTS_COLLECTION_ID para habilitar pedidos de moderação.' });
+  }
+  try {
+    const requests = await listAllDocuments(moderationRequestsCollectionId, [
+      Query.equal('userId', req.appwriteUser.$id)
+    ]);
+    const request = requests
+      .filter((document) => document.userId === req.appwriteUser.$id)
+      .sort((left, right) => String(right.$createdAt).localeCompare(String(left.$createdAt)))[0];
+    return res.json({
+      isModerator: hasUserLabel(req.appwriteUser, 'moderator') || isAdminUser(req.appwriteUser),
+      request: request ? {
+        id: request.$id,
+        motivos: request.motivos,
+        idiomasPreferencia: request.idiomasPreferencia,
+        status: request.status
+      } : null
+    });
+  } catch (error) {
+    return sendAppwriteError(res, error, 'Não foi possível carregar o pedido de moderação.');
+  }
+});
+
 app.post('/api/pedido_moderacao', requireAuthenticatedUser, async (req, res) => {
   if (!moderationRequestsCollectionId) {
     return res.status(503).json({ error: 'Configure APPWRITE_MODERATION_REQUESTS_COLLECTION_ID para habilitar pedidos de moderação.' });
   }
   const { motivos, idiomas_preferencia: idiomasPreferencia } = req.body || {};
-  if (typeof motivos !== 'string' || typeof idiomasPreferencia !== 'string') {
-    return res.status(400).json({ error: 'Informe os motivos e os idiomas de preferência.' });
+  if (typeof motivos !== 'string' || !motivos.trim() || motivos.length > 5000
+    || typeof idiomasPreferencia !== 'string' || !idiomasPreferencia.trim() || idiomasPreferencia.length > 255) {
+    return res.status(400).json({ error: 'Informe os motivos (até 5000 caracteres) e os idiomas de preferência (até 255 caracteres).' });
+  }
+  if (hasUserLabel(req.appwriteUser, 'moderator') || isAdminUser(req.appwriteUser)) {
+    return res.status(409).json({ error: 'Sua conta já possui acesso de moderação.' });
   }
   try {
+    const requests = await listAllDocuments(moderationRequestsCollectionId, [
+      Query.equal('userId', req.appwriteUser.$id),
+      Query.equal('status', 'PENDENTE')
+    ]);
+    const existingRequest = requests[0];
+    if (existingRequest) {
+      return res.status(409).json({ error: 'Você já possui um pedido de moderação aguardando análise.' });
+    }
+
     const document = await databases.createDocument(
       appwriteDatabaseId,
       moderationRequestsCollectionId,
       ID.unique(),
       {
-        usuarioId: req.appwriteUser.$id,
+        userId: req.appwriteUser.$id,
         motivos,
         idiomasPreferencia,
         status: 'PENDENTE'
@@ -750,9 +937,9 @@ app.post('/api/pedido_moderacao', requireAuthenticatedUser, async (req, res) => 
     return res.status(201).json({
       pedido: {
         id: document.$id,
-        usuario_id: document.usuarioId,
+        userId: document.userId,
         motivos: document.motivos,
-        idiomas_preferencia: document.idiomasPreferencia,
+        idiomasPreferencia: document.idiomasPreferencia,
         status: document.status
       }
     });
@@ -761,20 +948,280 @@ app.post('/api/pedido_moderacao', requireAuthenticatedUser, async (req, res) => 
   }
 });
 
+app.post('/api/pedido_obra', requireAuthenticatedUser, requireModeratorUser, async (req, res) => {
+  if (!workRequestsCollectionId) {
+    return res.status(503).json({ error: 'Configure APPWRITE_WORK_REQUESTS_COLLECTION_ID para habilitar pedidos de obra.' });
+  }
+  const { nomeObra, author = '', sinopse, coverUrl, gender = '', formato } = req.body || {};
+  if (typeof nomeObra !== 'string' || !nomeObra.trim() || nomeObra.length > 255
+    || typeof author !== 'string' || !author.trim() || author.length > 255
+    || typeof sinopse !== 'string' || sinopse.length > 10000
+    || typeof gender !== 'string' || !gender.trim() || gender.length > 255
+    || !['hq', 'manhwa', 'manga'].includes(formato)
+    || typeof coverUrl !== 'string' || coverUrl.length > 2048 || !isImageKitAsset(coverUrl)) {
+    return res.status(400).json({ error: 'Informe nome, formato, gênero, sinopse e uma capa válida enviada ao ImageKit.' });
+  }
+  try {
+    const document = await databases.createDocument(
+      appwriteDatabaseId,
+      workRequestsCollectionId,
+      ID.unique(),
+      {
+        userId: req.appwriteUser.$id,
+        moderadorId: req.appwriteUser.$id,
+        nomeObra: nomeObra.trim(),
+        Author: author.trim(),
+        sinopse,
+        coverUrl,
+        gender: gender.trim(),
+        formato,
+        status: 'PENDENTE'
+      }
+    );
+    return res.status(201).json({ pedido: { id: document.$id, status: document.status } });
+  } catch (error) {
+    const appwriteErrorDetails = `${error?.message || ''} ${JSON.stringify(error?.response || '')}`;
+    if (error?.type === 'document_invalid_structure'
+      && /Unknown attribute:\s*["']gender["']/.test(appwriteErrorDetails)) {
+      console.error('The work requests collection is missing its gender attribute:', error);
+      return res.status(503).json({
+        error: 'A collection configurada em APPWRITE_WORK_REQUESTS_COLLECTION_ID não possui o atributo gender. Crie um atributo String chamado gender, com tamanho 255, e tente novamente.'
+      });
+    }
+    if (error?.type === 'document_invalid_structure'
+      && /Unknown attribute:\s*["']author["']/i.test(appwriteErrorDetails)) {
+      console.error('The work requests collection is missing its author attribute:', error);
+      return res.status(503).json({
+        error: 'A collection configurada em APPWRITE_WORK_REQUESTS_COLLECTION_ID não possui o atributo Author. Crie um atributo String chamado Author, com tamanho 255, e tente novamente.'
+      });
+    }
+    return sendAppwriteError(res, error, 'Não foi possível criar o pedido de obra no Appwrite.');
+  }
+});
+
+app.get('/api/pedido_obra/me', requireAuthenticatedUser, requireModeratorUser, async (req, res) => {
+  if (!workRequestsCollectionId) {
+    return res.status(503).json({ error: 'Configure APPWRITE_WORK_REQUESTS_COLLECTION_ID para habilitar pedidos de obra.' });
+  }
+  try {
+    const [moderatorRequests, userRequests] = await Promise.all([
+      listAllDocuments(workRequestsCollectionId, [Query.equal('moderadorId', req.appwriteUser.$id)]),
+      listAllDocuments(workRequestsCollectionId, [Query.equal('userId', req.appwriteUser.$id)])
+    ]);
+    const requests = [...new Map(
+      [...moderatorRequests, ...userRequests].map((document) => [document.$id, document])
+    ).values()]
+      .sort((left, right) => String(right.$createdAt).localeCompare(String(left.$createdAt)));
+    return res.json({
+      requests: requests.map((request) => ({
+        id: request.$id,
+        status: request.status,
+        title: request.nomeObra,
+        gender: typeof request.gender === 'string' && request.gender.trim()
+          ? request.gender.trim()
+          : 'Não informado',
+        formato: request.formato ?? ''
+      }))
+    });
+  } catch (error) {
+    return sendAppwriteError(res, error, 'Não foi possível carregar o status do pedido de obra.');
+  }
+});
+
+app.delete('/api/pedido_obra/:id', requireAuthenticatedUser, requireModeratorUser, async (req, res) => {
+  if (!workRequestsCollectionId) {
+    return res.status(503).json({ error: 'Configure APPWRITE_WORK_REQUESTS_COLLECTION_ID para habilitar pedidos de obra.' });
+  }
+  let deletionStep = 'carregar o pedido de obra';
+  try {
+    let request;
+    try {
+      request = await databases.getDocument(appwriteDatabaseId, workRequestsCollectionId, req.params.id);
+    } catch (error) {
+      if (isAppwriteNotFound(error)) return res.json({ deleted: true, alreadyDeleted: true });
+      throw error;
+    }
+    if (request.moderadorId !== req.appwriteUser.$id && request.userId !== req.appwriteUser.$id) {
+      return res.status(403).json({ error: 'Você só pode excluir os pedidos de obra da sua conta.' });
+    }
+    const status = String(request.status).toUpperCase();
+    if (!['PENDENTE', 'REPROVADO'].includes(status)) {
+      return res.status(409).json({ error: 'Somente pedidos pendentes ou negados podem ser excluídos.' });
+    }
+    deletionStep = status === 'PENDENTE' ? 'cancelar a análise do pedido' : 'excluir o pedido negado';
+    await databases.deleteDocument(appwriteDatabaseId, workRequestsCollectionId, req.params.id);
+    return res.json({ deleted: true });
+  } catch (error) {
+    console.error(`Não foi possível ${deletionStep}:`, error);
+    return res.status(getAppwriteStatus(error)).json({
+      error: `Falha ao ${deletionStep}: ${error?.message || 'erro inesperado do Appwrite.'}`
+    });
+  }
+});
+
+app.get('/api/homologacao', requireAuthenticatedUser, requireAdminUser, async (req, res) => {
+  if (!moderationRequestsCollectionId || !workRequestsCollectionId) {
+    return res.status(503).json({ error: 'Configure as collections de pedidos de moderação e de obra no servidor.' });
+  }
+  try {
+    const [moderationDocuments, workRequestDocuments] = await Promise.all([
+      listAllDocuments(moderationRequestsCollectionId),
+      listAllDocuments(workRequestsCollectionId)
+    ]);
+    const pending = (document) => String(document.status).toUpperCase() === 'PENDENTE';
+    const pendingModeration = moderationDocuments.filter(pending);
+    const pendingWorkRequests = workRequestDocuments.filter(pending);
+    const userIds = [...new Set([
+      ...pendingModeration.map((request) => request.userId),
+      ...pendingWorkRequests.map((request) => request.moderadorId || request.userId)
+    ].filter(Boolean))];
+    const names = new Map(await Promise.all(userIds.map(async (userId) => (
+      [userId, await getUserDisplayName(userId)]
+    ))));
+    return res.json({
+      moderationRequests: pendingModeration.map((request) => ({
+        id: request.$id,
+        userId: request.userId,
+        userName: names.get(request.userId) || 'Usuário',
+        language: request.idiomasPreferencia,
+        motivation: request.motivos
+      })),
+      workRequests: pendingWorkRequests.map((request) => ({
+        id: request.$id,
+        userId: request.moderadorId || request.userId,
+        userName: names.get(request.moderadorId || request.userId) || 'Moderador',
+        title: request.nomeObra,
+        author: getWorkAttribute(request.Author ?? request.author),
+        synopsis: request.sinopse,
+
+        gender: request.gender ?? '',
+        formato: request.formato ?? '',
+        cover: request.coverUrl
+      }))
+    });
+  } catch (error) {
+    return sendAppwriteError(res, error, 'Não foi possível carregar os pedidos para homologação.');
+  }
+});
+
+app.post('/api/pedido_moderacao/:id/aprovar', requireAuthenticatedUser, requireAdminUser, async (req, res) => {
+  if (!moderationRequestsCollectionId) {
+    return res.status(503).json({ error: 'Configure APPWRITE_MODERATION_REQUESTS_COLLECTION_ID para habilitar pedidos de moderação.' });
+  }
+  try {
+    const request = await databases.getDocument(appwriteDatabaseId, moderationRequestsCollectionId, req.params.id);
+    if (String(request.status).toUpperCase() !== 'PENDENTE') {
+      return res.status(409).json({ error: 'Este pedido já foi analisado.' });
+    }
+    const user = await users.get(request.userId);
+    const labels = Array.isArray(user.labels) ? user.labels : [];
+    if (!labels.includes('moderator')) {
+      await users.updateLabels(request.userId, [...labels, 'moderator']);
+    }
+    const document = await databases.updateDocument(
+      appwriteDatabaseId,
+      moderationRequestsCollectionId,
+      req.params.id,
+      { status: 'APROVADO' }
+    );
+    return res.json({ pedido: { id: document.$id, status: document.status } });
+  } catch (error) {
+    return sendAppwriteError(res, error, 'Não foi possível aprovar o pedido de moderação.');
+  }
+});
+
+app.post('/api/pedido_moderacao/:id/reprovar', requireAuthenticatedUser, requireAdminUser, async (req, res) => {
+  if (!moderationRequestsCollectionId) {
+    return res.status(503).json({ error: 'Configure APPWRITE_MODERATION_REQUESTS_COLLECTION_ID para habilitar pedidos de moderação.' });
+  }
+  try {
+    const request = await databases.getDocument(appwriteDatabaseId, moderationRequestsCollectionId, req.params.id);
+    if (String(request.status).toUpperCase() !== 'PENDENTE') {
+      return res.status(409).json({ error: 'Este pedido já foi analisado.' });
+    }
+    const document = await databases.updateDocument(
+      appwriteDatabaseId,
+      moderationRequestsCollectionId,
+      req.params.id,
+      { status: 'REPROVADO' }
+    );
+    return res.json({ pedido: { id: document.$id, status: document.status } });
+  } catch (error) {
+    return sendAppwriteError(res, error, 'Não foi possível reprovar o pedido de moderação.');
+  }
+});
+
 app.post('/api/pedido_obra/:id/aprovar', requireAuthenticatedUser, requireAdminUser, async (req, res) => {
   if (!workRequestsCollectionId) {
     return res.status(503).json({ error: 'Configure APPWRITE_WORK_REQUESTS_COLLECTION_ID para habilitar pedidos de obra.' });
   }
   try {
+    const request = await databases.getDocument(appwriteDatabaseId, workRequestsCollectionId, req.params.id);
+    if (String(request.status).toUpperCase() === 'APROVADO') {
+      return res.json({ pedido: { id: request.$id, status: request.status }, workId: request.$id });
+    }
+    if (String(request.status).toUpperCase() !== 'PENDENTE' || !isImageKitAsset(request.coverUrl)) {
+      return res.status(409).json({ error: 'Este pedido não está pendente ou a capa enviada não é válida.' });
+    }
+    const requestedAuthor = getWorkAttribute(request.Author ?? request.author);
+    const workData = {
+      Title: request.nomeObra,
+      createBy: request.moderadorId || request.userId,
+      Author: requestedAuthor ? [requestedAuthor] : [],
+      gender: request.gender ?? '',
+      formato: ['hq', 'manhwa', 'manga'].includes(request.formato) ? request.formato : 'manga',
+      Description: [request.sinopse],
+      coverUrl: [request.coverUrl]
+    };
+    let work;
+    try {
+      work = await databases.createDocument(
+        appwriteDatabaseId,
+        worksCollectionId,
+        req.params.id,
+        workData
+      );
+    } catch (error) {
+      if (error?.code !== 409) throw error;
+      work = await databases.getDocument(appwriteDatabaseId, worksCollectionId, req.params.id);
+      if (work.createBy !== (request.moderadorId || request.userId)) throw error;
+      work = await databases.updateDocument(
+        appwriteDatabaseId,
+        worksCollectionId,
+        req.params.id,
+        { Author: workData.Author, gender: workData.gender, formato: workData.formato }
+      );
+    }
     const document = await databases.updateDocument(
       appwriteDatabaseId,
       workRequestsCollectionId,
       req.params.id,
       { status: 'APROVADO' }
     );
-    return res.json({ pedido: document });
+    return res.json({ pedido: { id: document.$id, status: document.status }, workId: work.$id });
   } catch (error) {
-    return sendAppwriteError(res, error, 'Não foi possível aprovar o pedido de obra no Appwrite.');
+    return sendAppwriteError(res, error, 'Não foi possível aprovar o pedido de obra.');
+  }
+});
+
+app.post('/api/pedido_obra/:id/reprovar', requireAuthenticatedUser, requireAdminUser, async (req, res) => {
+  if (!workRequestsCollectionId) {
+    return res.status(503).json({ error: 'Configure APPWRITE_WORK_REQUESTS_COLLECTION_ID para habilitar pedidos de obra.' });
+  }
+  try {
+    const request = await databases.getDocument(appwriteDatabaseId, workRequestsCollectionId, req.params.id);
+    if (String(request.status).toUpperCase() !== 'PENDENTE') {
+      return res.status(409).json({ error: 'Este pedido já foi analisado.' });
+    }
+    const document = await databases.updateDocument(
+      appwriteDatabaseId,
+      workRequestsCollectionId,
+      req.params.id,
+      { status: 'REPROVADO' }
+    );
+    return res.json({ pedido: { id: document.$id, status: document.status } });
+  } catch (error) {
+    return sendAppwriteError(res, error, 'Não foi possível reprovar o pedido de obra.');
   }
 });
 
@@ -863,98 +1310,25 @@ function parseProviderJson(text, responseSchema, providerName) {
   return parsed;
 }
 
-function toChatCompletionMessages(contents, responseSchema) {
-  const userContent = [];
-  for (const content of contents) {
-    for (const part of content.parts || []) {
-      if (typeof part.text === 'string') {
-        userContent.push({ type: 'text', text: part.text });
-      }
-      if (part.inlineData?.data && part.inlineData?.mimeType) {
-        userContent.push({
-          type: 'image_url',
-          image_url: {
-            url: `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`
-          }
-        });
-      }
-    }
-  }
-
-  userContent.push({
-    type: 'text',
-    text: `Retorne apenas um objeto JSON válido que corresponda a este schema: ${JSON.stringify(responseSchema)}`
-  });
-  return [{ role: 'user', content: userContent }];
-}
-
 async function generateWithProvider(provider, contents, generationConfig, responseSchema, signal) {
-  if (provider.name === 'Gemini') {
-    const result = await gemini.models.generateContent({
-      model: 'gemini-3.8-flash',
-      contents,
-      config: {
-        ...generationConfig,
-        httpOptions: {
-          timeout: providerTimeoutMs,
-          retryOptions: { attempts: 1 }
-        },
-        abortSignal: signal
-      }
-    });
-    const text = result.text
-      || result.candidates?.[0]?.content?.parts?.map((part) => part.text || '').join('');
-    if (!text?.trim()) {
-      const error = new Error(`Gemini não retornou conteúdo${result.candidates?.[0]?.finishReason
-        ? ` (${result.candidates[0].finishReason})`
-        : ''}.`);
-      error.status = 502;
-      throw error;
+  const result = await provider.gemini.models.generateContent({
+    model: 'gemini-3.8-flash',
+    contents,
+    config: {
+      ...generationConfig,
+      httpOptions: {
+        timeout: providerTimeoutMs,
+        retryOptions: { attempts: 1 }
+      },
+      abortSignal: signal
     }
-    parseProviderJson(text, responseSchema, provider.name);
-    return {
-      candidates: [{
-        content: { parts: [{ text }] },
-        finishReason: result.candidates?.[0]?.finishReason
-      }],
-      promptFeedback: result.promptFeedback
-    };
-  }
-
-  const isOpenAI = provider.name === 'OpenAI';
-  const isQwen = provider.name === 'Qwen';
-  const apiUrl = isOpenAI
-    ? 'https://api.openai.com/v1/chat/completions'
-    : isQwen
-      ? qwenApiUrl
-      : 'https://api.groq.com/openai/v1/chat/completions';
-  const apiKey = isOpenAI ? openAIKey : isQwen ? qwenApiKey : groqApiKey;
-  const model = isOpenAI ? openAIModel : isQwen ? qwenModel : groqModel;
-  const messages = toChatCompletionMessages(contents, responseSchema);
-  const providerResponse = await fetch(apiUrl, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json'
-    },
-    signal: AbortSignal.any([signal, AbortSignal.timeout(providerTimeoutMs)]),
-    body: JSON.stringify({
-      model,
-      messages,
-      max_tokens: generationConfig.maxOutputTokens || 4096,
-      response_format: { type: 'json_object' }
-    })
   });
-  const providerResult = await providerResponse.json();
-  if (!providerResponse.ok) {
-    const error = new Error(providerResult.error?.message || `${provider.name} respondeu com HTTP ${providerResponse.status}.`);
-    error.status = providerResponse.status;
-    throw error;
-  }
-
-  const text = providerResult.choices?.[0]?.message?.content;
-  if (typeof text !== 'string' || !text.trim()) {
-    const error = new Error(`${provider.name} não retornou conteúdo.`);
+  const text = result.text
+    || result.candidates?.[0]?.content?.parts?.map((part) => part.text || '').join('');
+  if (!text?.trim()) {
+    const error = new Error(`Gemini não retornou conteúdo${result.candidates?.[0]?.finishReason
+      ? ` (${result.candidates[0].finishReason})`
+      : ''}.`);
     error.status = 502;
     throw error;
   }
@@ -962,8 +1336,9 @@ async function generateWithProvider(provider, contents, generationConfig, respon
   return {
     candidates: [{
       content: { parts: [{ text }] },
-      finishReason: providerResult.choices?.[0]?.finish_reason
-    }]
+      finishReason: result.candidates?.[0]?.finishReason
+    }],
+    promptFeedback: result.promptFeedback
   };
 }
 
@@ -975,14 +1350,14 @@ app.post('/api/gemini', async (req, res) => {
   }
 
   const providers = [
-    ...(gemini ? [{ name: 'Gemini' }] : []),
-    ...(openAIKey ? [{ name: 'OpenAI' }] : []),
-    ...(qwenApiKey ? [{ name: 'Qwen' }] : []),
-    ...(groqApiKey ? [{ name: 'Groq' }] : [])
+    ...geminiApiKeys.map((apiKey, index) => ({
+      name: `Gemini (chave ${index + 1})`,
+      gemini: new GoogleGenAI({ apiKey })
+    }))
   ];
   if (providers.length === 0) {
     return res.status(503).json({
-      error: { message: 'Configure ao menos uma chave de API válida para Gemini, OpenAI, Qwen ou Groq no arquivo .env e reinicie o servidor. Valores de exemplo como "cole_sua_chave_aqui" não são aceitos.' }
+      error: { message: 'Configure ao menos uma chave Gemini válida no arquivo .env e reinicie o servidor. Valores de exemplo como "cole_sua_chave_aqui" não são aceitos.' }
     });
   }
 

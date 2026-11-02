@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#35333e">
+    <title>Homologação | HokuPédia</title>
+    <link rel="stylesheet" href="../CSS/Confirmacao.css">
+    <link rel="stylesheet" href="../CSS/Moderacao.css">
+</head>
+<body class="workflow-body">
+    <header class="workflow-header">
+        <a class="workflow-brand" href="/" aria-label="HokuPédia — tela inicial">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+            <span>HokuPedia</span>
+        </a>
+        <a class="workflow-profile" href="/HTML/GerenciarObras.html" aria-label="Abrir gerenciamento de obras">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+        </a>
+    </header>
+
+    <main class="homologation-main">
+        <div class="homologation-heading">
+            <div>
+                <p class="workflow-eyebrow">Painel do administrador</p>
+                <h1>Tela de Homologação</h1>
+            </div>
+            <a class="management-link" href="/HTML/GerenciarObras.html">Gerenciar catálogo</a>
+        </div>
+        <p class="workflow-feedback" id="feedback" role="status" aria-live="polite"></p>
+
+        <section class="approval-section" aria-labelledby="moderationHeading">
+            <h2 id="moderationHeading">Pedidos de Moderação</h2>
+            <div class="approval-list" id="moderationRequests"></div>
+        </section>
+        <section class="approval-section" aria-labelledby="workHeading">
+            <h2 id="workHeading">Adição de Obra</h2>
+            <div class="approval-list" id="workRequests"></div>
+        </section>
+    </main>
+
+    <dialog class="cover-preview-dialog" id="coverPreviewDialog" aria-label="Visualização da capa">
+        <button class="cover-preview-close" type="button" aria-label="Fechar visualização">×</button>
+        <img class="cover-preview-large" id="coverPreviewImage" alt="">
+    </dialog>
+
+    <script type="module" src="../JS/Homologacao.js"></script>
+</body>
+</html>

@@ -25,6 +25,7 @@ export default defineConfig({
         cadLog: resolve(process.cwd(), 'HTML/CadLog.html'),
         perfil: resolve(process.cwd(), 'HTML/Perfil.html'),
         gerenciarObras: resolve(process.cwd(), 'HTML/GerenciarObras.html'),
+        homologacao: resolve(process.cwd(), 'HTML/Homologacao.html'),
         obra: resolve(process.cwd(), 'HTML/Obra.html'),
         leitura: resolve(process.cwd(), 'HTML/Leitura.html'),
       },

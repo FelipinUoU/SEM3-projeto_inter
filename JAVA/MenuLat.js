@@ -16,16 +16,25 @@ async function updateNavigationForUser() {
             || user.labels?.includes("admin");
         const isModerator = isAdmin || user.labels?.includes("moderator");
         navigation.querySelectorAll("[data-role-navigation]").forEach((link) => link.remove());
+        navigation.querySelectorAll("[data-admin-only]").forEach((link) => {
+            link.hidden = !isAdmin;
+        });
 
-        const manageWorksLink = document.createElement("a");
-        manageWorksLink.className = "menu-lateral-item";
-        manageWorksLink.href = "/HTML/GerenciarObras.html";
+        const existingManageWorksLink = navigation.querySelector('a[href="/HTML/GerenciarObras.html"]');
+        const manageWorksLink = existingManageWorksLink || document.createElement("a");
+        manageWorksLink.classList.add("menu-lateral-item");
         manageWorksLink.textContent = isModerator ? "Gerenciar Obras" : "Solicitar moderação";
-        manageWorksLink.dataset.roleNavigation = "works";
-        navigation.querySelector('a[href="/HTML/Biblioteca.html"]')
-            ?.insertAdjacentElement("afterend", manageWorksLink);
+        manageWorksLink.hidden = false;
+        if (!existingManageWorksLink) {
+            manageWorksLink.href = "/HTML/GerenciarObras.html";
+            manageWorksLink.dataset.roleNavigation = "works";
+            navigation.querySelector('a[href="/HTML/Biblioteca.html"]')
+                ?.insertAdjacentElement("afterend", manageWorksLink);
+        }
 
-        if (isAdmin) {
+        const existingApprovalLink = navigation.querySelector('a[href="/HTML/Homologacao.html"]');
+        if (existingApprovalLink) existingApprovalLink.hidden = !isAdmin;
+        if (isAdmin && !existingApprovalLink) {
             const approvalLink = document.createElement("a");
             approvalLink.className = "menu-lateral-item";
             approvalLink.href = "/HTML/Homologacao.html";
@@ -34,6 +43,8 @@ async function updateNavigationForUser() {
             manageWorksLink.insertAdjacentElement("afterend", approvalLink);
         }
     } catch (error) {
+        navigation?.querySelector('a[href="/HTML/GerenciarObras.html"]')?.setAttribute("hidden", "");
+        navigation?.querySelectorAll("[data-admin-only]").forEach((link) => { link.hidden = true; });
         if (error.code !== 401) {
             console.error("Não foi possível verificar a sessão do usuário:", error);
         }

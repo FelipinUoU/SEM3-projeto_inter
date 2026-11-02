@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#29272f">
     <title>Gerenciar obras | HokuPédia</title>
+    <link rel="stylesheet" href="../CSS/Confirmacao.css">
     <link rel="stylesheet" href="../CSS/GerenciarObras.css">
     <link rel="stylesheet" href="../CSS/MenuLat.css">
 </head>
@@ -16,6 +17,7 @@
             <span></span>
         </button>
         <h1 class="menu-lateral-logo"><a href="/" aria-label="Ir para a página inicial">HokuPédia</a></h1>
+        <a class="back-link" id="workApprovalLink" href="/HTML/Homologacao.html" hidden>Homologação</a>
         <a class="header-login" href="/HTML/CadLog.html?mode=login">Login</a>
     </header>
     <button class="menu-lateral-overlay" id="menuOverlay" type="button" aria-label="Fechar dashboard" hidden></button>
@@ -24,13 +26,15 @@
             <a class="menu-lateral-item" href="/">Home</a>
             <a class="menu-lateral-item" href="/HTML/Catalogo.html">Catálogo</a>
             <a class="menu-lateral-item" href="/HTML/Biblioteca.html">Biblioteca</a>
+            <a class="menu-lateral-item" href="/HTML/CadLog.html?mode=login">Login</a>
         </nav>
     </aside>
 
     <main class="management-page">
         <div class="page-heading">
             <div>
-                <h1>Gerenciamento de obras</h1>
+                <p class="eyebrow">Painel da comunidade</p>
+                <h1 id="pageTitle">Gerenciamento de obras</h1>
             </div>
             <button class="add-work-button" id="addWorkButton" type="button">
                 <span aria-hidden="true">＋</span>
@@ -38,10 +42,47 @@
             </button>
         </div>
 
-        <p class="feedback" id="feedback" role="status" aria-live="polite"></p>
+        <section class="moderation-request" id="moderationRequestRegion" hidden>
+            <p class="moderation-intro">Peça acesso para contribuir com a criação e organização de obras e capítulos da comunidade.</p>
+            <section class="request-status" id="requestStatus" aria-live="polite" hidden>
+                <strong id="requestStatusTitle"></strong>
+                <p id="requestStatusDescription"></p>
+                <button class="submit-button retry-moderation-button" id="retryModerationButton" type="button" hidden>
+                    Pedir de novo
+                </button>
+            </section>
+            <p class="feedback" id="requestFeedback" role="status" aria-live="polite"></p>
+            <form class="moderation-form" id="moderationForm">
+                <label class="field" for="preferredLanguages">
+                    Idioma preferido
+                    <select id="preferredLanguages" name="idiomas_preferencia" required>
+                        <option value="" selected disabled>Selecione um idioma</option>
+                        <option value="Português (Brasil)">Português (Brasil)</option>
+                        <option value="Inglês">Inglês</option>
+                        <option value="Espanhol">Espanhol</option>
+                        <option value="Japonês">Japonês</option>
+                        <option value="Francês">Francês</option>
+                    </select>
+                </label>
+                <label class="field" for="motivation">
+                    Motivação
+                    <textarea id="motivation" name="motivos" maxlength="5000" required placeholder="Conte por que deseja ajudar a comunidade como moderador."></textarea>
+                </label>
+                <div class="form-actions">
+                    <a class="cancel-button" href="/HTML/Biblioteca.html">Cancelar</a>
+                    <button class="submit-button" type="submit">Enviar solicitação</button>
+                </div>
+            </form>
+        </section>
 
-        <section class="editor-region" id="editorRegion" aria-live="polite"></section>
-        <section class="work-list" id="workList" aria-label="Obras cadastradas"></section>
+        <section id="workManagementRegion" hidden>
+            <p class="storage-note">
+                Obras, capítulos e imagens são salvos no Appwrite.
+            </p>
+            <p class="feedback" id="feedback" role="status" aria-live="polite"></p>
+            <section class="editor-region" id="editorRegion" aria-live="polite"></section>
+            <section class="work-list" id="workList" aria-label="Obras cadastradas"></section>
+        </section>
     </main>
 
     <script type="module" src="../JAVA/MenuLat.js"></script>

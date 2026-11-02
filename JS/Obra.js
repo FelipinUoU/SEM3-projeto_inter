@@ -48,12 +48,14 @@ function getWorkFormat(value) {
 
 async function showManageLink() {
     try {
-        const isAdmin = currentUser?.email?.trim().toLowerCase() === "hokupedia@gmail.com"
-            || currentUser?.labels?.includes("admin");
-        const isModerator = isAdmin || currentUser?.labels?.includes("moderator");
-        if (manageLink && isModerator) {
-            manageLink.hidden = false;
-        }
+        if (!currentUser || !manageLink) return;
+        const isAdmin = currentUser.email?.trim().toLowerCase() === "hokupedia@gmail.com"
+            || currentUser.labels?.includes("admin");
+        manageLink.textContent = isAdmin || currentUser.labels?.includes("moderator")
+            ? "Gerenciar obras"
+            : "Solicitar moderação";
+        manageLink.setAttribute("aria-label", manageLink.textContent);
+        manageLink.hidden = false;
     } catch (error) {
         console.error("Não foi possível verificar o acesso administrativo:", error);
     }

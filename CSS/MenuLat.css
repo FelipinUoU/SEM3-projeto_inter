@@ -365,6 +365,10 @@ body > header .logo a:focus-visible,
     transition: background-color 0.2s ease, color 0.2s ease;
 }
 
+.menu-lateral-item[hidden] {
+    display: none;
+}
+
 .menu-lateral-item:hover,
 .menu-lateral-item[aria-pressed="true"] {
     background: #d5bd00;

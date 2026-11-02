@@ -12,6 +12,10 @@
     box-sizing: border-box;
 }
 
+.management-page [hidden] {
+    display: none !important;
+}
+
 body {
     min-width: 320px;
     min-height: 100vh;
@@ -73,6 +77,12 @@ a {
 
 .back-link:hover {
     color: white;
+}
+
+.management-nav {
+    display: flex;
+    align-items: center;
+    gap: 20px;
 }
 
 .management-page {
@@ -139,6 +149,63 @@ a {
     line-height: 1.5;
 }
 
+.moderation-request {
+    display: grid;
+    max-width: 720px;
+    gap: 16px;
+    padding: 24px;
+    border: 1px solid #ffffff10;
+    border-radius: 12px;
+    background: #1e1d20;
+}
+
+.moderation-intro {
+    margin: 0;
+    color: #c3bec8;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.moderation-form {
+    display: grid;
+    gap: 16px;
+}
+
+.request-status {
+    padding: 16px;
+    border: 1px solid #ffffff18;
+    border-radius: 8px;
+    background: #29272f;
+    color: #f6f5f7;
+    line-height: 1.5;
+}
+
+.request-status p {
+    margin: 6px 0 0;
+    color: #c3bec8;
+    font-size: 13px;
+}
+
+.retry-moderation-button {
+    margin-top: 14px;
+}
+
+.cancel-button {
+    display: inline-flex;
+    min-height: 40px;
+    align-items: center;
+    justify-content: center;
+    padding: 0 14px;
+    border: 1px solid #ffffff24;
+    border-radius: 8px;
+    color: #d1cdd7;
+    font-size: 13px;
+}
+
+.cancel-button:hover {
+    background: #ffffff0a;
+}
+
 .feedback {
     min-height: 0;
     margin: 0;
@@ -157,6 +224,80 @@ a {
 .work-list {
     display: grid;
     gap: 16px;
+}
+
+.work-request-card {
+    position: relative;
+    display: grid;
+    grid-template-columns: 74px minmax(0, 1fr);
+    align-items: center;
+    gap: 16px;
+    padding: 20px;
+    border: 1px solid #ffffff1a;
+    border-radius: 13px;
+    background: #1e1d20;
+}
+
+.work-request-card-status {
+    display: grid;
+    width: 74px;
+    min-height: 92px;
+    place-items: center;
+    border: 1px solid #ffffff1c;
+    border-radius: 6px;
+    background: #29272f;
+    color: #f0b84b;
+    font-size: 11px;
+    font-weight: 700;
+    text-align: center;
+}
+
+.work-request-card.is-rejected .work-request-card-status {
+    color: #ff9c9c;
+}
+
+.work-request-card h2 {
+    margin: 0 0 7px;
+    font-size: 17px;
+}
+
+.work-request-card p {
+    margin: 0;
+    color: #bcb8c1;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.work-request-card .work-request-title {
+    margin-top: 5px;
+    color: #f6f5f7;
+    font-weight: 700;
+}
+
+.work-request-delete {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    display: grid;
+    width: 27px;
+    height: 27px;
+    place-items: center;
+    border: 1px solid #ff6868;
+    border-radius: 5px;
+    background: transparent;
+    color: #ff8585;
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.work-request-delete:hover {
+    background: #ff68681a;
+}
+
+.work-request-delete:disabled {
+    cursor: wait;
+    opacity: 0.6;
 }
 
 .work-card {
@@ -267,9 +408,16 @@ a {
     background: #ff424222;
 }
 
+.delete-action:disabled {
+    cursor: wait;
+    opacity: 0.6;
+}
+
 .work-chapters {
-    grid-column: 2 / -1;
+    grid-column: 1 / -1;
     display: grid;
+    grid-template-columns: 74px minmax(0, 1fr);
+    align-items: start;
     gap: 7px;
     width: 100%;
 }
@@ -281,11 +429,56 @@ a {
     scrollbar-gutter: stable;
 }
 
-.work-chapters.is-scrollable:focus-visible {
+.work-chapters > .chapter-row,
+.work-chapters > .no-chapters {
+    grid-column: 2;
+}
+
+.chapter-row[hidden] {
+    display: none;
+}
+
+.chapter-list-toggle {
+    grid-column: 1;
+    grid-row: 1;
+    display: grid;
+    width: 30px;
+    height: 30px;
+    place-items: center;
+    justify-self: center;
+    padding: 0;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: #bdb8c4;
+    cursor: pointer;
+}
+
+.chapter-list-toggle:hover {
+    background: #ffffff0a;
+    color: #fff;
+}
+
+.work-chapters.is-scrollable:focus-visible,
+.chapter-list-toggle:focus-visible {
     outline: 2px solid #48aaff;
     outline-offset: 2px;
 }
 
+.chapter-list-toggle svg {
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 2;
+    transition: transform 150ms ease;
+}
+
+.chapter-list-toggle[aria-expanded="true"] svg {
+    transform: rotate(180deg);
+}
 .no-chapters {
     margin: 0;
     color: #aaa5b2;
@@ -368,6 +561,216 @@ a {
     border: 1px solid #ffffff10;
     border-radius: 12px;
     background: #111113;
+}
+
+.management-page.has-work-creation-form {
+    width: min(calc(100% - 40px), 1287px);
+}
+
+.work-creation-panel {
+    padding: 30px 37px;
+    border: 0;
+    border-radius: 20px;
+    background: #1e1e1e;
+}
+
+.work-creation-panel .editor-heading {
+    margin-bottom: 22px;
+}
+
+.work-creation-panel .editor-heading h2 {
+    font-size: 21px;
+}
+
+.work-creation-form {
+    gap: 18px;
+}
+
+.work-creation-form .work-form-layout {
+    position: relative;
+    grid-template-columns: minmax(150px, 217px) minmax(0, 1fr);
+    align-items: start;
+    gap: 30px;
+}
+
+.work-creation-form .work-cover-upload {
+    width: 100%;
+    min-height: 0;
+    aspect-ratio: 217 / 290;
+    border: 0;
+    background: #d9d9d9;
+}
+
+.work-creation-form .work-cover-prompt {
+    max-width: 82%;
+    color: #111;
+    font-size: clamp(14px, 2vw, 25px);
+    line-height: 1.25;
+}
+
+.work-creation-form .work-cover-upload.has-cover .work-cover-prompt {
+    color: white;
+    font-size: 11px;
+}
+
+.work-creation-form .file-input {
+    position: absolute;
+    inset: 0 auto auto 0;
+}
+
+.work-creation-form .work-form-fields {
+    gap: 12px;
+}
+
+.work-creation-form .field {
+    gap: 6px;
+    font-size: 13px;
+}
+
+.work-creation-form .field input,
+.work-creation-form .field textarea,
+.work-creation-form .field select {
+    min-height: 40px;
+    padding: 9px 13px;
+    border: 1px solid #dedde0;
+    border-radius: 8px;
+    font-size: 14px;
+}
+
+.work-creation-form .field textarea {
+    min-height: 64px;
+}
+
+.work-creation-form .genre-tag-list {
+    gap: 7px;
+    max-height: 35px;
+    overflow: hidden;
+    transition: max-height 180ms ease;
+}
+
+.work-creation-form .genre-tag-list.is-expanded {
+    max-height: 500px;
+}
+
+.genre-field-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.genre-dropdown-toggle {
+    display: grid;
+    width: 25px;
+    height: 25px;
+    flex: 0 0 auto;
+    place-items: center;
+    padding: 0;
+    border: 1px solid #ffffff30;
+    border-radius: 6px;
+    background: #303030;
+    color: #f3f1f4;
+    cursor: pointer;
+}
+
+.genre-dropdown-toggle:hover {
+    background: #45424b;
+}
+
+.genre-dropdown-toggle:focus-visible {
+    outline: 2px solid #48aaff;
+    outline-offset: 2px;
+}
+
+.genre-dropdown-toggle svg {
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 2;
+    transition: transform 180ms ease;
+}
+
+.genre-dropdown-toggle[aria-expanded="true"] svg {
+    transform: rotate(180deg);
+}
+
+.work-creation-form .genre-tag {
+    display: inline-flex;
+    min-height: 28px;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 9px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: #f7f6f8;
+    color: #77727f;
+    font-size: 12px;
+}
+
+.work-creation-form .genre-tag.is-selected {
+    background: #303030;
+    color: #f3f1f4;
+    font-weight: 400;
+}
+
+.work-creation-form .genre-tag svg {
+    width: 14px;
+    height: 14px;
+    flex: 0 0 auto;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 2;
+}
+
+.work-creation-form .field-hint {
+    display: none;
+}
+
+.work-creation-form .form-actions {
+    align-items: center;
+    gap: 34px;
+    margin-top: 4px;
+}
+
+.work-creation-form .form-actions button {
+    min-height: 48px;
+    gap: 12px;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: #f6f5f7;
+    font-size: 24px;
+    font-weight: 400;
+}
+
+.work-creation-form .form-actions button:hover {
+    transform: none;
+    background: transparent;
+    filter: brightness(1.15);
+}
+
+.work-creation-form .form-actions svg {
+    width: 34px;
+    height: 34px;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 2;
+}
+
+.work-creation-form .form-actions .work-form-cancel svg {
+    color: #ff2638;
+}
+
+.work-creation-form .form-actions .work-form-save svg {
+    color: #168dff;
 }
 
 .editor-heading {
@@ -532,6 +935,46 @@ a {
 .field textarea {
     min-height: 76px;
     resize: vertical;
+}
+
+.genre-tag-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.genre-tag {
+    min-height: 32px;
+    padding: 6px 11px;
+    border: 1px solid #625d6b;
+    border-radius: 999px;
+    background: #29272f;
+    color: #e6e3e9;
+    font-size: 12px;
+    cursor: pointer;
+    transition: border-color 150ms ease, background-color 150ms ease, color 150ms ease;
+}
+
+.genre-tag:hover {
+    border-color: #f0b84b;
+}
+
+.genre-tag.is-selected {
+    border-color: #f0b84b;
+    background: #f0b84b;
+    color: #28231b;
+    font-weight: 700;
+}
+
+.genre-tag:focus-visible {
+    outline: 2px solid #48aaff;
+    outline-offset: 2px;
+}
+
+.field-hint {
+    color: #aaa5b2;
+    font-size: 11px;
+    font-weight: 400;
 }
 
 .field input:focus,
@@ -740,7 +1183,7 @@ a {
     }
 
     .work-chapters {
-        grid-column: 1 / -1;
+        grid-template-columns: 56px minmax(0, 1fr);
     }
 
     .work-chapters.is-scrollable {
@@ -774,5 +1217,52 @@ a {
 
     .editor-panel {
         padding: 17px;
+    }
+
+    .management-page.has-work-creation-form {
+        width: min(calc(100% - 28px), 1287px);
+    }
+
+    .work-creation-panel {
+        padding: 20px;
+        border-radius: 14px;
+    }
+
+    .work-creation-form .work-form-layout {
+        grid-template-columns: minmax(90px, 30%) minmax(0, 1fr);
+        gap: 14px;
+    }
+
+    .work-creation-form .form-actions {
+        gap: 18px;
+    }
+
+    .work-creation-form .form-actions button {
+        gap: 8px;
+        font-size: 17px;
+    }
+
+    .work-creation-form .form-actions svg {
+        width: 27px;
+        height: 27px;
+    }
+}
+
+@media (max-width: 420px) {
+    .work-creation-form .work-form-layout {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .work-creation-form .work-cover-upload {
+        width: min(100%, 217px);
+    }
+
+    .work-creation-form .form-actions {
+        justify-content: space-between;
+        gap: 8px;
+    }
+
+    .work-creation-form .form-actions button {
+        font-size: 15px;
     }
 }

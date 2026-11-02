@@ -1,0 +1,792 @@
+:root {
+    color-scheme: dark;
+    font-family: Arial, Helvetica, sans-serif;
+    color: #f6f5f7;
+    background: #35333e;
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    min-width: 320px;
+    min-height: 100vh;
+    margin: 0;
+    background: #35333e;
+}
+
+button,
+input,
+textarea,
+select {
+    font: inherit;
+}
+
+a {
+    color: inherit;
+    text-decoration: none;
+}
+
+.workflow-header {
+    display: flex;
+    height: 74px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 22px;
+    background: #050505;
+}
+
+.workflow-brand,
+.workflow-profile {
+    display: inline-flex;
+    align-items: center;
+}
+
+.workflow-brand {
+    gap: 14px;
+    font-size: 19px;
+}
+
+.workflow-brand svg {
+    width: 35px;
+    height: 35px;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-width: 2;
+}
+
+.workflow-profile svg {
+    width: 30px;
+    height: 30px;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-width: 2;
+}
+
+.moderation-main {
+    width: min(100% - 48px, 1160px);
+    margin: 76px auto 80px;
+}
+
+.workflow-title {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    margin: 0 0 74px;
+}
+
+.workflow-title svg {
+    width: 46px;
+    height: 46px;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-width: 1.8;
+}
+
+.workflow-title h1 {
+    margin: 0;
+    font-size: clamp(27px, 4vw, 46px);
+    font-weight: 400;
+}
+
+.moderation-form {
+    display: grid;
+    gap: 34px;
+    padding: clamp(30px, 5vw, 62px) clamp(24px, 5vw, 70px);
+    border-radius: 20px;
+    background: #101010;
+}
+
+.workflow-field {
+    display: grid;
+    gap: 10px;
+    color: #f5f4f6;
+    font-size: 14px;
+}
+
+.language-field {
+    width: min(100%, 488px);
+}
+
+.workflow-field select,
+.workflow-field textarea {
+    width: 100%;
+    border: 1px solid #d5d4d7;
+    border-radius: 7px;
+    outline: none;
+    background: #fff;
+    color: #26252a;
+    font-size: 14px;
+}
+
+.workflow-field select {
+    min-height: 42px;
+    padding: 8px 12px;
+}
+
+.workflow-field textarea {
+    min-height: 190px;
+    padding: 18px 16px;
+    resize: vertical;
+}
+
+.workflow-field select:focus,
+.workflow-field textarea:focus {
+    outline: 2px solid #aeb9ff;
+    outline-offset: 2px;
+}
+
+.workflow-field textarea::placeholder {
+    color: #6d6a71;
+}
+
+.workflow-actions {
+    display: flex;
+    align-items: center;
+    justify-content: end;
+    gap: 48px;
+    margin-top: 6px;
+}
+
+.workflow-action {
+    display: inline-flex;
+    min-height: 45px;
+    align-items: center;
+    gap: 14px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #f8f7f8;
+    font-size: 22px;
+    cursor: pointer;
+}
+
+.workflow-action svg {
+    width: 34px;
+    height: 34px;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 2;
+}
+
+.cancel-action svg {
+    color: #ff2638;
+}
+
+.submit-action svg,
+.approve-action svg {
+    color: #27d66d;
+}
+
+.workflow-action:disabled {
+    cursor: wait;
+    opacity: 0.6;
+}
+
+.workflow-action:focus-visible,
+.management-link:focus-visible,
+.workflow-brand:focus-visible,
+.workflow-profile:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: 4px;
+}
+
+.workflow-feedback {
+    min-height: 0;
+    margin: 0;
+    color: #a4e0ba;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.workflow-feedback:not(:empty) {
+    margin: 0 0 18px;
+}
+
+.workflow-feedback.is-error {
+    color: #ff9c9c;
+}
+
+.request-status {
+    margin: -34px 0 30px;
+    padding: 16px 20px;
+    border: 1px solid #ffffff25;
+    border-radius: 11px;
+    background: #1e1d20;
+    color: #eeeaf1;
+    line-height: 1.5;
+}
+
+.request-status[hidden] {
+    display: none;
+}
+
+.request-status strong {
+    display: block;
+    margin-bottom: 4px;
+}
+
+.homologation-main {
+    width: min(100% - 56px, 1380px);
+    margin: 50px auto 80px;
+}
+
+.homologation-heading {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 26px;
+}
+
+.workflow-eyebrow {
+    margin: 0 0 8px;
+    color: #b6b2be;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.homologation-heading h1 {
+    margin: 0;
+    font-size: clamp(28px, 4vw, 38px);
+}
+
+.management-link {
+    padding: 11px 15px;
+    border: 1px solid #ffffff30;
+    border-radius: 8px;
+    color: #e8e4ed;
+    font-size: 13px;
+}
+
+.management-link:hover {
+    background: #ffffff10;
+}
+
+.approval-section {
+    margin: 28px 0 40px;
+}
+
+.approval-section h2 {
+    margin: 0 0 14px;
+    font-size: 22px;
+}
+
+.approval-list {
+    display: grid;
+    gap: 15px;
+}
+
+.approval-card {
+    overflow: hidden;
+    border-radius: 16px;
+    background: #1e1d20;
+}
+
+.approval-card-summary {
+    list-style: none;
+    cursor: pointer;
+}
+
+.approval-card-summary::-webkit-details-marker {
+    display: none;
+}
+
+.approval-card-summary:focus-visible {
+    outline: 2px solid #aeb9ff;
+    outline-offset: -2px;
+}
+
+.approval-card-header {
+    display: flex;
+    min-height: 82px;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 16px;
+    padding: 20px 34px;
+}
+
+.approval-card-header h3 {
+    flex: 1;
+    margin: 0;
+    font-size: 19px;
+}
+
+.approval-card-toggle {
+    color: #b6b2be;
+    font-size: 12px;
+}
+
+.approval-card-toggle::after {
+    display: inline-block;
+    margin-left: 8px;
+    content: "＋";
+    transition: transform 150ms ease;
+}
+
+.approval-card[open] .approval-card-toggle::after {
+    transform: rotate(45deg);
+}
+
+.approval-card[open] .approval-card-toggle {
+    font-size: 0;
+}
+
+.approval-card[open] .approval-card-toggle::before {
+    content: "Recolher";
+    font-size: 12px;
+}
+
+.requester {
+    display: inline-flex;
+    min-width: 0;
+    align-items: center;
+    gap: 12px;
+    color: #eeeaf1;
+    font-size: 13px;
+}
+
+.requester svg {
+    width: 28px;
+    height: 28px;
+    flex: 0 0 auto;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-width: 1.8;
+}
+
+.approval-details {
+    width: min(100% - 36px, 690px);
+    margin: 2px auto 24px;
+    padding: 26px;
+    border-radius: 14px;
+    background: #101010;
+}
+
+.approval-details-work {
+    width: min(100% - 36px, 904px);
+    min-height: 561px;
+    margin-top: 2px;
+    padding: 28px 37px 24px;
+    border-radius: 20px;
+}
+
+.request-data {
+    display: grid;
+    gap: 16px;
+}
+
+.work-request-data {
+    grid-template-columns: 213px minmax(0, 1fr);
+    align-items: start;
+    gap: 14px;
+}
+
+.request-data p {
+    margin: 0;
+    color: #f0edf3;
+    font-size: 14px;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+
+.request-data strong {
+    color: #c4bfcb;
+    font-size: 12px;
+}
+
+.work-request-cover {
+    display: block;
+    width: 120px;
+    max-height: 170px;
+    object-fit: cover;
+    border-radius: 5px;
+}
+
+.work-approval-cover {
+    display: grid;
+    aspect-ratio: 213 / 283;
+    place-items: center;
+    overflow: hidden;
+    background: #d9d9d9;
+    color: #29272f;
+    font-size: 13px;
+    text-align: center;
+}
+
+.work-request-cover-preview,
+.work-approval-cover-image {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.work-approval-cover-image {
+    object-fit: cover;
+}
+
+.work-approval-fields {
+    display: grid;
+    align-content: start;
+    gap: 13px;
+}
+
+.work-approval-field-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.work-approval-field {
+    display: grid;
+    min-width: 0;
+    align-content: start;
+    gap: 7px;
+}
+
+.work-approval-label {
+    color: #f0edf3;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+.work-approval-value {
+    min-height: 39px;
+    padding: 9px 13px;
+    border-radius: 8px;
+    background: #f7f6f8;
+    color: #28262c;
+    font-size: 14px;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+}
+
+.work-approval-genres {
+    gap: 9px;
+}
+
+.work-approval-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.work-approval-tag {
+    display: inline-flex;
+    min-height: 30px;
+    align-items: center;
+    gap: 7px;
+    padding: 5px 10px;
+    border-radius: 8px;
+    background: #303030;
+    color: #f3f1f4;
+    font-size: 13px;
+}
+
+.work-approval-tag svg {
+    width: 14px;
+    height: 14px;
+    flex: 0 0 auto;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 2;
+}
+
+.work-request-data > .work-approval-field:last-child {
+    grid-column: 1 / -1;
+    margin-top: 1px;
+}
+
+.work-request-cover-preview {
+    width: fit-content;
+    padding: 0;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    cursor: zoom-in;
+}
+
+.work-approval-cover .work-request-cover-preview {
+    width: 100%;
+    height: 100%;
+}
+
+.work-request-cover-preview:focus-visible {
+    outline: 2px solid #aeb9ff;
+    outline-offset: 3px;
+}
+
+.cover-preview-dialog {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    max-height: none;
+    place-items: center;
+    padding: 32px;
+    border: 0;
+    background: #08080bea;
+}
+
+.cover-preview-dialog:not([open]) {
+    display: none;
+}
+
+.cover-preview-dialog::backdrop {
+    background: #08080bea;
+}
+
+.cover-preview-large {
+    display: block;
+    max-width: min(100%, 1400px);
+    max-height: calc(100vh - 64px);
+    object-fit: contain;
+}
+
+.cover-preview-close {
+    position: absolute;
+    top: 18px;
+    right: 24px;
+    width: 42px;
+    height: 42px;
+    border: 1px solid #ffffff50;
+    border-radius: 50%;
+    background: #171619;
+    color: #fff;
+    font-size: 28px;
+    cursor: pointer;
+}
+
+.approval-actions {
+    display: flex;
+    justify-content: end;
+    gap: 28px;
+    margin-top: 24px;
+    padding-top: 18px;
+    border-top: 1px solid #ffffff33;
+}
+
+.approval-details-work .approval-actions {
+    justify-content: flex-end;
+    gap: 26px;
+    margin-top: 46px;
+    padding-top: 0;
+    border-top: 0;
+}
+
+.approval-action {
+    display: inline-flex;
+    min-height: 40px;
+    align-items: center;
+    gap: 10px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #f4f2f5;
+    font-size: 18px;
+    cursor: pointer;
+}
+
+.approval-details-work .approval-action {
+    min-height: 48px;
+    gap: 12px;
+    font-size: 28px;
+}
+
+.approval-details-work .approval-action svg {
+    width: 36px;
+    height: 36px;
+}
+
+.approval-action svg {
+    width: 26px;
+    height: 26px;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 2;
+}
+
+.reject-action svg {
+    color: #ff2638;
+}
+
+.approve-action svg {
+    color: #27d66d;
+}
+
+.approval-action:disabled {
+    cursor: wait;
+    opacity: 0.6;
+}
+
+.empty-approvals {
+    margin: 0;
+    padding: 24px;
+    border: 1px dashed #ffffff30;
+    border-radius: 12px;
+    color: #c4bfcb;
+    text-align: center;
+}
+
+@media (max-width: 680px) {
+    .workflow-header {
+        height: 58px;
+        padding: 0 16px;
+    }
+
+    .workflow-brand {
+        font-size: 16px;
+    }
+
+    .workflow-brand svg {
+        width: 30px;
+        height: 30px;
+    }
+
+    .moderation-main {
+        width: min(100% - 28px, 1160px);
+        margin-top: 42px;
+    }
+
+    .workflow-title {
+        gap: 10px;
+        margin-bottom: 34px;
+    }
+
+    .workflow-title svg {
+        width: 34px;
+        height: 34px;
+    }
+
+    .workflow-title h1 {
+        font-size: clamp(23px, 6vw, 32px);
+    }
+
+    .moderation-form {
+        gap: 24px;
+        padding: 26px 20px;
+        border-radius: 14px;
+    }
+
+    .workflow-field textarea {
+        min-height: 160px;
+    }
+
+    .workflow-actions {
+        justify-content: space-between;
+        gap: 16px;
+    }
+
+    .workflow-action {
+        gap: 8px;
+        font-size: 17px;
+    }
+
+    .workflow-action svg {
+        width: 28px;
+        height: 28px;
+    }
+
+    .homologation-main {
+        width: min(100% - 28px, 1380px);
+        margin-top: 30px;
+    }
+
+    .homologation-heading {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .approval-card-header {
+        align-items: flex-start;
+        flex-wrap: wrap;
+        padding: 18px 20px;
+    }
+
+    .approval-card-header h3 {
+        flex-basis: calc(100% - 130px);
+    }
+
+    .approval-card-toggle {
+        margin-left: auto;
+    }
+
+    .approval-details {
+        width: calc(100% - 24px);
+        padding: 18px;
+    }
+
+    .approval-details-work {
+        min-height: 0;
+        padding: 20px;
+        border-radius: 14px;
+    }
+
+    .work-request-data {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 16px;
+    }
+
+    .work-approval-cover {
+        width: min(100%, 213px);
+        min-height: 0;
+        aspect-ratio: 213 / 283;
+    }
+
+    .work-approval-field-row {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 13px;
+    }
+
+    .work-request-data > .work-approval-field:last-child {
+        grid-column: auto;
+    }
+
+    .approval-details-work .approval-actions {
+        gap: 12px;
+        margin-top: 28px;
+    }
+
+    .approval-actions {
+        justify-content: space-between;
+        gap: 12px;
+    }
+
+    .approval-action {
+        gap: 6px;
+        font-size: 15px;
+    }
+
+    .approval-action svg {
+        width: 22px;
+        height: 22px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        scroll-behavior: auto !important;
+    }
+}
