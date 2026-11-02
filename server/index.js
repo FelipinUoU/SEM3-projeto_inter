@@ -18,6 +18,7 @@ const READER_DIRECTORY = path.join(rootDirectory, 'public', 'reader');
 const READER_IMAGE_EXTENSIONS = new Set(['.avif', '.gif', '.jpeg', '.jpg', '.png', '.webp']);
 const UPLOAD_IMAGE_TYPES = new Set(['image/avif', 'image/gif', 'image/jpeg', 'image/png', 'image/webp']);
 const MAX_UPLOAD_BYTES = Number.parseInt(process.env.MAX_IMAGE_BYTES || '20971520', 10);
+const MAX_PROFILE_AVATAR_BYTES = 200 * 1024;
 const MAX_CHAPTER_PAGES = Number.parseInt(process.env.MAX_CHAPTER_PAGES || '500', 10);
 const MAX_CHAPTER_ARCHIVE_BYTES = Number.parseInt(process.env.MAX_CHAPTER_ARCHIVE_BYTES || '104857600', 10);
 const MAX_CHAPTER_UNPACKED_BYTES = 209715200;
@@ -219,6 +220,35 @@ function isImageKitAsset(url) {
   }
 }
 
+async function findImageKitFileIdByUrl(assetUrl) {
+  const asset = new URL(assetUrl);
+  const endpoint = new URL(process.env.IMAGEKIT_URL_ENDPOINT);
+  let assetPath = decodeURIComponent(asset.pathname);
+  const endpointPath = endpoint.pathname.replace(/\/+$/, '');
+  if (endpointPath && assetPath.startsWith(`${endpointPath}/`)) {
+    assetPath = assetPath.slice(endpointPath.length);
+  }
+  const files = await imageKit.listFiles({
+    searchQuery: path.posix.basename(assetPath),
+    limit: 100
+  });
+  return files.find((file) => file.url === assetUrl && file.filePath.startsWith('/hokupedia/'))?.fileId;
+}
+
+async function deleteImageKitFile(fileId, allowedFolderPrefix) {
+  let file;
+  try {
+    file = await imageKit.getFileDetails(fileId);
+  } catch (error) {
+    if (error?.statusCode === 404 || error?.code === 404) return;
+    throw error;
+  }
+  if (!file.filePath.startsWith(allowedFolderPrefix)) {
+    throw new Error('O arquivo não pertence à pasta autorizada do ImageKit.');
+  }
+  await imageKit.deleteFile(fileId);
+}
+
 function getWorkAttribute(value) {
   if (typeof value === 'string') return value;
   return Array.isArray(value) && typeof value[0] === 'string' ? value[0] : '';
@@ -399,6 +429,92 @@ app.post('/api/uploads', requireAuthenticatedUser, requireModeratorUser, express
   } catch (error) {
     console.error('ImageKit upload failed:', error);
     return res.status(502).json({ error: 'Não foi possível enviar a imagem ao ImageKit.' });
+  }
+});
+
+app.post('/api/uploads/work-request-cover', requireAuthenticatedUser, requireModeratorUser, express.raw({
+  type: [...UPLOAD_IMAGE_TYPES],
+  limit: MAX_UPLOAD_BYTES
+}), async (req, res) => {
+  if (!imageKit) {
+    return res.status(503).json({ error: 'Configure as chaves do ImageKit no servidor.' });
+  }
+  if (!UPLOAD_IMAGE_TYPES.has(req.get('Content-Type')?.split(';')[0])) {
+    return res.status(415).json({ error: 'Formato de imagem não suportado.' });
+  }
+  if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+    return res.status(400).json({ error: 'Envie um arquivo de capa válido.' });
+  }
+  const rawFileName = typeof req.query.filename === 'string' ? req.query.filename : 'capa';
+  const fileName = path.basename(rawFileName).replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 180) || 'capa';
+  try {
+    const uploaded = await imageKit.upload({
+      file: req.body,
+      fileName,
+      folder: `/hokupedia/work-requests/${req.appwriteUser.$id}`,
+      useUniqueFileName: true
+    });
+    return res.status(201).json({
+      name: fileName,
+      url: uploaded.url,
+      fileId: uploaded.fileId
+    });
+  } catch (error) {
+    console.error('Work request cover upload failed:', error);
+    return res.status(502).json({ error: 'Não foi possível enviar a capa ao ImageKit.' });
+  }
+});
+
+app.post('/api/profile/avatar', requireAuthenticatedUser, express.raw({
+  type: [...UPLOAD_IMAGE_TYPES],
+  limit: MAX_PROFILE_AVATAR_BYTES
+}), async (req, res) => {
+  if (!imageKit) {
+    return res.status(503).json({ error: 'Configure as chaves do ImageKit no servidor.' });
+  }
+  if (!UPLOAD_IMAGE_TYPES.has(req.get('Content-Type')?.split(';')[0])) {
+    return res.status(415).json({ error: 'Formato de imagem não suportado.' });
+  }
+  if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+    return res.status(400).json({ error: 'Envie uma foto de perfil válida.' });
+  }
+  if (req.body.length > MAX_PROFILE_AVATAR_BYTES) {
+    return res.status(413).json({ error: 'A foto de perfil deve ter no máximo 200 KB.' });
+  }
+  try {
+    const uploaded = await imageKit.upload({
+      file: req.body,
+      fileName: 'perfil.webp',
+      folder: `/hokupedia/profiles/${req.appwriteUser.$id}`,
+      useUniqueFileName: true
+    });
+    return res.status(201).json({ url: uploaded.url, fileId: uploaded.fileId });
+  } catch (error) {
+    console.error('Profile avatar upload failed:', error);
+    return res.status(502).json({ error: 'Não foi possível enviar a foto de perfil ao ImageKit.' });
+  }
+});
+
+app.delete('/api/profile/avatar/:fileId', requireAuthenticatedUser, async (req, res) => {
+  if (!imageKit) {
+    return res.status(503).json({ error: 'Configure as chaves do ImageKit no servidor.' });
+  }
+  try {
+    await deleteImageKitFile(
+      req.params.fileId,
+      `/hokupedia/profiles/${req.appwriteUser.$id}/`
+    );
+    return res.json({ deleted: true });
+  } catch (error) {
+    if (error?.statusCode === 404 || error?.code === 404) {
+      return res.json({ deleted: true, alreadyDeleted: true });
+    }
+    console.error('Profile avatar deletion failed:', error);
+    return res.status(error?.message?.includes('não pertence') ? 403 : 502).json({
+      error: error?.message?.includes('não pertence')
+        ? error.message
+        : 'Não foi possível excluir a foto de perfil anterior do ImageKit.'
+    });
   }
 });
 
@@ -1001,16 +1117,25 @@ app.post('/api/pedido_obra', requireAuthenticatedUser, requireModeratorUser, asy
   if (!workRequestsCollectionId) {
     return res.status(503).json({ error: 'Configure APPWRITE_WORK_REQUESTS_COLLECTION_ID para habilitar pedidos de obra.' });
   }
-  const { nomeObra, author = '', sinopse, coverUrl, gender = '', formato } = req.body || {};
+  if (!imageKit) {
+    return res.status(503).json({ error: 'Configure as chaves do ImageKit no servidor para enviar capas de pedidos.' });
+  }
+  const { nomeObra, author = '', sinopse, coverUrl, coverFileId, gender = '', formato } = req.body || {};
   if (typeof nomeObra !== 'string' || !nomeObra.trim() || nomeObra.length > 255
     || typeof author !== 'string' || !author.trim() || author.length > 255
     || typeof sinopse !== 'string' || sinopse.length > 10000
     || typeof gender !== 'string' || !gender.trim() || gender.length > 255
     || !['hq', 'manhwa', 'manga'].includes(formato)
-    || typeof coverUrl !== 'string' || coverUrl.length > 2048 || !isImageKitAsset(coverUrl)) {
+    || typeof coverUrl !== 'string' || coverUrl.length > 2048 || !isImageKitAsset(coverUrl)
+    || typeof coverFileId !== 'string' || !coverFileId || coverFileId.length > 255) {
     return res.status(400).json({ error: 'Informe nome, formato, gênero, sinopse e uma capa válida enviada ao ImageKit.' });
   }
   try {
+    const coverFile = await imageKit.getFileDetails(coverFileId);
+    if (coverFile.url !== coverUrl
+      || !coverFile.filePath.startsWith(`/hokupedia/work-requests/${req.appwriteUser.$id}/`)) {
+      return res.status(400).json({ error: 'A capa do pedido não corresponde a um arquivo seu no ImageKit.' });
+    }
     const document = await databases.createDocument(
       appwriteDatabaseId,
       workRequestsCollectionId,
@@ -1022,6 +1147,7 @@ app.post('/api/pedido_obra', requireAuthenticatedUser, requireModeratorUser, asy
         Author: author.trim(),
         sinopse,
         coverUrl,
+        coverFileId,
         gender: gender.trim(),
         formato,
         status: 'PENDENTE'
@@ -1030,6 +1156,14 @@ app.post('/api/pedido_obra', requireAuthenticatedUser, requireModeratorUser, asy
     return res.status(201).json({ pedido: { id: document.$id, status: document.status } });
   } catch (error) {
     const appwriteErrorDetails = `${error?.message || ''} ${JSON.stringify(error?.response || '')}`;
+    try {
+      await deleteImageKitFile(
+        coverFileId,
+        `/hokupedia/work-requests/${req.appwriteUser.$id}/`
+      );
+    } catch (cleanupError) {
+      console.error('Could not remove the unregistered work request cover:', cleanupError);
+    }
     if (error?.type === 'document_invalid_structure'
       && /Unknown attribute:\s*["']gender["']/.test(appwriteErrorDetails)) {
       console.error('The work requests collection is missing its gender attribute:', error);
@@ -1042,6 +1176,13 @@ app.post('/api/pedido_obra', requireAuthenticatedUser, requireModeratorUser, asy
       console.error('The work requests collection is missing its author attribute:', error);
       return res.status(503).json({
         error: 'A collection configurada em APPWRITE_WORK_REQUESTS_COLLECTION_ID não possui o atributo Author. Crie um atributo String chamado Author, com tamanho 255, e tente novamente.'
+      });
+    }
+    if (error?.type === 'document_invalid_structure'
+      && /Unknown attribute:\s*["']coverFileId["']/i.test(appwriteErrorDetails)) {
+      console.error('The work requests collection is missing its coverFileId attribute:', error);
+      return res.status(503).json({
+        error: 'A collection configurada em APPWRITE_WORK_REQUESTS_COLLECTION_ID não possui o atributo coverFileId. Crie um atributo String chamado coverFileId, com tamanho 255, e tente novamente.'
       });
     }
     return sendAppwriteError(res, error, 'Não foi possível criar o pedido de obra no Appwrite.');
@@ -1257,20 +1398,62 @@ app.post('/api/pedido_obra/:id/reprovar', requireAuthenticatedUser, requireAdmin
   if (!workRequestsCollectionId) {
     return res.status(503).json({ error: 'Configure APPWRITE_WORK_REQUESTS_COLLECTION_ID para habilitar pedidos de obra.' });
   }
+  if (!imageKit) {
+    return res.status(503).json({ error: 'Configure as chaves do ImageKit no servidor para remover a capa do pedido.' });
+  }
+  let request;
   try {
-    const request = await databases.getDocument(appwriteDatabaseId, workRequestsCollectionId, req.params.id);
-    if (String(request.status).toUpperCase() !== 'PENDENTE') {
-      return res.status(409).json({ error: 'Este pedido já foi analisado.' });
+    request = await databases.getDocument(appwriteDatabaseId, workRequestsCollectionId, req.params.id);
+  } catch (error) {
+    return sendAppwriteError(res, error, 'Não foi possível carregar o pedido de obra.');
+  }
+
+  const status = String(request.status).toUpperCase();
+  if (!['PENDENTE', 'REPROVADO'].includes(status)) {
+    return res.status(409).json({ error: 'Este pedido já foi analisado.' });
+  }
+  if (status === 'PENDENTE') {
+    try {
+      request = await databases.updateDocument(
+        appwriteDatabaseId,
+        workRequestsCollectionId,
+        req.params.id,
+        { status: 'REPROVADO' }
+      );
+    } catch (error) {
+      return sendAppwriteError(res, error, 'Não foi possível reprovar o pedido de obra.');
     }
+  }
+
+  try {
+    const hasStoredCoverFileId = typeof request.coverFileId === 'string' && request.coverFileId.length > 0;
+    let coverFileId = request.coverFileId;
+    if (!coverFileId && isImageKitAsset(request.coverUrl)) {
+      coverFileId = await findImageKitFileIdByUrl(request.coverUrl);
+    }
+    if (coverFileId) {
+      const allowedFolderPrefix = hasStoredCoverFileId
+        ? `/hokupedia/work-requests/${request.moderadorId || request.userId}/`
+        : '/hokupedia/';
+      await deleteImageKitFile(coverFileId, allowedFolderPrefix);
+    }
+  } catch (error) {
+    console.error('Não foi possível excluir a capa do pedido de obra reprovado:', error);
+    return res.status(502).json({
+      error: 'O pedido foi reprovado, mas não foi possível apagar a capa do ImageKit. Tente reprovar novamente para repetir a limpeza.'
+    });
+  }
+
+  try {
     const document = await databases.updateDocument(
       appwriteDatabaseId,
       workRequestsCollectionId,
       req.params.id,
-      { status: 'REPROVADO' }
+      { status: 'REPROVADO', coverUrl: '' }
     );
     return res.json({ pedido: { id: document.$id, status: document.status } });
   } catch (error) {
-    return sendAppwriteError(res, error, 'Não foi possível reprovar o pedido de obra.');
+    return sendAppwriteError(res, error, 'A capa foi excluída, mas não foi possível atualizar o pedido de obra.');
   }
 });
 

@@ -120,22 +120,22 @@ async function updateAuthHeader() {
     try {
         const user = await account.get();
         const loginButton = document.querySelector(".header-login");
-        const avatarKey = `hokupedia.profileAvatar.${user.$id}`;
-        let avatarSource = defaultAvatar;
-
-        try {
-            const storedAvatar = localStorage.getItem(avatarKey);
-            if (storedAvatar && /^data:image\/(?:avif|gif|jpeg|png|webp);base64,/.test(storedAvatar)) {
-                avatarSource = storedAvatar;
-            }
-        } catch (error) {
-            console.error("Não foi possível carregar a foto do perfil no cabeçalho:", error);
-        }
+        const avatarSource = typeof user.prefs?.profileAvatarUrl === "string"
+            && user.prefs.profileAvatarUrl.startsWith("https://")
+            ? user.prefs.profileAvatarUrl
+            : defaultAvatar;
 
         if (loginButton) {
             loginButton.replaceWith(createAccountMenu(user, avatarSource));
         }
 
+        window.addEventListener("profile-avatar-updated", (event) => {
+            const source = typeof event.detail?.url === "string" && event.detail.url
+                ? event.detail.url
+                : defaultAvatar;
+            document.querySelectorAll(".header-profile .profile-avatar, .account-popover__avatar")
+                .forEach((image) => { image.src = source; });
+        });
     } catch (error) {
         if (error.code !== 401) {
             console.error("Não foi possível verificar a sessão para atualizar o cabeçalho:", error);

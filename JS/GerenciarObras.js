@@ -143,6 +143,15 @@ async function uploadImage(file) {
     });
 }
 
+async function uploadWorkRequestCover(file) {
+    return apiRequest(`/api/uploads/work-request-cover?filename=${encodeURIComponent(file.name)}`, {
+        method: "POST",
+        headers: { "Content-Type": file.type },
+        body: file,
+        authenticated: true
+    });
+}
+
 async function uploadChapterArchive(file) {
     return apiRequest(`/api/uploads/chapter-archive?filename=${encodeURIComponent(file.name)}`, {
         method: "POST",
@@ -949,7 +958,10 @@ async function handleWorkSubmit(form) {
     let coverFileId = existing?.coverFileId || "";
     if (selectedCoverFile) {
         try {
-            ({ url: cover, fileId: coverFileId } = await uploadImage(selectedCoverFile));
+            const upload = !isAdmin && !existing
+                ? await uploadWorkRequestCover(selectedCoverFile)
+                : await uploadImage(selectedCoverFile);
+            ({ url: cover, fileId: coverFileId } = upload);
         } catch (error) {
             console.error("Não foi possível enviar a imagem da capa:", error);
             showFeedback(error.message || "Não foi possível enviar a imagem da capa.", true);
@@ -979,6 +991,7 @@ async function handleWorkSubmit(form) {
                     author: updated.author,
                     sinopse: updated.description,
                     coverUrl: updated.cover,
+                    coverFileId: updated.coverFileId,
                     gender: updated.gender,
                     formato: updated.formato
                 },

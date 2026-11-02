@@ -30,8 +30,11 @@ const confirmDeleteButton = document.getElementById("confirmAccountDelete");
 const cancelDeleteButton = document.getElementById("cancelAccountDelete");
 let user;
 let avatarKey;
+let savedAvatarFileId = "";
 let savedAvatar = defaultAvatar;
 let pendingAvatar = defaultAvatar;
+let pendingAvatarFile;
+let pendingAvatarPreview;
 let photoChanged = false;
 let isAdmin = false;
 let confirmedPassword = "";
@@ -52,12 +55,157 @@ function setProfileFields(profile) {
     editInputs[0].value = profile.name || "";
 }
 
+function isValidAvatarUrl(value) {
+    if (typeof value !== "string" || !value) return false;
+    try {
+        return new URL(value).protocol === "https:";
+    } catch {
+        return false;
+    }
+}
+
+async function profileApiRequest(url, options = {}) {
+    const { jwt } = await account.createJWT();
+    const headers = new Headers(options.headers);
+    headers.set("X-Appwrite-JWT", jwt);
+    const response = await fetch(url, { ...options, headers });
+    const contentType = response.headers.get("content-type") || "";
+    const result = contentType.includes("application/json") ? await response.json() : {};
+    if (!response.ok) {
+        throw new Error(result.error || `A solicitação falhou (HTTP ${response.status}).`);
+    }
+    return result;
+}
+
+async function uploadProfileAvatar(file) {
+    return profileApiRequest(`/api/profile/avatar?filename=${encodeURIComponent(file.name || "perfil.webp")}`, {
+        method: "POST",
+        headers: { "Content-Type": file.type || "image/webp" },
+        body: file
+    });
+}
+
+async function deleteProfileAvatar(fileId) {
+    if (!fileId) return;
+    await profileApiRequest(`/api/profile/avatar/${encodeURIComponent(fileId)}`, { method: "DELETE" });
+}
+
+function revokePendingAvatarPreview() {
+    if (pendingAvatarPreview) URL.revokeObjectURL(pendingAvatarPreview);
+    pendingAvatarPreview = undefined;
+}
+
+async function migrateLegacyAvatar() {
+    let legacyAvatar;
+    try {
+        legacyAvatar = localStorage.getItem(avatarKey);
+    } catch (error) {
+        console.error("Não foi possível acessar a foto local antiga:", error);
+        return;
+    }
+    if (!legacyAvatar) return;
+    if (!/^data:image\/(?:avif|gif|jpeg|png|webp);base64,/.test(legacyAvatar)) {
+        try {
+            localStorage.removeItem(avatarKey);
+        } catch (error) {
+            console.error("Não foi possível remover a foto local inválida:", error);
+        }
+        return;
+    }
+
+    try {
+        let file = await fetch(legacyAvatar).then((response) => response.blob());
+        if (file.size > maxAvatarSize) {
+            file = await compressAvatar(new File([file], "perfil.webp", { type: file.type }));
+        }
+        const uploaded = await uploadProfileAvatar(new File([file], "perfil.webp", { type: file.type || "image/webp" }));
+        const prefs = { ...(user.prefs || {}), profileAvatarUrl: uploaded.url, profileAvatarFileId: uploaded.fileId };
+        try {
+            user = await account.updatePrefs({ prefs });
+        } catch (error) {
+            try {
+                await deleteProfileAvatar(uploaded.fileId);
+            } catch (cleanupError) {
+                console.error("Não foi possível limpar a foto migrada após falha ao salvar as preferências:", cleanupError);
+            }
+            throw error;
+        }
+        savedAvatar = uploaded.url;
+        savedAvatarFileId = uploaded.fileId;
+        profileImage.src = savedAvatar;
+        window.dispatchEvent(new CustomEvent("profile-avatar-updated", { detail: { url: savedAvatar } }));
+        try {
+            localStorage.removeItem(avatarKey);
+        } catch (error) {
+            console.error("Não foi possível remover a foto local migrada:", error);
+        }
+    } catch (error) {
+        console.error("Não foi possível migrar a foto local para o ImageKit:", error);
+        showFeedback("Não foi possível transferir sua foto antiga para o ImageKit. Selecione e salve a foto novamente.", true);
+    }
+}
+
+async function saveAvatarChange() {
+    const previousFileId = savedAvatarFileId;
+    let uploaded;
+    if (pendingAvatarFile) uploaded = await uploadProfileAvatar(pendingAvatarFile);
+
+    const prefs = { ...(user.prefs || {}) };
+    if (uploaded) {
+        prefs.profileAvatarUrl = uploaded.url;
+        prefs.profileAvatarFileId = uploaded.fileId;
+    } else {
+        delete prefs.profileAvatarUrl;
+        delete prefs.profileAvatarFileId;
+    }
+
+    try {
+        user = await account.updatePrefs({ prefs });
+    } catch (error) {
+        if (uploaded?.fileId) {
+            try {
+                await deleteProfileAvatar(uploaded.fileId);
+            } catch (cleanupError) {
+                console.error("Não foi possível limpar a foto enviada após falha ao salvar as preferências:", cleanupError);
+            }
+        }
+        throw error;
+    }
+
+    savedAvatar = uploaded?.url || defaultAvatar;
+    savedAvatarFileId = uploaded?.fileId || "";
+    pendingAvatar = savedAvatar;
+    pendingAvatarFile = undefined;
+    photoChanged = false;
+    photoInput.value = "";
+    revokePendingAvatarPreview();
+    profileImage.src = savedAvatar;
+    window.dispatchEvent(new CustomEvent("profile-avatar-updated", { detail: { url: savedAvatar } }));
+    try {
+        localStorage.removeItem(avatarKey);
+    } catch (error) {
+        console.error("Não foi possível remover a cópia local antiga da foto:", error);
+    }
+
+    if (previousFileId && previousFileId !== savedAvatarFileId) {
+        try {
+            await deleteProfileAvatar(previousFileId);
+        } catch (error) {
+            console.error("Não foi possível excluir a foto anterior do ImageKit:", error);
+            return "A foto foi atualizada, mas não foi possível excluir a imagem anterior do ImageKit.";
+        }
+    }
+    return "";
+}
+
 function resetPendingChanges() {
     setProfileFields(user);
     editInputs[1].value = "";
     editInputs[2].value = "";
     editInputs[3].value = "";
     photoInput.value = "";
+    revokePendingAvatarPreview();
+    pendingAvatarFile = undefined;
     pendingAvatar = savedAvatar;
     photoChanged = false;
     confirmedPassword = "";
@@ -83,21 +231,24 @@ async function loadProfile() {
         logoutButton.disabled = false;
         logoutButton.hidden = false;
 
-        try {
-            const storedAvatar = localStorage.getItem(avatarKey);
-            if (storedAvatar !== null) {
-                if (!/^data:image\/(?:avif|gif|jpeg|png|webp);base64,/.test(storedAvatar)) {
-                    throw new Error("A foto de perfil salva está em um formato inválido.");
-                }
-                savedAvatar = storedAvatar;
-            }
-        } catch (error) {
-            console.error("Não foi possível carregar a foto do perfil:", error);
-            showFeedback("Não foi possível carregar a foto salva. A imagem padrão será usada.", true);
+        const storedAvatar = user.prefs?.profileAvatarUrl;
+        const storedAvatarFileId = user.prefs?.profileAvatarFileId;
+        if (isValidAvatarUrl(storedAvatar) && typeof storedAvatarFileId === "string") {
+            savedAvatar = storedAvatar;
+            savedAvatarFileId = storedAvatarFileId;
         }
 
         pendingAvatar = savedAvatar;
         profileImage.src = savedAvatar;
+        if (savedAvatar === defaultAvatar) {
+            await migrateLegacyAvatar();
+        } else {
+            try {
+                localStorage.removeItem(avatarKey);
+            } catch (error) {
+                console.error("Não foi possível remover a cópia local antiga da foto:", error);
+            }
+        }
         if (profileFeedback.textContent.startsWith("Carregando")) showFeedback("");
     } catch (error) {
         if (error.code === 401) {
@@ -166,21 +317,13 @@ async function readAvatar(file) {
         }
     }
 
-    const reader = new FileReader();
-    reader.addEventListener("load", () => {
-        if (typeof reader.result !== "string") {
-            showFeedback("Não foi possível ler a imagem selecionada.", true);
-            return;
-        }
-        pendingAvatar = reader.result;
-        photoChanged = true;
-        profileImage.src = pendingAvatar;
-        showFeedback("Foto selecionada. Salve as alterações para confirmar.");
-    });
-    reader.addEventListener("error", () => {
-        showFeedback("Não foi possível ler a imagem selecionada.", true);
-    });
-    reader.readAsDataURL(avatarFile);
+    revokePendingAvatarPreview();
+    pendingAvatarFile = avatarFile;
+    pendingAvatarPreview = URL.createObjectURL(avatarFile);
+    pendingAvatar = pendingAvatarPreview;
+    photoChanged = true;
+    profileImage.src = pendingAvatar;
+    showFeedback("Foto selecionada. Salve as alterações para confirmar.");
 }
 
 async function saveProfile() {
@@ -193,15 +336,8 @@ async function saveProfile() {
         }
         saveButton.disabled = true;
         try {
-            if (pendingAvatar === defaultAvatar) {
-                localStorage.removeItem(avatarKey);
-            } else {
-                localStorage.setItem(avatarKey, pendingAvatar);
-            }
-            savedAvatar = pendingAvatar;
-            photoChanged = false;
-            photoInput.value = "";
-            showFeedback("Foto de perfil atualizada.");
+            const cleanupWarning = await saveAvatarChange();
+            showFeedback(cleanupWarning || "Foto de perfil atualizada no ImageKit.", Boolean(cleanupWarning));
         } catch (error) {
             console.error("Não foi possível salvar a foto do perfil:", error);
             showFeedback("Não foi possível salvar a foto do perfil. Tente novamente.", true);
@@ -251,6 +387,7 @@ async function saveProfile() {
     saveButton.disabled = true;
     showFeedback("Salvando alterações...");
 
+    let avatarCleanupWarning = "";
     try {
         if (name !== user.name) user = await account.updateName({ name });
         if (changesEmail) user = await account.updateEmail({ email, password: confirmedPassword });
@@ -260,20 +397,17 @@ async function saveProfile() {
         }
 
         if (photoChanged) {
-            if (pendingAvatar === defaultAvatar) {
-                localStorage.removeItem(avatarKey);
-            } else {
-                localStorage.setItem(avatarKey, pendingAvatar);
-            }
-            savedAvatar = pendingAvatar;
-            photoChanged = false;
+            avatarCleanupWarning = await saveAvatarChange();
         }
         setProfileFields(user);
         setProfileFields(user);
         resetPendingChanges();
-        showFeedback(changesEmail
+        const successMessage = changesEmail
             ? "Perfil atualizado. O novo e-mail precisa ser confirmado novamente."
-            : "Perfil atualizado com sucesso.");
+            : "Perfil atualizado com sucesso.";
+        showFeedback(avatarCleanupWarning
+            ? `${successMessage} ${avatarCleanupWarning}`
+            : successMessage, Boolean(avatarCleanupWarning));
     } catch (error) {
         console.error("Não foi possível salvar as alterações do perfil:", error);
         try {
@@ -352,6 +486,8 @@ photoInput.addEventListener("change", () => {
 });
 
 removePhotoButton.addEventListener("click", () => {
+    revokePendingAvatarPreview();
+    pendingAvatarFile = undefined;
     pendingAvatar = defaultAvatar;
     photoChanged = true;
     photoInput.value = "";
