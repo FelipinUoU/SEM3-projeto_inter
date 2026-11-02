@@ -6,7 +6,7 @@ import fs from 'fs';
 import { createServer } from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { Account, Client, Databases, ID, Query } from 'node-appwrite';
+import { Account, Client, Databases, ID, Query, Users } from 'node-appwrite';
 import ImageKit from 'imagekit';
 import { readChapterArchive } from './chapterArchive.js';
 
@@ -19,7 +19,6 @@ const READER_DIRECTORY = path.join(rootDirectory, 'public', 'reader');
 const READER_IMAGE_EXTENSIONS = new Set(['.avif', '.gif', '.jpeg', '.jpg', '.png', '.webp']);
 const UPLOAD_IMAGE_TYPES = new Set(['image/avif', 'image/gif', 'image/jpeg', 'image/png', 'image/webp']);
 const MAX_UPLOAD_BYTES = Number.parseInt(process.env.MAX_IMAGE_BYTES || '20971520', 10);
-const MAX_PROFILE_AVATAR_BYTES = 5 * 1024 * 1024;
 const MAX_CHAPTER_PAGES = Number.parseInt(process.env.MAX_CHAPTER_PAGES || '500', 10);
 const MAX_CHAPTER_ARCHIVE_BYTES = Number.parseInt(process.env.MAX_CHAPTER_ARCHIVE_BYTES || '104857600', 10);
 const MAX_CHAPTER_UNPACKED_BYTES = 209715200;
@@ -38,6 +37,7 @@ if (appwriteEndpoint) appwriteClient.setEndpoint(appwriteEndpoint);
 if (appwriteProjectId) appwriteClient.setProject(appwriteProjectId);
 if (appwriteApiKey) appwriteClient.setKey(appwriteApiKey);
 const databases = new Databases(appwriteClient);
+const users = new Users(appwriteClient);
 const imageKit = process.env.IMAGEKIT_PUBLIC_KEY
   && process.env.IMAGEKIT_PRIVATE_KEY
   && process.env.IMAGEKIT_URL_ENDPOINT
@@ -239,6 +239,45 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
+app.delete('/api/account', requireAuthenticatedUser, async (req, res) => {
+  const password = req.body?.password;
+  if (typeof password !== 'string' || password.length === 0 || password.length > 256) {
+    return res.status(400).json({ error: 'Informe sua senha para confirmar a exclusão.' });
+  }
+  if (!appwriteApiKey) {
+    return res.status(503).json({ error: 'A exclusão de contas não está configurada no servidor.' });
+  }
+
+  const verificationClient = new Client()
+    .setEndpoint(appwriteEndpoint)
+    .setProject(appwriteProjectId);
+  const verificationAccount = new Account(verificationClient);
+  let verificationSession;
+  try {
+    verificationSession = await verificationAccount.createEmailPasswordSession({
+      email: req.appwriteUser.email,
+      password
+    });
+  } catch (error) {
+    if (error?.code === 401) {
+      return res.status(401).json({ error: 'A senha informada está incorreta.' });
+    }
+    return sendAppwriteError(res, error, 'Não foi possível verificar sua senha.');
+  }
+
+  if (verificationSession.userId !== req.appwriteUser.$id) {
+    await verificationAccount.deleteSession({ sessionId: verificationSession.$id });
+    return res.status(403).json({ error: 'Não foi possível confirmar a identidade da conta.' });
+  }
+
+  try {
+    await users.delete(req.appwriteUser.$id);
+    return res.status(204).end();
+  } catch (error) {
+    return sendAppwriteError(res, error, 'Não foi possível excluir a conta.');
+  }
+});
+
 app.post('/api/uploads', requireAuthenticatedUser, requireAdminUser, express.raw({
   type: [...UPLOAD_IMAGE_TYPES],
   limit: MAX_UPLOAD_BYTES
@@ -269,58 +308,6 @@ app.post('/api/uploads', requireAuthenticatedUser, requireAdminUser, express.raw
   } catch (error) {
     console.error('ImageKit upload failed:', error);
     return res.status(502).json({ error: 'Não foi possível enviar a imagem ao ImageKit.' });
-  }
-});
-
-app.post('/api/profile/avatar', requireAuthenticatedUser, express.raw({
-  type: [...UPLOAD_IMAGE_TYPES],
-  limit: MAX_PROFILE_AVATAR_BYTES
-}), async (req, res) => {
-  if (!imageKit) {
-    return res.status(503).json({ error: 'Configure as chaves do ImageKit no servidor para enviar sua foto.' });
-  }
-  if (!UPLOAD_IMAGE_TYPES.has(req.get('Content-Type')?.split(';')[0])) {
-    return res.status(415).json({ error: 'Formato de imagem não suportado.' });
-  }
-  if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
-    return res.status(400).json({ error: 'Envie uma foto de perfil válida.' });
-  }
-
-  const rawFileName = typeof req.query.filename === 'string' ? req.query.filename : 'avatar';
-  const fileName = path.basename(rawFileName).replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 180) || 'avatar';
-  const folder = `/hokupedia/avatars/${req.appwriteUser.$id}`;
-  try {
-    const uploaded = await imageKit.upload({
-      file: req.body,
-      fileName,
-      folder,
-      useUniqueFileName: true
-    });
-    return res.status(201).json({
-      url: uploaded.url,
-      fileId: uploaded.fileId
-    });
-  } catch (error) {
-    console.error('Profile avatar upload failed:', error);
-    return res.status(502).json({ error: 'Não foi possível enviar a foto de perfil.' });
-  }
-});
-
-app.delete('/api/profile/avatar/:fileId', requireAuthenticatedUser, async (req, res) => {
-  if (!imageKit) {
-    return res.status(503).json({ error: 'Configure as chaves do ImageKit no servidor.' });
-  }
-  try {
-    const file = await imageKit.getFileDetails(req.params.fileId);
-    const userAvatarFolder = `/hokupedia/avatars/${req.appwriteUser.$id}/`;
-    if (!file.filePath.startsWith(userAvatarFolder)) {
-      return res.status(404).json({ error: 'Foto de perfil não encontrada.' });
-    }
-    await imageKit.deleteFile(req.params.fileId);
-    return res.json({ deleted: true });
-  } catch (error) {
-    console.error('Profile avatar deletion failed:', error);
-    return res.status(502).json({ error: 'Não foi possível excluir a foto de perfil.' });
   }
 });
 

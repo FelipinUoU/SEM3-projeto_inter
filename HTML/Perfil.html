@@ -21,7 +21,8 @@
             <span></span>
             <span></span>
         </button>
-        <div class="logo">HokuPédia</div>
+        <div class="logo"><a href="/" aria-label="Ir para a página inicial">HokuPédia</a></div>
+        <a class="header-login" href="/HTML/CadLog.html?mode=login">Login</a>
     </header>
 
     <button class="menu-lateral-overlay" id="menuOverlay" type="button" aria-label="Fechar dashboard" hidden></button>
@@ -42,28 +43,29 @@
         <section class="profile-card" aria-label="Configurações do perfil">
             <div class="profile-details">
                 <div class="profile-view-fields" aria-label="Dados do perfil">
-                    <input id="profileName" type="text" placeholder="Nome" aria-label="Nome" readonly>
-                    <input id="profileEmail" type="email" placeholder="Email" aria-label="E-mail" readonly>
-                    <input type="text" value="••••••••" aria-label="Senha cadastrada" readonly>
+                    <input type="text" placeholder="Nome" aria-label="Nome" readonly>
+                    <input type="email" placeholder="Email" aria-label="E-mail" readonly>
+                    <input type="text" value="••••••••" aria-label="Senha oculta; a senha real não é exibida" readonly>
                 </div>
 
-                <form class="profile-edit-fields" id="profileEditForm" aria-label="Editar dados do perfil">
-                    <input id="editName" name="name" type="text" placeholder="Alterar Nome" aria-label="Alterar nome" autocomplete="name" maxlength="128">
-                    <input id="currentEmail" name="currentEmail" type="email" placeholder="Email que será mudado" aria-label="E-mail atual" autocomplete="email">
-                    <input id="newEmail" name="newEmail" type="email" placeholder="Novo email registrado" aria-label="Novo e-mail" autocomplete="email">
-                    <input id="currentPassword" name="currentPassword" type="password" placeholder="Senha atual (necessária para alterações)" aria-label="Senha atual" autocomplete="current-password">
-                    <input id="newPassword" name="newPassword" type="password" placeholder="Nova Senha" aria-label="Nova senha" autocomplete="new-password" minlength="8" maxlength="256">
-                    <input id="confirmNewPassword" name="confirmNewPassword" type="password" placeholder="Confirmar Nova Senha" aria-label="Confirmar nova senha" autocomplete="new-password" minlength="8" maxlength="256">
-                </form>
-                <p class="profile-feedback" id="profileFeedback" role="status" aria-live="polite"></p>
+                <div class="profile-edit-fields" aria-label="Editar dados do perfil">
+                    <input type="text" placeholder="Alterar nome" aria-label="Alterar nome" autocomplete="name" maxlength="128">
+                    <input type="email" placeholder="Novo e-mail (opcional)" aria-label="Novo e-mail" autocomplete="email">
+                    <input type="password" placeholder="Senha atual" aria-label="Senha atual" autocomplete="current-password">
+                    <input type="password" placeholder="Nova senha (opcional)" aria-label="Nova senha" autocomplete="new-password" minlength="8" maxlength="256">
+                    <input type="password" placeholder="Confirmar nova senha" aria-label="Confirmar nova senha" autocomplete="new-password" minlength="8" maxlength="256">
+                    <p class="profile-edit-hint">Informe a senha atual somente para alterar o e-mail ou a senha.</p>
+                </div>
+                <p class="profile-feedback" id="profileFeedback" role="status" aria-live="polite">Carregando dados do perfil...</p>
+                <a class="profile-login-link" id="profileLoginLink" href="/HTML/CadLog.html?mode=login" hidden>Fazer login</a>
             </div>
 
             <aside class="profile-photo" aria-label="Foto do perfil">
-                <img src="../Img/PerfilExemplo.svg" alt="Foto atual do perfil">
+                <img class="profile-avatar profile-avatar--large" src="../Img/Perfil/PerfilExemplo.svg" alt="Foto atual do perfil">
                 <div class="photo-actions">
-                    <input class="photo-input" id="profilePhotoInput" type="file" accept="image/avif,image/gif,image/jpeg,image/png,image/webp" aria-label="Selecionar nova foto de perfil">
+                    <input class="photo-input" id="profilePhotoInput" type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif" aria-label="Selecionar nova foto de perfil">
                     <label class="photo-add" for="profilePhotoInput">Adicionar foto</label>
-                    <button class="photo-remove" id="removePhotoButton" type="button">Remover foto</button>
+                    <button class="photo-remove" type="button">Remover foto</button>
                 </div>
             </aside>
 
@@ -72,11 +74,31 @@
                     <span class="edit-label">Editar</span>
                     <span class="cancel-label">Cancelar edição</span>
                 </label>
-                <button class="profile-button profile-save-button" type="submit" form="profileEditForm">Salvar Alterações</button>
+                <button class="profile-button profile-save-button" type="button">Salvar alterações</button>
                 <button class="profile-button profile-delete-button" type="button">Excluir Conta</button>
             </div>
         </section>
     </main>
+
+    <dialog class="account-delete-dialog" id="accountDeleteDialog" aria-labelledby="accountDeleteTitle">
+        <form class="account-delete-form" id="accountDeleteForm">
+            <h2 id="accountDeleteTitle">Excluir sua conta?</h2>
+            <p>Tem certeza de que deseja excluir sua conta? Essa ação é permanente. Para entrar novamente, você precisará cadastrar uma nova conta.</p>
+            <label for="accountDeletePassword">Digite sua senha para confirmar</label>
+            <input
+                id="accountDeletePassword"
+                name="password"
+                type="password"
+                autocomplete="current-password"
+                maxlength="256"
+                required>
+            <p class="account-delete-feedback" id="accountDeleteFeedback" role="status" aria-live="polite"></p>
+            <div class="account-delete-actions">
+                <button class="account-delete-cancel" id="cancelAccountDelete" type="button">Cancelar</button>
+                <button class="account-delete-confirm" id="confirmAccountDelete" type="submit">Excluir conta</button>
+            </div>
+        </form>
+    </dialog>
 
     <script type="module" src="../JAVA/MenuLat.js"></script>
     <script type="module" src="../JS/Perfil.js"></script>

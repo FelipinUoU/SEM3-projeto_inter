@@ -1,283 +1,289 @@
 import { account } from "./JAVA/appwriteClient.js";
-import { loadProfileUser, renderProfileAvatar } from "./PerfilAvatar.js";
 
-const fallbackAvatar = new URL("/Img/PerfilExemplo.svg", window.location.origin).href;
+const defaultAvatar = "../Img/Perfil/PerfilExemplo.svg";
+const maxAvatarSize = 1.5 * 1024 * 1024;
+const allowedAvatarTypes = new Set(["image/avif", "image/gif", "image/jpeg", "image/png", "image/webp"]);
 const editMode = document.getElementById("editMode");
-const editForm = document.getElementById("profileEditForm");
-const feedback = document.getElementById("profileFeedback");
-const saveButton = document.querySelector(".profile-save-button");
+const profileImage = document.querySelector(".profile-avatar--large");
+const profileInputs = document.querySelectorAll(".profile-view-fields input");
+const editInputs = document.querySelectorAll(".profile-edit-fields input");
+const profileFeedback = document.getElementById("profileFeedback");
+const loginLink = document.getElementById("profileLoginLink");
 const photoInput = document.getElementById("profilePhotoInput");
-const removePhotoButton = document.getElementById("removePhotoButton");
-const photoImage = document.querySelector(".profile-photo > img");
-const nameField = document.getElementById("editName");
-const currentEmailField = document.getElementById("currentEmail");
-const newEmailField = document.getElementById("newEmail");
-const currentPasswordField = document.getElementById("currentPassword");
-const newPasswordField = document.getElementById("newPassword");
-const confirmPasswordField = document.getElementById("confirmNewPassword");
-const supportedImageTypes = new Set(["image/avif", "image/gif", "image/jpeg", "image/png", "image/webp"]);
-const maxAvatarBytes = 5 * 1024 * 1024;
-let currentUser;
-let originalAvatarFileId = null;
-let selectedAvatarFile = null;
-let removeAvatar = false;
-let previewUrl = null;
+const removePhotoButton = document.querySelector(".photo-remove");
+const saveButton = document.querySelector(".profile-save-button");
+const deleteAccountButton = document.querySelector(".profile-delete-button");
+const deleteAccountDialog = document.getElementById("accountDeleteDialog");
+const deleteAccountForm = document.getElementById("accountDeleteForm");
+const deleteAccountPassword = document.getElementById("accountDeletePassword");
+const deleteAccountFeedback = document.getElementById("accountDeleteFeedback");
+const confirmDeleteButton = document.getElementById("confirmAccountDelete");
+const cancelDeleteButton = document.getElementById("cancelAccountDelete");
+let user;
+let avatarKey;
+let savedAvatar = defaultAvatar;
+let pendingAvatar = defaultAvatar;
+let photoChanged = false;
 
 editMode.disabled = true;
+saveButton.disabled = true;
+deleteAccountButton.disabled = true;
 
-function showFeedback(message, type = "") {
-    feedback.textContent = message;
-    feedback.classList.toggle("is-error", type === "error");
-    feedback.classList.toggle("is-success", type === "success");
+function showFeedback(message, isError = false) {
+    profileFeedback.textContent = message;
+    profileFeedback.classList.toggle("is-error", isError);
 }
 
-function getAvatarUrl(user) {
-    return typeof user.prefs?.profileAvatarUrl === "string"
-        ? user.prefs.profileAvatarUrl
-        : fallbackAvatar;
+function setProfileFields(profile) {
+    profileInputs[0].value = profile.name || "";
+    profileInputs[1].value = profile.email || "";
+    editInputs[0].value = profile.name || "";
 }
 
-function renderUser(user) {
-    currentUser = user;
-    originalAvatarFileId = typeof user.prefs?.profileAvatarFileId === "string"
-        ? user.prefs.profileAvatarFileId
-        : null;
-    document.getElementById("profileName").value = user.name || "";
-    document.getElementById("profileEmail").value = user.email || "";
-    renderProfileAvatar(user);
-}
-
-function clearPreview() {
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
-    previewUrl = null;
-    selectedAvatarFile = null;
+function resetPendingChanges() {
+    setProfileFields(user);
+    editInputs[1].value = "";
+    editInputs[2].value = "";
+    editInputs[3].value = "";
+    editInputs[4].value = "";
     photoInput.value = "";
-    removeAvatar = false;
-    photoImage.src = getAvatarUrl(currentUser);
+    pendingAvatar = savedAvatar;
+    photoChanged = false;
+    profileImage.src = savedAvatar;
+    showFeedback("");
 }
 
-function apiRequest(url, options = {}) {
-    return account.createJWT().then(({ jwt }) => fetch(url, {
-        ...options,
-        headers: {
-            ...options.headers,
-            "X-Appwrite-JWT": jwt
+async function loadProfile() {
+    try {
+        user = await account.get();
+        avatarKey = `hokupedia.profileAvatar.${user.$id}`;
+        setProfileFields(user);
+        editMode.disabled = false;
+        saveButton.disabled = false;
+        deleteAccountButton.disabled = false;
+
+        try {
+            const storedAvatar = localStorage.getItem(avatarKey);
+            if (storedAvatar !== null) {
+                if (!/^data:image\/(?:avif|gif|jpeg|png|webp);base64,/.test(storedAvatar)) {
+                    throw new Error("A foto de perfil salva está em um formato inválido.");
+                }
+                savedAvatar = storedAvatar;
+            }
+        } catch (error) {
+            console.error("Não foi possível carregar a foto do perfil:", error);
+            showFeedback("Não foi possível carregar a foto salva. A imagem padrão será usada.", true);
         }
-    })).then(async (response) => {
-        const contentType = response.headers.get("content-type") || "";
-        const data = contentType.includes("application/json") ? await response.json() : {};
-        if (!response.ok) throw new Error(data.error || `A solicitação falhou (HTTP ${response.status}).`);
-        return data;
-    });
-}
 
-async function uploadAvatar(file) {
-    return apiRequest(`/api/profile/avatar?filename=${encodeURIComponent(file.name)}`, {
-        method: "POST",
-        headers: { "Content-Type": file.type },
-        body: file
-    });
-}
-
-async function deleteAvatar(fileId) {
-    if (!fileId) return;
-    await apiRequest(`/api/profile/avatar/${encodeURIComponent(fileId)}`, { method: "DELETE" });
-}
-
-function fillEditFields() {
-    nameField.value = currentUser.name || "";
-    currentEmailField.value = currentUser.email || "";
-    newEmailField.value = "";
-    currentPasswordField.value = "";
-    newPasswordField.value = "";
-    confirmPasswordField.value = "";
-    clearPreview();
-    showFeedback("");
-}
-
-editMode.addEventListener("change", () => {
-    if (editMode.checked) {
-        fillEditFields();
-    } else {
-        clearPreview();
-        showFeedback("");
+        pendingAvatar = savedAvatar;
+        profileImage.src = savedAvatar;
+        if (profileFeedback.textContent.startsWith("Carregando")) showFeedback("");
+    } catch (error) {
+        if (error.code === 401) {
+            showFeedback("Faça login para visualizar e editar seu perfil.", true);
+            loginLink.hidden = false;
+            return;
+        }
+        console.error("Não foi possível carregar os dados do perfil:", error);
+        showFeedback(error.message || "Não foi possível carregar os dados do perfil.", true);
     }
-});
+}
 
-photoInput.addEventListener("change", () => {
-    const [file] = photoInput.files || [];
-    if (!file) return;
-    if (!supportedImageTypes.has(file.type)) {
+function readAvatar(file) {
+    if (!allowedAvatarTypes.has(file.type)) {
+        showFeedback("Escolha uma imagem JPEG, PNG, WebP, GIF ou AVIF.", true);
         photoInput.value = "";
-        showFeedback("Selecione uma imagem AVIF, GIF, JPEG, PNG ou WebP.", "error");
         return;
     }
-    if (file.size > maxAvatarBytes) {
+    if (file.size > maxAvatarSize) {
+        showFeedback("A foto deve ter no máximo 1,5 MB.", true);
         photoInput.value = "";
-        showFeedback("A foto deve ter no máximo 5 MB.", "error");
         return;
     }
 
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
-    selectedAvatarFile = file;
-    removeAvatar = false;
-    previewUrl = URL.createObjectURL(file);
-    photoImage.src = previewUrl;
-    showFeedback("A foto será enviada ao salvar as alterações.");
-});
+    const reader = new FileReader();
+    reader.addEventListener("load", () => {
+        if (typeof reader.result !== "string") {
+            showFeedback("Não foi possível ler a imagem selecionada.", true);
+            return;
+        }
+        pendingAvatar = reader.result;
+        photoChanged = true;
+        profileImage.src = pendingAvatar;
+        showFeedback("Foto selecionada. Salve as alterações para confirmar.");
+    });
+    reader.addEventListener("error", () => {
+        showFeedback("Não foi possível ler a imagem selecionada.", true);
+    });
+    reader.readAsDataURL(file);
+}
 
-removePhotoButton.addEventListener("click", () => {
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
-    previewUrl = null;
-    selectedAvatarFile = null;
-    photoInput.value = "";
-    removeAvatar = true;
-    photoImage.src = fallbackAvatar;
-    showFeedback("A remoção da foto será aplicada ao salvar.");
-});
+async function saveProfile() {
+    if (!user) return;
 
-editForm.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    showFeedback("");
-
-    const name = nameField.value.trim();
-    const currentEmail = currentEmailField.value.trim();
-    const newEmail = newEmailField.value.trim();
-    const currentPassword = currentPasswordField.value;
-    const newPassword = newPasswordField.value;
-    const confirmPassword = confirmPasswordField.value;
-    const emailChanged = newEmail.length > 0 && newEmail.toLowerCase() !== currentUser.email.toLowerCase();
-    const passwordChanged = newPassword.length > 0;
+    const name = editInputs[0].value.trim();
+    const email = editInputs[1].value.trim();
+    const currentPassword = editInputs[2].value;
+    const newPassword = editInputs[3].value;
+    const confirmPassword = editInputs[4].value;
+    const changesEmail = email !== "" && email.toLowerCase() !== user.email.toLowerCase();
+    const changesPassword = newPassword !== "" || confirmPassword !== "";
 
     if (!name) {
-        showFeedback("O nome não pode ficar vazio.", "error");
-        nameField.focus();
+        showFeedback("Digite seu nome.", true);
+        editInputs[0].focus();
         return;
     }
-    if (name === currentUser.name && !emailChanged && !passwordChanged && !selectedAvatarFile && !removeAvatar) {
-        editMode.checked = false;
-        showFeedback("Nenhuma alteração foi feita.");
+    if (changesPassword && newPassword.length < 8) {
+        showFeedback("A nova senha deve ter pelo menos 8 caracteres.", true);
+        editInputs[3].focus();
         return;
     }
-    if (emailChanged && currentEmail.toLowerCase() !== currentUser.email.toLowerCase()) {
-        showFeedback("Informe o e-mail atual da conta antes de alterá-lo.", "error");
-        currentEmailField.focus();
+    if (changesPassword && newPassword.length > 256) {
+        showFeedback("A nova senha deve ter no máximo 256 caracteres.", true);
+        editInputs[3].focus();
         return;
     }
-    if ((emailChanged || passwordChanged) && !currentPassword) {
-        showFeedback("Informe sua senha atual para alterar o e-mail ou a senha.", "error");
-        currentPasswordField.focus();
+    if (changesPassword && newPassword !== confirmPassword) {
+        showFeedback("As novas senhas não são iguais.", true);
+        editInputs[4].focus();
         return;
     }
-    if (passwordChanged && (newPassword.length < 8 || newPassword.length > 256)) {
-        showFeedback("A nova senha deve ter entre 8 e 256 caracteres.", "error");
-        newPasswordField.focus();
+    if (changesEmail && !editInputs[1].checkValidity()) {
+        showFeedback("Digite um e-mail válido.", true);
+        editInputs[1].focus();
         return;
     }
-    if (passwordChanged && newPassword !== confirmPassword) {
-        showFeedback("As novas senhas não são iguais.", "error");
-        confirmPasswordField.focus();
+    if ((changesEmail || changesPassword) && !currentPassword) {
+        showFeedback("Informe sua senha atual para alterar o e-mail ou a senha.", true);
+        editInputs[2].focus();
         return;
     }
 
     saveButton.disabled = true;
-    let uploadedAvatar = null;
-    let avatarSaved = false;
-    let avatarPersistenceAttempted = false;
-    const previousAvatarFileId = originalAvatarFileId;
     showFeedback("Salvando alterações...");
 
     try {
-        if (selectedAvatarFile) uploadedAvatar = await uploadAvatar(selectedAvatarFile);
+        if (name !== user.name) user = await account.updateName({ name });
+        if (changesEmail) user = await account.updateEmail({ email, password: currentPassword });
+        if (changesPassword) user = await account.updatePassword({ password: newPassword, oldPassword: currentPassword });
 
-        if (name && name !== currentUser.name) {
-            currentUser = await account.updateName({ name });
-        }
-        if (emailChanged) {
-            currentUser = await account.updateEmail({ email: newEmail, password: currentPassword });
-        }
-        if (passwordChanged) {
-            currentUser = await account.updatePassword({ password: newPassword, oldPassword: currentPassword });
-        }
-
-        if (uploadedAvatar || removeAvatar) {
-            const prefs = { ...currentUser.prefs };
-            if (uploadedAvatar) {
-                prefs.profileAvatarUrl = uploadedAvatar.url;
-                prefs.profileAvatarFileId = uploadedAvatar.fileId;
+        if (photoChanged) {
+            if (pendingAvatar === defaultAvatar) {
+                localStorage.removeItem(avatarKey);
             } else {
-                delete prefs.profileAvatarUrl;
-                delete prefs.profileAvatarFileId;
+                localStorage.setItem(avatarKey, pendingAvatar);
             }
-            avatarPersistenceAttempted = true;
-            currentUser = await account.updatePrefs({ prefs });
-            avatarSaved = true;
+            savedAvatar = pendingAvatar;
+            photoChanged = false;
         }
 
-        currentUser = await account.get();
-        renderUser(currentUser);
+        setProfileFields(user);
         editMode.checked = false;
-        editForm.reset();
-        clearPreview();
-
-        if (previousAvatarFileId && (uploadedAvatar || removeAvatar)) {
-            try {
-                await deleteAvatar(previousAvatarFileId);
-            } catch (error) {
-                console.error("Não foi possível remover a foto de perfil anterior:", error);
-                showFeedback("Alterações salvas, mas não foi possível excluir a foto anterior.", "error");
-                return;
-            }
-        }
-
-        showFeedback(
-            emailChanged
-                ? "Alterações salvas. Confirme o novo e-mail para validar a conta."
-                : "Alterações salvas com sucesso.",
-            "success"
-        );
+        resetPendingChanges();
+        showFeedback(changesEmail
+            ? "Perfil atualizado. O novo e-mail precisa ser confirmado novamente."
+            : "Perfil atualizado com sucesso.");
     } catch (error) {
         console.error("Não foi possível salvar as alterações do perfil:", error);
-        let profileRefreshed = false;
         try {
-            currentUser = await account.get();
-            renderUser(currentUser);
-            fillEditFields();
-            profileRefreshed = true;
-            if (uploadedAvatar) {
-                avatarSaved = currentUser.prefs?.profileAvatarFileId === uploadedAvatar.fileId;
-            }
+            user = await account.get();
+            setProfileFields(user);
         } catch (refreshError) {
-            console.error("Não foi possível atualizar os dados do perfil:", refreshError);
-            currentPasswordField.value = "";
-            newPasswordField.value = "";
-            confirmPasswordField.value = "";
+            console.error("Não foi possível atualizar os dados do perfil após a falha:", refreshError);
         }
-        if (uploadedAvatar && !avatarSaved && (!avatarPersistenceAttempted || profileRefreshed)) {
-            try {
-                await deleteAvatar(uploadedAvatar.fileId);
-            } catch (cleanupError) {
-                console.error("Não foi possível remover o upload de perfil não utilizado:", cleanupError);
-            }
-        }
-        showFeedback(error.message || "Não foi possível salvar as alterações. Tente novamente.", "error");
+        showFeedback(error.message || "Não foi possível salvar as alterações do perfil.", true);
     } finally {
         saveButton.disabled = false;
     }
+}
+
+editMode.addEventListener("change", () => {
+    if (editMode.checked) {
+        setProfileFields(user);
+        showFeedback("");
+    } else if (user) {
+        resetPendingChanges();
+    }
 });
 
-loadProfileUser()
-    .then((user) => {
-        renderUser(user);
-        fillEditFields();
-        clearPreview();
-        editMode.disabled = false;
-    })
-    .catch((error) => {
-        console.error("Não foi possível carregar o perfil:", error);
-        showFeedback(error.code === 401
-            ? "Faça login para visualizar e editar seu perfil."
-            : error.message || "Não foi possível carregar seu perfil.", "error");
-        editMode.disabled = true;
-        saveButton.disabled = true;
-    });
+photoInput.addEventListener("change", () => {
+    const [file] = photoInput.files;
+    if (file) readAvatar(file);
+});
+
+removePhotoButton.addEventListener("click", () => {
+    pendingAvatar = defaultAvatar;
+    photoChanged = true;
+    photoInput.value = "";
+    profileImage.src = defaultAvatar;
+    showFeedback("A foto padrão será restaurada ao salvar.");
+});
+
+saveButton.addEventListener("click", saveProfile);
+
+deleteAccountButton.addEventListener("click", () => {
+    if (!user) return;
+    deleteAccountFeedback.textContent = "";
+    deleteAccountPassword.value = "";
+    deleteAccountDialog.showModal();
+    deleteAccountPassword.focus();
+});
+
+cancelDeleteButton.addEventListener("click", () => deleteAccountDialog.close());
+deleteAccountDialog.addEventListener("close", () => {
+    deleteAccountPassword.value = "";
+    deleteAccountFeedback.textContent = "";
+});
+
+deleteAccountForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!user) return;
+
+    confirmDeleteButton.disabled = true;
+    cancelDeleteButton.disabled = true;
+    deleteAccountFeedback.textContent = "Verificando senha e excluindo a conta...";
+
+    try {
+        const jwt = await account.createJWT();
+        const response = await fetch("/api/account", {
+            method: "DELETE",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Appwrite-JWT": jwt.jwt
+            },
+            body: JSON.stringify({ password: deleteAccountPassword.value })
+        });
+
+        if (!response.ok) {
+            const result = await response.json();
+            throw new Error(response.status === 401
+                ? "A senha informada está incorreta. Confira e tente novamente."
+                : result.error || "Não foi possível excluir sua conta.");
+        }
+
+        try {
+            localStorage.removeItem(avatarKey);
+        } catch (error) {
+            console.error("Não foi possível remover a foto local após excluir a conta:", error);
+        }
+        document.getElementById("accountDeleteTitle").textContent = "Conta excluída com sucesso";
+        deleteAccountDialog.querySelector(".account-delete-form > p").textContent =
+            "Sua conta foi excluída. Você será redirecionado para a página inicial.";
+        deleteAccountPassword.hidden = true;
+        deleteAccountForm.querySelector('label[for="accountDeletePassword"]').hidden = true;
+        deleteAccountForm.querySelector(".account-delete-actions").hidden = true;
+        deleteAccountFeedback.textContent = "Conta excluída com sucesso.";
+        deleteAccountFeedback.classList.add("is-success");
+        window.setTimeout(() => window.location.assign("/"), 2000);
+    } catch (error) {
+        console.error("Não foi possível excluir a conta:", error);
+        deleteAccountFeedback.textContent = error.message || "Não foi possível excluir sua conta. Tente novamente.";
+        deleteAccountFeedback.classList.remove("is-success");
+        confirmDeleteButton.disabled = false;
+        cancelDeleteButton.disabled = false;
+        deleteAccountPassword.focus();
+    }
+});
+
+loadProfile();

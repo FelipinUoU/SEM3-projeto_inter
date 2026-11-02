@@ -1,5 +1,6 @@
 import { createAuthorIcon } from "./authorIcon.js";
 import { account } from "./JAVA/appwriteClient.js";
+import "../JAVA/AuthHeader.js";
 
 const readHistoryKey = "hokupedia.readChapters.v1";
 const chapterList = document.querySelector("#chapterList");

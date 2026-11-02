@@ -10,8 +10,6 @@
   --sky: #cfeafc;
   --hill-light: #9ecf68;
   --hill-dark: #7ba85a;
-  --olive-panel: #b7a679;
-  --olive-panel-dark: #8d7d52;
 }
 
 * {
@@ -157,96 +155,6 @@ body {
   transform: scaleX(1.05);
 }
 
-.summary-panel {
-  flex: 0 0 420px;
-  min-height: 220px;
-  background: linear-gradient(180deg, var(--olive-panel) 0%, var(--olive-panel-dark) 100%);
-  border: 2px solid var(--panel-border-soft);
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 18px 24px 18px 26px;
-  gap: 18px;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
-}
-
-.summary-copy {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 12px;
-}
-
-.nickname-edit-button,
-.summary-copy p {
-  color: rgba(0, 0, 0, 0.82);
-  font-size: clamp(30px, 2vw, 44px);
-  font-weight: 700;
-  line-height: 1.1;
-}
-
-.nickname-edit-button {
-  display: inline-flex;
-  align-items: center;
-  align-self: flex-start;
-  gap: 8px;
-  border: 0;
-  padding: 0;
-  background: transparent;
-  font-family: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.nickname-edit-icon {
-  width: 0.65em;
-  height: 0.65em;
-  fill: currentColor;
-}
-
-.nickname-edit-button:focus-visible {
-  outline: 3px solid #fff;
-  outline-offset: 3px;
-}
-
-.nickname-input {
-  width: 100%;
-  min-width: 0;
-  padding: 8px 10px;
-  border: 2px solid rgba(31, 31, 31, 0.55);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.82);
-  color: #1f1f1f;
-  font: 700 1rem Georgia, serif;
-}
-
-.nickname-input[hidden] {
-  display: none;
-}
-
-.nickname-input:focus-visible {
-  outline: 3px solid #fff;
-  outline-offset: 2px;
-}
-
-.summary-badge {
-  width: 150px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-}
-
-.badge-avatar {
-  width: 110px;
-  height: 110px;
-  border-radius: 50%;
-  object-fit: cover;
-}
-
 .historic-grid,
 .favorites-grid {
   grid-template-columns: repeat(6, minmax(160px, 1fr));
@@ -257,11 +165,6 @@ body {
     flex-direction: column;
   }
 
-  .summary-panel {
-    width: 100%;
-    min-height: 180px;
-    flex: 1;
-  }
 }
 
 @media (max-width: 860px) {
@@ -271,11 +174,6 @@ body {
     grid-template-columns: repeat(2, minmax(160px, 1fr));
   }
 
-  .summary-panel {
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-  }
 }
 
 @media (max-width: 520px) {

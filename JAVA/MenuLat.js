@@ -1,4 +1,5 @@
 import { account } from "../JS/JAVA/appwriteClient.js";
+import "./AuthHeader.js";
 
 const adminEmail = "hokupedia@gmail.com";
 const menuButton = document.getElementById("menuBtn");
@@ -6,31 +7,31 @@ const dashboard = document.getElementById("dashboard");
 const overlay = document.getElementById("menuOverlay");
 const dashboardItems = document.querySelectorAll(".menu-lateral-item");
 const navigation = document.querySelector(".menu-lateral-items");
-const headerLogin = document.querySelector(".header-login");
 
 async function updateNavigationForUser() {
     try {
         const user = await account.get();
-        if (headerLogin) {
-            const profileImage = document.createElement("img");
-            profileImage.src = "/Img/Perfil/PerfilExemplo.svg";
-            profileImage.alt = "Perfil";
+        if (!navigation) return;
+        const isAdmin = user.email?.trim().toLowerCase() === adminEmail
+            || user.labels?.includes("admin");
+        const isModerator = isAdmin || user.labels?.includes("moderator");
+        navigation.querySelectorAll("[data-role-navigation]").forEach((link) => link.remove());
 
-            headerLogin.className = "header-profile";
-            headerLogin.href = "/HTML/Biblioteca.html";
-            headerLogin.setAttribute("aria-label", `Abrir perfil de ${user.name || user.email}`);
-            headerLogin.replaceChildren(profileImage);
-        }
+        const manageWorksLink = document.createElement("a");
+        manageWorksLink.className = "menu-lateral-item";
+        manageWorksLink.href = "/HTML/GerenciarObras.html";
+        manageWorksLink.textContent = isModerator ? "Gerenciar Obras" : "Solicitar moderação";
+        manageWorksLink.dataset.roleNavigation = "works";
+        navigation.querySelector('a[href="/HTML/Biblioteca.html"]')
+            ?.insertAdjacentElement("afterend", manageWorksLink);
 
-        if (user.email.trim().toLowerCase() === adminEmail && navigation
-            && !navigation.querySelector("[data-admin-navigation]")) {
-            const manageWorksLink = document.createElement("a");
-            manageWorksLink.className = "menu-lateral-item";
-            manageWorksLink.href = "/HTML/GerenciarObras.html";
-            manageWorksLink.textContent = "Gerenciar Obras";
-            manageWorksLink.dataset.adminNavigation = "true";
-            navigation.querySelector('a[href="/HTML/Biblioteca.html"]')
-                ?.insertAdjacentElement("afterend", manageWorksLink);
+        if (isAdmin) {
+            const approvalLink = document.createElement("a");
+            approvalLink.className = "menu-lateral-item";
+            approvalLink.href = "/HTML/Homologacao.html";
+            approvalLink.textContent = "Homologação";
+            approvalLink.dataset.roleNavigation = "approval";
+            manageWorksLink.insertAdjacentElement("afterend", approvalLink);
         }
     } catch (error) {
         if (error.code !== 401) {
