@@ -114,6 +114,9 @@ function createAccountMenu(user, avatarSource) {
 }
 
 async function updateAuthHeader() {
+    const sidebarLoginLinks = document.querySelectorAll('.menu-lateral-item[href*="CadLog.html"]');
+    sidebarLoginLinks.forEach((link) => link.remove());
+
     try {
         const user = await account.get();
         const loginButton = document.querySelector(".header-login");
@@ -133,15 +136,6 @@ async function updateAuthHeader() {
             loginButton.replaceWith(createAccountMenu(user, avatarSource));
         }
 
-        document.querySelectorAll('.menu-lateral-item[href*="CadLog.html"]').forEach((link) => {
-            if (window.location.pathname === "/HTML/Perfil.html") {
-                link.remove();
-                return;
-            }
-            link.href = "/HTML/Perfil.html";
-            link.textContent = "Meu perfil";
-            link.removeAttribute("aria-current");
-        });
     } catch (error) {
         if (error.code !== 401) {
             console.error("Não foi possível verificar a sessão para atualizar o cabeçalho:", error);

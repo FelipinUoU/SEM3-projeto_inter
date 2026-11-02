@@ -5,11 +5,6 @@ const latestReadGrid = document.getElementById("latestReadGrid");
 const readingHistoryGrid = document.getElementById("readingHistoryGrid");
 const favoritesGrid = document.getElementById("favoritesGrid");
 const libraryStatus = document.getElementById("libraryStatus");
-const nicknameInput = document.getElementById("nicknameInput");
-const nicknameText = document.getElementById("nicknameText");
-const nicknameEditButton = document.getElementById("nicknameEditButton");
-const readingCount = document.getElementById("readingCount");
-let nickname = "";
 
 function showEmptyState(container, message) {
     const emptyState = document.createElement("p");
@@ -96,9 +91,6 @@ async function renderLibrary() {
             [latestReadGrid, readingHistoryGrid, favoritesGrid].forEach((grid) => (
                 showEmptyState(grid, "Entre na sua conta para ver este conteúdo.")
             ));
-            nickname = "Minha biblioteca";
-            nicknameText.textContent = nickname;
-            readingCount.textContent = "0 obras lidas";
             return;
         }
 
@@ -116,13 +108,10 @@ async function renderLibrary() {
             .filter((entry) => worksById.has(entry.workId));
         const favorites = library.favorites.filter((workId) => worksById.has(workId));
 
-        nickname = user.name || "Minha biblioteca";
-        nicknameText.textContent = nickname;
-        readingCount.textContent = `${readingHistory.length} ${readingHistory.length === 1 ? "obra lida" : "obras lidas"}`;
         libraryStatus.textContent = "";
         renderWorkGrid(
             latestReadGrid,
-            readingHistory.slice(0, 3),
+            readingHistory.slice(0, 5),
             worksById,
             "Você ainda não leu nenhuma obra."
         );
@@ -145,31 +134,6 @@ async function renderLibrary() {
             showEmptyState(grid, "Não foi possível carregar este conteúdo.")
         ));
     }
-}
-
-if (nicknameInput && nicknameText && nicknameEditButton) {
-    function closeNicknameEditor() {
-        nickname = nicknameInput.value.trim();
-        nicknameText.textContent = nickname || "Minha biblioteca";
-        nicknameInput.hidden = true;
-        nicknameEditButton.setAttribute("aria-expanded", "false");
-    }
-
-    nicknameEditButton.addEventListener("click", () => {
-        nicknameInput.value = nickname;
-        nicknameInput.hidden = false;
-        nicknameEditButton.setAttribute("aria-expanded", "true");
-        nicknameInput.focus();
-    });
-
-    nicknameInput.addEventListener("keydown", (event) => {
-        if (event.key === "Enter") {
-            closeNicknameEditor();
-            nicknameEditButton.focus();
-        }
-    });
-
-    nicknameInput.addEventListener("blur", closeNicknameEditor);
 }
 
 renderLibrary();

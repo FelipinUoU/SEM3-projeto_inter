@@ -32,29 +32,23 @@
             <a class="menu-lateral-item" href="/">Home</a>
             <a class="menu-lateral-item" href="/HTML/Catalogo.html">Catálogo</a>
             <a class="menu-lateral-item" href="/HTML/Biblioteca.html">Biblioteca</a>
-            <a class="menu-lateral-item" href="/HTML/Perfil.html" aria-current="page">Meu perfil</a>
             <a class="menu-lateral-item" href="/HTML/CadLog.html?mode=login">Login</a>
         </nav>
     </aside>
 
     <main class="profile-page">
-        <input class="profile-mode-toggle" id="editMode" type="checkbox" aria-label="Alternar edição do perfil">
-
         <section class="profile-card" aria-label="Configurações do perfil">
             <div class="profile-details">
                 <div class="profile-view-fields" aria-label="Dados do perfil">
                     <input type="text" placeholder="Nome" aria-label="Nome" readonly>
                     <input type="email" placeholder="Email" aria-label="E-mail" readonly>
-                    <input type="text" value="••••••••" aria-label="Senha oculta; a senha real não é exibida" readonly>
                 </div>
 
                 <div class="profile-edit-fields" aria-label="Editar dados do perfil">
                     <input type="text" placeholder="Alterar nome" aria-label="Alterar nome" autocomplete="name" maxlength="128">
                     <input type="email" placeholder="Novo e-mail (opcional)" aria-label="Novo e-mail" autocomplete="email">
-                    <input type="password" placeholder="Senha atual" aria-label="Senha atual" autocomplete="current-password">
                     <input type="password" placeholder="Nova senha (opcional)" aria-label="Nova senha" autocomplete="new-password" minlength="8" maxlength="256">
                     <input type="password" placeholder="Confirmar nova senha" aria-label="Confirmar nova senha" autocomplete="new-password" minlength="8" maxlength="256">
-                    <p class="profile-edit-hint">Informe a senha atual somente para alterar o e-mail ou a senha.</p>
                 </div>
                 <p class="profile-feedback" id="profileFeedback" role="status" aria-live="polite">Carregando dados do perfil...</p>
                 <a class="profile-login-link" id="profileLoginLink" href="/HTML/CadLog.html?mode=login" hidden>Fazer login</a>
@@ -70,15 +64,31 @@
             </aside>
 
             <div class="profile-actions">
-                <label class="profile-button profile-edit-button" for="editMode">
+                <button class="profile-button profile-edit-button" id="profileEditButton" type="button" disabled hidden>
                     <span class="edit-label">Editar</span>
                     <span class="cancel-label">Cancelar edição</span>
-                </label>
-                <button class="profile-button profile-save-button" type="button">Salvar alterações</button>
-                <button class="profile-button profile-delete-button" type="button">Excluir Conta</button>
+                </button>
+                <button class="profile-button profile-save-button" type="button" disabled>Salvar alterações</button>
+                <button class="profile-button profile-delete-button" type="button" disabled hidden>Excluir Conta</button>
+                <button class="profile-button profile-logout-button" id="profileLogoutButton" type="button" disabled hidden>Sair da conta</button>
             </div>
         </section>
     </main>
+
+    <dialog class="account-delete-dialog password-confirm-dialog" id="passwordConfirmDialog" aria-labelledby="passwordConfirmTitle">
+        <form class="account-delete-form" id="passwordConfirmForm">
+            <h2 id="passwordConfirmTitle">Confirme sua senha</h2>
+            <p>Digite sua senha para liberar a edição dos dados do perfil.</p>
+            <label for="profileConfirmPassword">Senha da conta</label>
+            <input id="profileConfirmPassword" name="password" type="password" autocomplete="current-password" maxlength="256" required>
+            <a class="password-confirm-recovery" href="/HTML/CadLog.html?mode=login&amp;recovery=1">Esqueci minha senha</a>
+            <p class="account-delete-feedback" id="passwordConfirmFeedback" role="status" aria-live="polite"></p>
+            <div class="account-delete-actions">
+                <button class="account-delete-cancel" id="cancelPasswordConfirm" type="button">Cancelar</button>
+                <button class="account-delete-confirm password-confirm-submit" id="submitPasswordConfirm" type="submit">Confirmar</button>
+            </div>
+        </form>
+    </dialog>
 
     <dialog class="account-delete-dialog" id="accountDeleteDialog" aria-labelledby="accountDeleteTitle">
         <form class="account-delete-form" id="accountDeleteForm">

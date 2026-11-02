@@ -15,21 +15,6 @@ body {
     margin: 18px auto 48px;
 }
 
-.profile-mode-toggle {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
-    clip-path: inset(50%);
-}
-
-.profile-mode-toggle:focus-visible + .profile-card {
-    outline: 2px solid #fff;
-    outline-offset: 4px;
-}
-
 .profile-card {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 136px;
@@ -67,12 +52,6 @@ body {
 
 .profile-feedback.is-error {
     color: #ffaaa8;
-}
-
-.profile-edit-hint {
-    margin: -18px 0 0;
-    color: #e2dfe8;
-    font: 14px/1.4 Arial, sans-serif;
 }
 
 .profile-login-link {
@@ -210,34 +189,56 @@ body {
     background: #f83f3c;
 }
 
+.profile-logout-button {
+    background: #4b4853;
+}
+
 .cancel-label,
 .profile-save-button {
     display: none;
 }
 
-.profile-mode-toggle:checked + .profile-card .profile-view-fields,
-.profile-mode-toggle:checked + .profile-card .edit-label {
+.profile-card.is-editing .profile-view-fields,
+.profile-card.is-editing .edit-label {
     display: none;
 }
 
-.profile-mode-toggle:checked + .profile-card .profile-edit-fields {
+.profile-card.is-editing .profile-edit-fields {
     display: grid;
 }
 
-.profile-mode-toggle:checked + .profile-card .profile-feedback {
+.profile-card.is-editing .profile-feedback {
     margin-top: 16px;
 }
 
-.profile-mode-toggle:checked + .profile-card .photo-actions {
+.profile-card.is-editing .photo-actions {
     display: flex;
 }
 
-.profile-mode-toggle:checked + .profile-card .cancel-label {
+.profile-card.is-editing .cancel-label {
     display: inline;
 }
 
-.profile-mode-toggle:checked + .profile-card .profile-save-button {
+.profile-card.is-editing .profile-save-button {
     display: inline-flex;
+}
+
+.profile-card[data-admin="true"] .profile-edit-button,
+.profile-card[data-admin="true"] .profile-delete-button {
+    display: none;
+}
+
+.profile-card[data-admin="true"] .photo-actions {
+    display: flex;
+}
+
+.profile-card[data-admin="true"] .profile-save-button {
+    display: inline-flex;
+}
+
+.profile-button:disabled {
+    cursor: wait;
+    opacity: 0.65;
 }
 
 .account-delete-dialog {
@@ -312,6 +313,22 @@ body {
 
 .account-delete-feedback:empty {
     display: none;
+}
+
+.password-confirm-recovery {
+    justify-self: start;
+    color: #d5bd00;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.password-confirm-recovery:focus-visible {
+    outline: 2px solid #d5bd00;
+    outline-offset: 3px;
+}
+
+.password-confirm-submit {
+    background: #0759bd;
 }
 
 .account-delete-actions {

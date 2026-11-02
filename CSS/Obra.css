@@ -222,6 +222,7 @@ a {
 
 .work-author {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 8px;
     margin-top: 16px;
@@ -233,7 +234,6 @@ a {
     display: inline-flex;
     align-items: center;
     min-height: 30px;
-    margin-top: 12px;
     padding: 6px 12px;
     border: 1px solid #f1cf43;
     border-radius: 999px;

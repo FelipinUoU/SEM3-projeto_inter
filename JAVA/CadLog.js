@@ -76,6 +76,10 @@ document.getElementById("showRecoveryButton").addEventListener("click", () => {
     document.getElementById("recoveryEmail").focus();
 });
 
+if (new URLSearchParams(window.location.search).get("recovery") === "1") {
+    document.getElementById("showRecoveryButton").click();
+}
+
 document.getElementById("cancelRecoveryButton").addEventListener("click", () => {
     recoveryRequestForm.reset();
     recoveryRequestForm.hidden = true;

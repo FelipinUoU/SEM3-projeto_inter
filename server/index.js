@@ -320,6 +320,55 @@ app.delete('/api/account', requireAuthenticatedUser, async (req, res) => {
   }
 });
 
+app.post('/api/account/verify-password', requireAuthenticatedUser, async (req, res) => {
+  const password = req.body?.password;
+  if (typeof password !== 'string' || password.length === 0 || password.length > 256) {
+    return res.status(400).json({ error: 'Informe sua senha para confirmar a edição.' });
+  }
+  if (!appwriteApiKey) {
+    return res.status(503).json({ error: 'A confirmação de senha não está configurada no servidor.' });
+  }
+
+  const verificationClient = new Client()
+    .setEndpoint(appwriteEndpoint)
+    .setProject(appwriteProjectId);
+  const verificationAccount = new Account(verificationClient);
+  let verificationSession;
+  let verificationError;
+  try {
+    verificationSession = await verificationAccount.createEmailPasswordSession({
+      email: req.appwriteUser.email,
+      password
+    });
+  } catch (error) {
+    verificationError = error;
+  }
+
+  if (verificationSession) {
+    try {
+      await users.deleteSession(verificationSession.userId, verificationSession.$id);
+    } catch (error) {
+      console.error('Could not revoke temporary password-verification session:', error);
+      return res.status(503).json({
+        error: 'A senha foi verificada, mas não foi possível encerrar a sessão temporária. Tente novamente.'
+      });
+    }
+  }
+
+  if (verificationError) {
+    if (verificationError?.code === 401) {
+      return res.status(401).json({ error: 'A senha informada está incorreta.' });
+    }
+    return sendAppwriteError(res, verificationError, 'Não foi possível verificar sua senha.');
+  }
+
+  if (verificationSession.userId !== req.appwriteUser.$id) {
+    return res.status(403).json({ error: 'Não foi possível confirmar a identidade da conta.' });
+  }
+
+  return res.json({ verified: true });
+});
+
 app.post('/api/uploads', requireAuthenticatedUser, requireModeratorUser, express.raw({
   type: [...UPLOAD_IMAGE_TYPES],
   limit: MAX_UPLOAD_BYTES

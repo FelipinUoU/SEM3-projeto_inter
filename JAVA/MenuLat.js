@@ -45,7 +45,10 @@ async function updateNavigationForUser() {
     } catch (error) {
         navigation?.querySelector('a[href="/HTML/GerenciarObras.html"]')?.setAttribute("hidden", "");
         navigation?.querySelectorAll("[data-admin-only]").forEach((link) => { link.hidden = true; });
-        if (error.code !== 401) {
+        if (error.code === 401) {
+            const libraryLink = navigation?.querySelector('a[href="/HTML/Biblioteca.html"]');
+            if (libraryLink) libraryLink.href = "/HTML/CadLog.html";
+        } else {
             console.error("Não foi possível verificar a sessão do usuário:", error);
         }
     }
