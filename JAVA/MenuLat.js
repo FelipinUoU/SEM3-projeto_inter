@@ -1,3 +1,5 @@
+import "./AuthHeader.js";
+
 const menuButton = document.getElementById("menuBtn");
 const dashboard = document.getElementById("dashboard");
 const overlay = document.getElementById("menuOverlay");

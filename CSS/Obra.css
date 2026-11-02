@@ -54,6 +54,45 @@ a {
     gap: 24px;
 }
 
+.header-actions .header-login {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 9px 16px;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    background: #353341;
+    color: #fff;
+    font: bold 16px Georgia, serif;
+    text-decoration: none;
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.header-actions .header-login:hover {
+    background: #d5bd00;
+    color: #2b1a42;
+}
+
+.header-actions .header-login:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: 3px;
+}
+
+.header-actions .header-profile {
+    display: block;
+    width: 38px;
+    height: 38px;
+    flex: 0 0 38px;
+    overflow: hidden;
+    border: 1px solid rgba(213, 189, 0, 0.75);
+    border-radius: 50%;
+}
+
+.header-actions .header-profile:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: 3px;
+}
+
 .manage-link {
     color: #d1cdd7;
     font-size: 13px;
