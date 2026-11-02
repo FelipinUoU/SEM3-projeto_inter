@@ -38,7 +38,9 @@ function setAuthMode(mode, updateUrl = true) {
     document.title = `HokuPédia - ${isLogin ? "Login" : "Cadastro"}`;
 
     if (updateUrl) {
-        window.history.replaceState(null, "", `/HTML/CadLog.html?mode=${mode}`);
+        const query = new URLSearchParams(window.location.search);
+        query.set("mode", mode);
+        window.history.replaceState(null, "", `/HTML/CadLog.html?${query}`);
     }
 }
 
@@ -286,9 +288,19 @@ loginForm.addEventListener("submit", async (event) => {
         }
 
         await account.createEmailPasswordSession({ email, password });
-        const destination = email.toLowerCase() === "hokupedia@gmail.com"
+        const user = await account.get();
+        const requestedDestination = new URLSearchParams(window.location.search).get("redirect");
+        const safeDestination = requestedDestination?.startsWith("/")
+            && !requestedDestination.startsWith("//")
+            && !requestedDestination.includes("\\")
+            ? requestedDestination
+            : null;
+        const hasManagementAccess = user.email?.toLowerCase() === "hokupedia@gmail.com"
+            || user.labels?.includes("admin")
+            || user.labels?.includes("moderator");
+        const destination = safeDestination || (hasManagementAccess
             ? "/HTML/GerenciarObras.html"
-            : "/HTML/Biblioteca.html";
+            : "/HTML/Biblioteca.html");
         window.location.assign(destination);
     } catch (error) {
         console.error("Erro no login:", error);

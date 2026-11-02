@@ -1,0 +1,70 @@
+.confirmation-dialog {
+    width: min(100% - 32px, 430px);
+    padding: 24px;
+    border: 1px solid #ffffff24;
+    border-radius: 14px;
+    background: #211f25;
+    color: #f6f5f7;
+    box-shadow: 0 24px 80px #0009;
+}
+
+.confirmation-dialog::backdrop {
+    background: #08080bbd;
+    backdrop-filter: blur(3px);
+}
+
+.confirmation-dialog h2 {
+    margin: 0;
+    font-size: 19px;
+}
+
+.confirmation-dialog p {
+    margin: 12px 0 24px;
+    color: #c3bec8;
+    font-size: 14px;
+    line-height: 1.55;
+    white-space: pre-line;
+}
+
+.confirmation-dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.confirmation-dialog-actions button {
+    min-height: 40px;
+    padding: 0 15px;
+    border: 1px solid #ffffff24;
+    border-radius: 8px;
+    background: transparent;
+    color: #e6e3e9;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.confirmation-dialog-actions button:hover {
+    background: #ffffff10;
+}
+
+.confirmation-dialog-actions button:focus-visible {
+    outline: 2px solid #48aaff;
+    outline-offset: 3px;
+}
+
+.confirmation-dialog-actions [data-confirm-accept] {
+    border-color: #f0b84b;
+    background: #f0b84b;
+    color: #28231b;
+}
+
+.confirmation-dialog-actions [data-confirm-accept].is-destructive {
+    border-color: #ff6868;
+    background: #ff6868;
+    color: #260d0d;
+}
+
+.confirmation-dialog-actions [data-confirm-accept]:hover {
+    filter: brightness(1.08);
+}

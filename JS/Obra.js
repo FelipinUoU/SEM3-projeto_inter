@@ -12,9 +12,13 @@ const manageLink = document.querySelector(".manage-link");
 async function showAdminLink() {
     try {
         const user = await account.get();
-        if (user.email.trim().toLowerCase() === "hokupedia@gmail.com") {
-            manageLink.hidden = false;
-        }
+        const isAdmin = user.email?.trim().toLowerCase() === "hokupedia@gmail.com"
+            || user.labels?.includes("admin");
+        manageLink.textContent = isAdmin || user.labels?.includes("moderator")
+            ? "Gerenciar obras"
+            : "Solicitar moderação";
+        manageLink.setAttribute("aria-label", manageLink.textContent);
+        manageLink.hidden = false;
     } catch (error) {
         if (error.code !== 401) {
             console.error("Não foi possível verificar o acesso administrativo:", error);

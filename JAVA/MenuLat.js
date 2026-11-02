@@ -1,7 +1,31 @@
+import { account } from "../JS/JAVA/appwriteClient.js";
+
 const menuButton = document.getElementById("menuBtn");
 const dashboard = document.getElementById("dashboard");
 const overlay = document.getElementById("menuOverlay");
 const dashboardItems = document.querySelectorAll(".menu-lateral-item");
+const moderationLink = document.querySelector('.menu-lateral-item[href="/HTML/GerenciarObras.html"]');
+const adminOnlyLinks = document.querySelectorAll("[data-admin-only]");
+
+async function updateModerationLink() {
+    try {
+        const user = await account.get();
+        const isAdmin = user.email?.trim().toLowerCase() === "hokupedia@gmail.com"
+            || user.labels?.includes("admin");
+        const isManager = isAdmin || user.labels?.includes("moderator");
+        if (moderationLink) {
+            moderationLink.textContent = isManager ? "Gerenciar obras" : "Solicitar moderação";
+        }
+        adminOnlyLinks.forEach((link) => { link.hidden = !isAdmin; });
+    } catch (error) {
+        adminOnlyLinks.forEach((link) => { link.hidden = true; });
+        if (error.code !== 401) {
+            console.error("Não foi possível verificar o perfil da conta:", error);
+        }
+    }
+}
+
+void updateModerationLink();
 
 function setDashboardOpen(isOpen) {
     if (!dashboard || !menuButton || !overlay) return;
