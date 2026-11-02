@@ -1,6 +1,5 @@
 const catalogGrid = document.querySelector("#catalogGrid");
 const catalogStatus = document.querySelector("#catalogStatus");
-const catalogSearch = document.querySelector("#catalogSearch");
 const genreToggle = document.querySelector("#genreToggle");
 const genrePanel = document.querySelector("#genrePanel");
 const genreFilters = document.querySelector("#genreFilters");
@@ -125,17 +124,14 @@ function createWorkCard(work, index) {
 }
 
 function renderWorks() {
-    const query = catalogSearch.value.trim().toLocaleLowerCase("pt-BR");
     catalogFormatFilter.hidden = !selectedFormat;
     catalogFormatLabel.textContent = selectedFormat
         ? `Formato selecionado: ${getFormatLabel(selectedFormat)}`
         : "";
     const filteredWorks = works.filter((work) => {
-        const matchesQuery = [work.title, work.author, work.description]
-            .some((value) => String(value || "").toLocaleLowerCase("pt-BR").includes(query));
         const matchesGenre = !selectedGenre || getGenres(work).includes(selectedGenre);
         const matchesFormat = !selectedFormat || normalizeWorkFormat(work.formato) === selectedFormat;
-        return matchesQuery && matchesGenre && matchesFormat;
+        return matchesGenre && matchesFormat;
     });
 
     if (filteredWorks.length === 0) {
@@ -184,8 +180,6 @@ genreToggle.addEventListener("click", () => {
     genreToggle.setAttribute("aria-expanded", String(!expanded));
     genrePanel.hidden = expanded;
 });
-
-catalogSearch.addEventListener("input", renderWorks);
 
 clearFormatFilter.addEventListener("click", () => {
     selectedFormat = "";

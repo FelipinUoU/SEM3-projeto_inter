@@ -15,9 +15,10 @@
         <span></span>
       </button>
       <h1 class="menu-lateral-logo"><a href="/" aria-label="Ir para a página inicial">HokuPédia</a></h1>
-      <form class="barra-pesquisa" role="search">
-        <input type="search" name="q" placeholder="Pesquisar..." aria-label="Pesquisar na biblioteca" />
-        <button type="submit" aria-label="Pesquisar">⌕</button>
+      <form class="work-search" role="search" autocomplete="off">
+        <label class="work-search__label" for="work-search-input">Buscar obra por nome</label>
+        <input id="work-search-input" type="search" name="q" placeholder="Buscar obra..." aria-autocomplete="list" aria-controls="work-search-results" aria-expanded="false" />
+        <div class="work-search__results" id="work-search-results" role="listbox" aria-live="polite" hidden></div>
       </form>
       <a class="header-login" href="/HTML/CadLog.html?mode=login">Login</a>
     </header>
@@ -92,5 +93,6 @@
       </div>
     </main>
     <script type="module" src="/JAVA/MenuLat.js"></script>
+    <script type="module" src="/JS/WorkSearch.js"></script>
   </body>
 </html>

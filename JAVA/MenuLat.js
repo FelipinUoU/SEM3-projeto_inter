@@ -89,8 +89,6 @@ if (menuButton && dashboard && overlay) {
 const categoryFilters = document.querySelectorAll("[data-category-filter]");
 const getCatalogCards = () => Array.from(document.querySelectorAll(".obra-card[data-category]"));
 const catalogSections = document.querySelectorAll(".catalogo > section");
-const searchForm = document.querySelector(".barra-pesquisa");
-const searchInput = searchForm?.querySelector('input[type="search"]');
 const emptyCatalogMessage = document.querySelector(".catalogo-vazio");
 const homeCatalogStatus = document.getElementById("homeCatalogStatus");
 const homeCarouselTracks = [
@@ -246,15 +244,12 @@ carouselStates.forEach((state) => {
 });
 
 function filterCatalog() {
-    const query = searchInput?.value.trim().toLocaleLowerCase("pt-BR") ?? "";
-
     const catalogCards = getCatalogCards();
     catalogCards.forEach((card) => {
         const matchesCategory = selectedCategory === "all"
             || card.dataset.category === "all"
             || card.dataset.category === selectedCategory;
-        const matchesSearch = card.textContent.toLocaleLowerCase("pt-BR").includes(query);
-        card.hidden = !matchesCategory || !matchesSearch;
+        card.hidden = !matchesCategory;
     });
 
     catalogSections.forEach((section) => {
@@ -331,12 +326,6 @@ categoryFilters.forEach((filter) => {
         filterCatalog();
     });
 });
-
-searchForm?.addEventListener("submit", (event) => {
-    event.preventDefault();
-    filterCatalog();
-});
-searchInput?.addEventListener("input", filterCatalog);
 
 if (homeCatalogStatus) void loadHomeWorks();
 window.addEventListener("resize", () => {

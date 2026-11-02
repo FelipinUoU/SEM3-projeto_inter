@@ -1124,7 +1124,7 @@ async function handleAction(action, card, chapterRow, actionButton) {
         case "delete-work":
             if (work && await confirmInPage({
                 title: "Excluir obra?",
-                message: `Excluir “${work.title}” e todos os seus capítulos? Esta ação não pode ser desfeita.`,
+                message: `Excluir “${work.title}”, todos os capítulos e todas as imagens (capa e páginas) do ImageKit? Esta ação não pode ser desfeita.`,
                 confirmLabel: "Excluir obra",
                 destructive: true
             })) {
@@ -1137,7 +1137,7 @@ async function handleAction(action, card, chapterRow, actionButton) {
                     works = works.filter((item) => item.id !== workId);
                     renderWorks();
                     closeEditor();
-                    showFeedback("Obra excluída do Appwrite.");
+                    showFeedback("Obra, capítulos e imagens excluídos do Appwrite e do ImageKit.");
                 } catch (error) {
                     console.error("Não foi possível excluir a obra:", error);
                     showFeedback(getDeleteErrorMessage(error, "obra"), true);

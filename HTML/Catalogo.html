@@ -16,6 +16,11 @@
             <span></span>
         </button>
         <h1 class="menu-lateral-logo">HokuPédia</h1>
+        <form class="work-search" role="search" autocomplete="off">
+            <label class="work-search__label" for="work-search-input">Buscar obra por nome</label>
+            <input id="work-search-input" type="search" name="q" placeholder="Buscar obra..." aria-autocomplete="list" aria-controls="work-search-results" aria-expanded="false">
+            <div class="work-search__results" id="work-search-results" role="listbox" aria-live="polite" hidden></div>
+        </form>
         <a class="header-avatar" href="/HTML/Perfil.html" aria-label="Meu perfil">
             <img src="../Img/Perfil/PerfilExemplo.svg" alt="">
         </a>
@@ -47,14 +52,6 @@
                     <p class="catalog-eyebrow">Descubra sua próxima leitura</p>
                     <h2 id="catalogTitle">Catálogo</h2>
                 </div>
-                <label class="catalog-search">
-                    <span class="visually-hidden">Buscar obras</span>
-                    <svg aria-hidden="true" viewBox="0 0 24 24">
-                        <circle cx="10.8" cy="10.8" r="6.8"></circle>
-                        <path d="m16 16 5 5"></path>
-                    </svg>
-                    <input id="catalogSearch" type="search" placeholder="Buscar obra ou autor">
-                </label>
             </div>
             <p class="catalog-format-filter" id="catalogFormatFilter" hidden>
                 <span id="catalogFormatLabel"></span>
@@ -66,6 +63,7 @@
     </main>
 
     <script type="module" src="../JAVA/MenuLat.js"></script>
+    <script type="module" src="../JS/WorkSearch.js"></script>
     <script type="module" src="../JS/Catalogo.js"></script>
 </body>
 </html>
