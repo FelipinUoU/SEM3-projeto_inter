@@ -175,6 +175,10 @@ h1.titulo-manga { font-size: 26px; margin-bottom: 5px; }
     border-radius: 4px;
 }
 
+.reader-viewport.horizontal-mode .manga-page {
+    cursor: ew-resize;
+}
+
 /* Barra Inferior Flutuante */
 .floating-nav-bar {
     position: fixed;
@@ -196,8 +200,6 @@ h1.titulo-manga { font-size: 26px; margin-bottom: 5px; }
     justify-content: space-between;
 }
 
-.nav-arrow { background: none; border: none; color: #aaa; font-size: 18px; cursor: pointer; }
-.nav-arrow:hover { color: var(--text-color); }
 .chapter-indicator { font-size: 13px; font-weight: 500; white-space: nowrap; }
 
 .translation-container {

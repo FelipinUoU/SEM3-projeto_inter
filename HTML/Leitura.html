@@ -21,7 +21,6 @@
     <button class="menu-lateral-overlay" id="menuOverlay" type="button" aria-label="Fechar dashboard" hidden></button>
     <aside class="menu-lateral-dashboard" id="dashboard" aria-label="Navegação principal" aria-hidden="true" inert>
         <nav class="menu-lateral-items" aria-label="Navegação principal">
-            <a class="menu-lateral-item" href="/">Home</a>
             <a class="menu-lateral-item" href="/HTML/Catalogo.html">Catálogo</a>
             <a class="menu-lateral-item" href="/HTML/Biblioteca.html">Biblioteca</a>
             <a class="menu-lateral-item" href="/HTML/Homologacao.html" data-admin-only hidden>Homologação</a>
@@ -94,8 +93,6 @@
 
     <!-- Barra Inferior Flutuante com o Botão de Tradução -->
     <div class="floating-nav-bar">
-        <button class="nav-arrow" id="prev-page-btn">❮</button>
-        
         <div class="chapter-indicator" id="page-counter">
             <span>︽</span> Cap. 1 (1/15) <span>︾</span>
         </div>
@@ -117,8 +114,6 @@
                 <span id="translate-text">Tradução</span>
             </button>
         </div>
-
-        <button class="nav-arrow" id="next-page-btn">❯</button>
     </div>
 
     <p class="translation-status" id="translation-status" role="status" aria-live="polite"></p>
@@ -135,6 +130,12 @@
                     <option value="日本語">Japonês</option>
                     <option value="한국어">Coreano</option>
                     <option value="Français">Francês</option>
+                </select>
+            </label>
+            <label for="translation-scope">Aplicar tradução em
+                <select id="translation-scope" name="scope">
+                    <option value="current">Apenas a página atual</option>
+                    <option value="all">Todas as páginas do capítulo</option>
                 </select>
             </label>
             <label for="translation-capitalization">Formato das letras

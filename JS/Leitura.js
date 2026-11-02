@@ -12,14 +12,19 @@ const settingsDialog = document.getElementById("translation-dialog");
 const settingsForm = document.getElementById("translation-settings-form");
 const cancelSettingsButton = document.getElementById("cancel-translation-settings");
 const languageSelect = document.getElementById("translation-language");
+const scopeSelect = document.getElementById("translation-scope");
 const capitalizationSelect = document.getElementById("translation-capitalization");
 const fontSelect = document.getElementById("translation-font");
 const settingsKey = "hokupedia.translationSettings.v1";
-const defaultSettings = { language: "Português brasileiro", capitalization: "sentence", font: "arial" };
+const defaultSettings = {
+    language: "Português brasileiro",
+    scope: "current",
+    capitalization: "sentence",
+    font: "arial"
+};
 const readerQuery = new URLSearchParams(window.location.search);
 const workId = readerQuery.get("obra");
 const chapterId = readerQuery.get("capitulo");
-const analysisCache = new Map();
 const translationCache = new Map();
 let settings = loadSettings();
 let settingsBeforeDialog;
@@ -33,7 +38,7 @@ const pageTranslationLayers = new Map();
 let translationController;
 let statusTimeout;
 
-const analysisSchema = {
+const pageTranslationSchema = {
     type: "OBJECT",
     properties: {
         detectedLanguage: { type: "STRING" },
@@ -47,30 +52,15 @@ const analysisSchema = {
                     width: { type: "INTEGER" },
                     height: { type: "INTEGER" },
                     square: { type: "BOOLEAN" },
-                    originalText: { type: "STRING" }
+                    originalText: { type: "STRING" },
+                    id: { type: "INTEGER" },
+                    translation: { type: "STRING" }
                 },
-                required: ["x", "y", "width", "height", "square", "originalText"]
+                required: ["x", "y", "width", "height", "square", "originalText", "id", "translation"]
             }
         }
     },
     required: ["detectedLanguage", "bubbles"]
-};
-const translationSchema = {
-    type: "OBJECT",
-    properties: {
-        translations: {
-            type: "ARRAY",
-            items: {
-                type: "OBJECT",
-                properties: {
-                    id: { type: "INTEGER" },
-                    translation: { type: "STRING" }
-                },
-                required: ["id", "translation"]
-            }
-        }
-    },
-    required: ["translations"]
 };
 
 function loadSettings() {
@@ -81,6 +71,7 @@ function loadSettings() {
         return {
             language: languageSelect.querySelector(`option[value="${CSS.escape(value.language)}"]`)
                 ? value.language : defaultSettings.language,
+            scope: ["current", "all"].includes(value.scope) ? value.scope : defaultSettings.scope,
             capitalization: ["sentence", "uppercase"].includes(value.capitalization)
                 ? value.capitalization : defaultSettings.capitalization,
             font: ["arial", "trebuchet", "georgia", "comic"].includes(value.font)
@@ -94,8 +85,10 @@ function loadSettings() {
 
 function applySettingsToForm() {
     languageSelect.value = settings.language;
+    scopeSelect.value = settings.scope;
     capitalizationSelect.value = settings.capitalization;
     fontSelect.value = settings.font;
+    setTranslationPending(Boolean(translationController));
 }
 
 function setStatus(message, type = "") {
@@ -256,8 +249,13 @@ function positionTranslationLayers() {
 
 function setTranslationPending(isPending) {
     translateButton.setAttribute("aria-busy", String(isPending));
-    translateText.textContent = isPending ? "Interromper" : "Tradução";
-    translateButton.title = isPending ? "Interromper tradução" : "Traduzir página com IA";
+    const allPages = settings.scope === "all";
+    translateText.textContent = isPending
+        ? allPages ? "Parar tudo" : "Interromper"
+        : allPages ? "Traduzir tudo" : "Tradução";
+    translateButton.title = isPending
+        ? allPages ? "Interromper todas as traduções" : "Interromper tradução"
+        : allPages ? "Traduzir todas as páginas com IA" : "Traduzir página com IA";
 }
 
 function showHorizontalPage(index) {
@@ -265,11 +263,13 @@ function showHorizontalPage(index) {
     wrappers.forEach((wrapper, wrapperIndex) => {
         wrapper.classList.toggle("active-horizontal", wrapperIndex === currentPageIndex);
     });
-    translationController?.abort("navigation");
-    translationController = undefined;
-    translateButton.disabled = false;
-    setTranslationPending(false);
-    setStatus("");
+    if (translationController && settings.scope !== "all") {
+        translationController.abort("navigation");
+        translationController = undefined;
+        translateButton.disabled = false;
+        setTranslationPending(false);
+    }
+    if (settings.scope !== "all" || !translationController) setStatus("");
     updateCounter();
     syncCurrentTranslation();
 }
@@ -278,11 +278,13 @@ function setCurrentPage(index) {
     const nextPageIndex = Math.max(0, Math.min(wrappers.length - 1, index));
     if (nextPageIndex === currentPageIndex) return;
     currentPageIndex = nextPageIndex;
-    translationController?.abort("navigation");
-    translationController = undefined;
-    translateButton.disabled = false;
-    setTranslationPending(false);
-    setStatus("");
+    if (translationController && settings.scope !== "all") {
+        translationController.abort("navigation");
+        translationController = undefined;
+        translateButton.disabled = false;
+        setTranslationPending(false);
+    }
+    if (settings.scope !== "all" || !translationController) setStatus("");
     updateCounter();
     syncCurrentTranslation();
 }
@@ -330,14 +332,16 @@ function toggleMode(mode) {
 async function imageToBase64(image) {
     if (!image.complete) await image.decode();
     if (!image.naturalWidth) throw new Error("A imagem desta página não pôde ser carregada.");
+    const maxDimension = 2560;
+    const scale = Math.min(1, maxDimension / Math.max(image.naturalWidth, image.naturalHeight));
     const canvas = document.createElement("canvas");
-    canvas.width = image.naturalWidth;
-    canvas.height = image.naturalHeight;
+    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
     const context = canvas.getContext("2d");
     if (!context) throw new Error("Não foi possível preparar a imagem para tradução.");
-    context.drawImage(image, 0, 0);
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
     const blob = await new Promise((resolve, reject) => {
-        canvas.toBlob((value) => value ? resolve(value) : reject(new Error("Não foi possível codificar a imagem.")), "image/jpeg", 0.94);
+        canvas.toBlob((value) => value ? resolve(value) : reject(new Error("Não foi possível codificar a imagem.")), "image/jpeg", 0.9);
     });
     const bytes = new Uint8Array(await blob.arrayBuffer());
     let binary = "";
@@ -504,68 +508,122 @@ function displayTranslations(bubbles, wrapper) {
     syncCurrentTranslation();
 }
 
+async function getTranslatedBubbles(pageIndex, controller) {
+    const wrapper = wrappers[pageIndex];
+    const image = await imageToBase64(wrapper.querySelector("img"));
+    if (controller.signal.aborted) throw new DOMException("Tradução cancelada.", "AbortError");
+    const translationKey = `${image.cacheKey}:${settings.language}`;
+    const cached = translationCache.get(translationKey);
+    if (cached) return cached;
+
+    const result = await requestAI([{
+        text: `Analise a página de quadrinhos anexada e faça OCR dos balões de fala e pensamento. Percorra a página de cima para baixo e da esquerda para a direita. Retorne detectedLanguage e, para cada balão legível, um id sequencial começando em 1, originalText transcrito fielmente, translation traduzida integralmente para ${settings.language}, e uma caixa x, y, width e height em inteiros de 0 a 1000 normalizados pela imagem inteira que cubra o interior do balão sem a cauda. Defina square como true para balões quadrados/retangulares de lados retos; false para balões ovais/arredondados. Exclua quadros, legendas, narração, textos fora de balões e efeitos sonoros. Não invente nem resuma falas.`
+    }, { inlineData: image.inlineData }], pageTranslationSchema, controller, 8192);
+    if (controller.signal.aborted) throw new DOMException("Tradução cancelada.", "AbortError");
+    const bubbles = validateBubbles(result.bubbles);
+    const translatedBubbles = validateTranslations(result.bubbles, bubbles);
+    translationCache.set(translationKey, translatedBubbles);
+    return translatedBubbles;
+}
+
+function handleTranslationError(error, controller) {
+    if (controller.signal.aborted) {
+        if (controller.signal.reason === "timeout") {
+            setStatus("A solicitação de tradução excedeu o limite de tempo e foi cancelada. Tente novamente.", "error");
+        } else if (controller.signal.reason === "user") {
+            setStatus("Tradução interrompida.");
+        }
+    } else if (error.name === "AbortError") {
+        setStatus("A solicitação de tradução foi cancelada.", "error");
+    } else {
+        console.error("Falha ao traduzir as páginas:", error);
+        setStatus(error.message || "Não foi possível traduzir as páginas.", "error");
+    }
+}
+
 async function translateCurrentPage() {
     if (translateButton.disabled || wrappers.length === 0) return;
     const requestedIndex = currentPageIndex;
-    const wrapper = wrappers[requestedIndex];
-    const imageElement = wrapper.querySelector("img");
     const controller = new AbortController();
-    let requestTimeout;
     translationController = controller;
     setTranslationPending(true);
-    setStatus("Preparando a página para análise…");
+    setStatus("Analisando e traduzindo a página…");
+    const requestTimeout = window.setTimeout(() => controller.abort("timeout"), 18 * 60 * 1000);
 
     try {
-        requestTimeout = window.setTimeout(() => controller.abort("timeout"), 18 * 60 * 1000);
-        const image = await imageToBase64(imageElement);
-        if (requestedIndex !== currentPageIndex || controller.signal.aborted) return;
-        const translationKey = `${image.cacheKey}:${settings.language}`;
-        let translatedBubbles = translationCache.get(translationKey);
-        if (!translatedBubbles) {
-            let analysis = analysisCache.get(image.cacheKey);
-            if (!analysis) {
-                setStatus("Etapa 1/2: analisando a página e localizando os balões…");
-                analysis = await requestAI([{
-                    text: "Analise a página inteira como um sistema de visão e OCR para quadrinhos. Faça uma varredura linha por linha, de cima para baixo, identificando todos os balões de fala e pensamento com texto legível. Transcreva cada fala exatamente e informe o idioma predominante em detectedLanguage. Para cada balão, estime uma caixa que cubra o interior sem a cauda: x, y, width e height são inteiros de 0 a 1000 normalizados pela imagem inteira. Defina square como true quando o balão tiver formato quadrado ou retangular, com laterais retas e cantos predominantemente retos; use false para balões ovais ou arredondados. Não classifique quadros, legendas ou caixas de narração como balões. Ignore textos fora de balões, desenhos e efeitos sonoros. Não invente texto."
-                }, { inlineData: image.inlineData }], analysisSchema, controller, 4096);
-                analysis = { ...analysis, bubbles: validateBubbles(analysis.bubbles) };
-                analysisCache.set(image.cacheKey, analysis);
-            }
-            if (requestedIndex !== currentPageIndex || controller.signal.aborted) return;
-            if (!analysis.bubbles.length) {
-                setStatus("Nenhum balão legível foi encontrado nesta página.", "error");
-                return;
-            }
-            setStatus(`Etapa 2/2: traduzindo ${analysis.bubbles.length} balões para ${settings.language}…`);
-            const result = await requestAI([{
-                text: `Traduza integralmente para ${settings.language} cada fala abaixo. O idioma original é ${analysis.detectedLanguage}. Retorne uma tradução natural e fiel, sem resumir nem adicionar falas. Preserve cada id e retorne uma tradução não vazia para todos os itens: ${JSON.stringify(analysis.bubbles.map(({ id, originalText }) => ({ id, originalText }))) }`
-            }], translationSchema, controller, Math.min(4096, Math.max(512, analysis.bubbles.length * 100)));
-            translatedBubbles = validateTranslations(result.translations, analysis.bubbles);
-            translationCache.set(translationKey, translatedBubbles);
-        }
-        if (requestedIndex !== currentPageIndex || controller.signal.aborted) return;
-        displayTranslations(translatedBubbles, wrapper);
-        translateButton.setAttribute("aria-pressed", "true");
-        setStatus(`Página traduzida para ${settings.language}.`, "success");
+        const translatedBubbles = await getTranslatedBubbles(requestedIndex, controller);
+        if (controller.signal.aborted || requestedIndex !== currentPageIndex) return;
+        displayTranslations(translatedBubbles, wrappers[requestedIndex]);
+        setStatus(translatedBubbles.length
+            ? `Página traduzida para ${settings.language}.`
+            : "Nenhum balão legível foi encontrado nesta página.", translatedBubbles.length ? "success" : "error");
     } catch (error) {
-        if (controller.signal.aborted) {
-            if (controller.signal.reason === "timeout") {
-                setStatus("A solicitação de tradução excedeu o limite de tempo e foi cancelada. Tente novamente.", "error");
-            } else if (controller.signal.reason === "user") {
-                setStatus("Tradução interrompida.");
-            }
-        } else if (error.name === "AbortError") {
-            setStatus("A solicitação de tradução foi cancelada.", "error");
-        } else {
-            console.error("Falha ao traduzir a página:", error);
-            setStatus(error.message || "Não foi possível traduzir esta página.", "error");
-        }
+        handleTranslationError(error, controller);
     } finally {
         window.clearTimeout(requestTimeout);
         if (translationController === controller) {
             translationController = undefined;
             translateButton.disabled = false;
             setTranslationPending(false);
+        }
+    }
+}
+
+async function translateAllPages() {
+    if (translateButton.disabled || wrappers.length === 0) return;
+    const pendingIndices = wrappers
+        .map((wrapper, index) => ({ wrapper, index }))
+        .filter(({ wrapper }) => !pageTranslationLayers.has(wrapper))
+        .map(({ index }) => index);
+    if (pendingIndices.length === 0) {
+        clearTranslation();
+        setStatus("Traduções ocultadas.");
+        return;
+    }
+
+    const controller = new AbortController();
+    translationController = controller;
+    setTranslationPending(true);
+    setStatus(`Preparando tradução de ${pendingIndices.length} páginas…`);
+    const requestTimeout = window.setTimeout(() => controller.abort("timeout"), 18 * 60 * 1000);
+    let nextIndex = 0;
+    let completed = 0;
+    let firstError;
+
+    const worker = async () => {
+        while (nextIndex < pendingIndices.length && !controller.signal.aborted && !firstError) {
+            const pageIndex = pendingIndices[nextIndex];
+            nextIndex += 1;
+            try {
+                setStatus(`Traduzindo página ${pageIndex + 1}/${wrappers.length} (${completed}/${pendingIndices.length} concluídas)…`);
+                const translatedBubbles = await getTranslatedBubbles(pageIndex, controller);
+                if (controller.signal.aborted) return;
+                displayTranslations(translatedBubbles, wrappers[pageIndex]);
+                completed += 1;
+            } catch (error) {
+                firstError = error;
+            }
+        }
+    };
+
+    try {
+        await Promise.all(Array.from(
+            { length: Math.min(2, pendingIndices.length) },
+            () => worker()
+        ));
+        if (firstError) throw firstError;
+        if (!controller.signal.aborted) {
+            setStatus(`Tradução concluída: ${completed} páginas processadas.`, "success");
+        }
+    } catch (error) {
+        handleTranslationError(error, controller);
+    } finally {
+        window.clearTimeout(requestTimeout);
+        if (translationController === controller) {
+            translationController = undefined;
+            translateButton.disabled = false;
+            setTranslationPending(false);
+            syncCurrentTranslation();
         }
     }
 }
@@ -586,8 +644,26 @@ viewDropdown.querySelectorAll("[data-mode]").forEach((button) => {
 });
 
 window.addEventListener("click", () => viewDropdown.classList.remove("show"));
-document.getElementById("next-page-btn").addEventListener("click", () => goToPage(currentPageIndex + 1));
-document.getElementById("prev-page-btn").addEventListener("click", () => goToPage(currentPageIndex - 1));
+window.addEventListener("keydown", (event) => {
+    if (currentMode !== "horizontal" || !["ArrowLeft", "ArrowRight"].includes(event.key)) return;
+    if (event.target instanceof Element
+        && event.target.closest("input, textarea, select, [contenteditable='true']")) return;
+    event.preventDefault();
+    goToPage(currentPageIndex + (event.key === "ArrowRight" ? 1 : -1));
+});
+readerViewport.addEventListener("click", (event) => {
+    if (currentMode !== "horizontal" || !(event.target instanceof HTMLImageElement)) return;
+    const page = event.target.closest(".manga-page");
+    if (!page) return;
+    const bounds = page.getBoundingClientRect();
+    if (!bounds.width) return;
+    const horizontalPosition = (event.clientX - bounds.left) / bounds.width;
+    if (horizontalPosition <= 0.25) {
+        goToPage(currentPageIndex - 1);
+    } else if (horizontalPosition >= 0.75) {
+        goToPage(currentPageIndex + 1);
+    }
+});
 window.addEventListener("scroll", nearestVisiblePage, { passive: true });
 window.addEventListener("resize", () => {
     positionTranslationLayers();
@@ -597,7 +673,13 @@ window.addEventListener("resize", () => {
 translateButton.addEventListener("click", () => {
     if (translationController) {
         translationController.abort("user");
-        setStatus("Tradução interrompida.");
+    } else if (settings.scope === "all") {
+        if (wrappers.length > 0 && wrappers.every((wrapper) => pageTranslationLayers.has(wrapper))) {
+            clearTranslation();
+            setStatus("Traduções ocultadas.");
+        } else {
+            void translateAllPages();
+        }
     } else if (translationLayer) {
         clearTranslation(wrappers[currentPageIndex]);
         setStatus("Tradução ocultada.");
@@ -630,6 +712,7 @@ settingsForm.addEventListener("submit", (event) => {
     event.preventDefault();
     const nextSettings = {
         language: languageSelect.value,
+        scope: scopeSelect.value,
         capitalization: capitalizationSelect.value,
         font: fontSelect.value
     };
@@ -641,24 +724,26 @@ settingsForm.addEventListener("submit", (event) => {
         return;
     }
     const languageChanged = settings.language !== nextSettings.language;
+    const scopeChanged = settings.scope !== nextSettings.scope;
     const hasTranslations = pageTranslationLayers.size > 0;
     settings = nextSettings;
+    setTranslationPending(Boolean(translationController));
     settingsBeforeDialog = undefined;
     settingsDialog.close();
     if (languageChanged && hasTranslations) {
         clearTranslation();
-        void translateCurrentPage();
-    } else if (!languageChanged && hasTranslations) {
+        if (settings.scope === "all") void translateAllPages();
+        else void translateCurrentPage();
+    } else if ((!languageChanged || !hasTranslations) && (hasTranslations || scopeChanged)) {
         [...pageTranslationLayers.entries()].forEach(([wrapper, translation]) => {
             displayTranslations(translation.bubbles, wrapper);
         });
-        setStatus("Configurações aplicadas.", "success");
+        if (hasTranslations) setStatus("Configurações aplicadas.", "success");
     }
 });
 
 window.addEventListener("pagehide", () => {
     translationController?.abort("chapter-exit");
     clearTranslation();
-    analysisCache.clear();
     translationCache.clear();
 });

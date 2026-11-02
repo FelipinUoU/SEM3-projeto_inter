@@ -4,34 +4,40 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#29272f">
-    <title>Naruto — Hub de Obra | HokuPédia</title>
+    <title>Obra | HokuPédia</title>
     <link rel="stylesheet" href="../CSS/Obra.css">
     <link rel="stylesheet" href="../CSS/MenuLat.css">
 </head>
 <body>
-    <header class="site-header">
-        <a class="brand" href="/" aria-label="HokuPédia — tela inicial">
-            <span class="brand-mark" aria-hidden="true">H</span>
-            <span>HokuPédia</span>
-        </a>
-        <nav class="header-actions" aria-label="Navegação da obra">
-            <a class="manage-link" href="/HTML/GerenciarObras.html" hidden>Gerenciar obras</a>
-            <a class="header-login" href="/HTML/CadLog.html?mode=login">Login</a>
-            <a class="back-link" href="/" aria-label="Voltar à tela inicial">
-                <span aria-hidden="true">‹</span>
-                <span>Voltar</span>
-            </a>
-        </nav>
+    <header class="menu-lateral-header">
+        <button class="menu-lateral-button" id="menuBtn" type="button" aria-label="Abrir dashboard" aria-expanded="false" aria-controls="dashboard">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <h1 class="menu-lateral-logo"><a href="/" aria-label="Ir para a página inicial">HokuPédia</a></h1>
+        <a class="back-link" href="/HTML/Homologacao.html" data-admin-only hidden>Homologação</a>
+        <a class="header-login" href="/HTML/CadLog.html?mode=login">Login</a>
     </header>
+    <button class="menu-lateral-overlay" id="menuOverlay" type="button" aria-label="Fechar dashboard" hidden></button>
+    <aside class="menu-lateral-dashboard" id="dashboard" aria-label="Navegação principal" aria-hidden="true" inert>
+        <nav class="menu-lateral-items" aria-label="Navegação principal">
+            <a class="menu-lateral-item" href="/HTML/Catalogo.html">Catálogo</a>
+            <a class="menu-lateral-item" href="/HTML/Biblioteca.html">Biblioteca</a>
+            <a class="menu-lateral-item" href="/HTML/Homologacao.html" data-admin-only hidden>Homologação</a>
+            <a class="menu-lateral-item" href="/HTML/CadLog.html?mode=login">Login</a>
+        </nav>
+    </aside>
 
     <main class="work-page">
         <section class="work-summary" aria-labelledby="workTitle">
-            <div class="work-cover" id="workCover" aria-hidden="true">
-                <span>HOKU<br>PÉDIA</span>
-            </div>
+            <button class="work-cover" id="workCover" type="button" aria-label="Ampliar capa da obra" disabled hidden></button>
             <div class="work-info">
                 <div class="work-heading">
-                    <h1 id="workTitle">Naruto</h1>
+                    <div class="work-title-row">
+                        <h1 id="workTitle"></h1>
+                        <button class="favorite-button" id="favoriteButton" type="button" aria-label="Carregando favorito..." title="Carregando favorito..." aria-pressed="false" disabled>☆</button>
+                    </div>
                     <span class="work-divider" aria-hidden="true"></span>
                     <p class="work-description" id="workDescription">Acompanhe os capítulos desta obra.</p>
                 </div>
@@ -40,13 +46,10 @@
                         <circle cx="12" cy="7" r="4"></circle>
                         <path d="M4.5 21v-2a7.5 7.5 0 0 1 15 0v2"></path>
                     </svg>
-                    <span id="workAuthor">Masashi Kishimoto</span>
+                    <span id="workAuthor"></span>
                     <a class="work-format-link" id="workFormat" hidden></a>
                 </div>
                 <div class="work-genres" id="workGenres" aria-label="Gêneros da obra"></div>
-                <button class="favorite-button" id="favoriteButton" type="button" disabled>
-                    Carregando favorito...
-                </button>
                 <p class="favorite-feedback" id="favoriteFeedback" role="status" aria-live="polite"></p>
             </div>
         </section>
@@ -62,6 +65,12 @@
         </section>
     </main>
 
+    <dialog class="work-cover-preview" id="workCoverPreview" aria-label="Visualização ampliada da capa">
+        <button class="work-cover-preview-close" type="button" aria-label="Fechar visualização">×</button>
+        <img class="work-cover-preview-image" id="workCoverPreviewImage" alt="">
+    </dialog>
+
+    <script type="module" src="../JAVA/MenuLat.js"></script>
     <script type="module" src="../JS/Obra.js"></script>
 </body>
 </html>
