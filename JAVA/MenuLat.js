@@ -140,11 +140,25 @@ function updateCarousel(state, resetSelection = false) {
     state.next.disabled = visibleCards.length < 2;
 }
 
+function normalizeWorkFormat(value) {
+    const normalized = String(value || "")
+        .trim()
+        .toLocaleLowerCase("pt-BR")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z]/g, "");
+
+    if (["hq", "hqs", "quadrinho", "quadrinhos"].includes(normalized)) return "hq";
+    if (["manhwa", "manhwas"].includes(normalized)) return "manhwa";
+    if (["manga", "mangas"].includes(normalized)) return "manga";
+    return "";
+}
+
 function createWorkCard(work, subtitle) {
     const card = document.createElement("article");
     card.className = "obra-card";
     card.dataset.workId = work.id;
-    card.dataset.category = "all";
+    card.dataset.category = normalizeWorkFormat(work.formato);
     card.dataset.href = `/HTML/Obra.html?obra=${encodeURIComponent(work.id)}`;
     card.tabIndex = 0;
 

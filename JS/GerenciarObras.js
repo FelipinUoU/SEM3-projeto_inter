@@ -3,6 +3,59 @@ import { account } from "./JAVA/appwriteClient.js";
 
 const adminEmail = "hokupedia@gmail.com";
 const imageTypes = new Set(["image/avif", "image/gif", "image/jpeg", "image/png", "image/webp"]);
+const workGenres = [
+    "+18",
+    "Ação",
+    "Adulto",
+    "Apocalipse",
+    "Artes marciais",
+    "Aventura",
+    "Boys Love",
+    "Comédia",
+    "Crime",
+    "Drama",
+    "Demônios",
+    "Detetive",
+    "Doujinshi",
+    "Ecchi",
+    "Esporte",
+    "Família",
+    "Fantasia",
+    "Ficção científica",
+    "Furries",
+    "Girls Love",
+    "Guerra",
+    "Harém",
+    "História de Vida",
+    "Horror",
+    "Isekai",
+    "Josei",
+    "Magia",
+    "Mecha",
+    "Mistério",
+    "Música",
+    "Omegaverso",
+    "One Shot",
+    "Polícia",
+    "Psicológico",
+    "Realidade",
+    "Realidade virtual",
+    "Reencarnação",
+    "Regresso",
+    "Romance",
+    "Seinen",
+    "Sobrenatural",
+    "Sobrevivência",
+    "Shonen",
+    "Shoujo",
+    "Superpoderes",
+    "Tragédia",
+    "Universo alternativo",
+    "Vampiros",
+    "Vida escolar",
+    "Yaoi",
+    "Yuri"
+];
 const languageNames = {
     "pt-BR": "Português (Brasil)",
     ja: "Japonês",
@@ -142,6 +195,11 @@ function renderWorkCard(work) {
 
     const chapterList = document.createElement("div");
     chapterList.className = "work-chapters";
+    if (work.chapters.length > 3) {
+        chapterList.classList.add("is-scrollable");
+        chapterList.tabIndex = 0;
+        chapterList.setAttribute("aria-label", `Capítulos de ${work.title}`);
+    }
     if (work.chapters.length === 0) {
         const empty = document.createElement("p");
         empty.className = "no-chapters";
@@ -223,6 +281,87 @@ function createField({ id, label, name, value = "", type = "text", placeholder =
     return wrapper;
 }
 
+function normalizeWorkFormat(value) {
+    const normalized = String(value || "")
+        .trim()
+        .toLocaleLowerCase("pt-BR")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z]/g, "");
+
+    if (["hq", "hqs", "quadrinho", "quadrinhos"].includes(normalized)) return "hq";
+    if (["manhwa", "manhwas"].includes(normalized)) return "manhwa";
+    if (["manga", "mangas"].includes(normalized)) return "manga";
+    return "";
+}
+
+function createWorkFormatField(selected = "") {
+    const wrapper = document.createElement("label");
+    wrapper.className = "field";
+    wrapper.htmlFor = "workFormat";
+    wrapper.append(document.createTextNode("Formato"));
+
+    const select = document.createElement("select");
+    select.id = "workFormat";
+    select.name = "formato";
+    select.required = true;
+
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = "Selecione o formato";
+    placeholder.disabled = true;
+    placeholder.selected = !selected;
+    select.append(placeholder);
+
+    for (const [value, label] of [
+        ["hq", "HQs"],
+        ["manhwa", "Manhwas"],
+        ["manga", "Mangás"]
+    ]) {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = label;
+        option.selected = selected === value;
+        select.append(option);
+    }
+
+    wrapper.append(select);
+    return wrapper;
+}
+
+function getSelectedWorkGenres(value) {
+    const values = Array.isArray(value) ? value : String(value || "").split(/[,;]/);
+    return values.map((genre) => String(genre).trim()).filter(Boolean);
+}
+
+function createWorkGenresField(selected = []) {
+    const fieldset = document.createElement("fieldset");
+    fieldset.className = "work-genres-field";
+    const legend = document.createElement("legend");
+    legend.textContent = "Gêneros";
+    fieldset.append(legend);
+
+    const options = document.createElement("div");
+    options.className = "work-genre-options";
+    const genres = [...workGenres, ...selected.filter((genre) => !workGenres.includes(genre))];
+    for (const [index, genre] of genres.entries()) {
+        const label = document.createElement("label");
+        label.className = "work-genre-option";
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.name = "gender";
+        checkbox.value = genre;
+        checkbox.checked = selected.includes(genre);
+        checkbox.id = `workGenre${index}`;
+        label.htmlFor = checkbox.id;
+        label.append(checkbox, document.createTextNode(genre));
+        options.append(label);
+    }
+
+    fieldset.append(options);
+    return fieldset;
+}
+
 function renderWorkForm(work, targetRegion = editorRegion) {
     const isEditing = Boolean(work);
     const panel = createEditorPanel(isEditing ? "Editar Obra" : "Adicionar Obra");
@@ -275,6 +414,7 @@ function renderWorkForm(work, targetRegion = editorRegion) {
             value: work?.author || "",
             placeholder: "Nome do autor"
         }),
+        createWorkFormatField(normalizeWorkFormat(work?.formato)),
         createField({
             id: "workDescription",
             label: "Descrição",
@@ -285,7 +425,7 @@ function renderWorkForm(work, targetRegion = editorRegion) {
         })
     );
     layout.append(coverLabel, coverInput, fields);
-    form.append(layout);
+    form.append(layout, createWorkGenresField(getSelectedWorkGenres(work?.gender)));
     form.append(createFormActions());
 
     coverInput.addEventListener("change", () => {
@@ -563,6 +703,8 @@ async function handleWorkSubmit(form) {
     const updated = {
         title,
         author: String(formData.get("author") || "").trim(),
+        gender: formData.getAll("gender").map((genre) => String(genre)).join(", "),
+        formato: String(formData.get("formato") || ""),
         description: String(formData.get("description") || "").trim(),
         cover,
         coverFileId

@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#29272f">
+    <title>Catálogo | HokuPédia</title>
+    <link rel="stylesheet" href="../CSS/MenuLat.css">
+    <link rel="stylesheet" href="../CSS/Catalogo.css">
+</head>
+<body>
+    <header class="menu-lateral-header">
+        <button class="menu-lateral-button" id="menuBtn" type="button" aria-label="Abrir navegação" aria-expanded="false" aria-controls="dashboard">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <h1 class="menu-lateral-logo">HokuPédia</h1>
+        <a class="header-avatar" href="/HTML/Perfil.html" aria-label="Meu perfil">
+            <img src="../Img/Perfil/PerfilExemplo.svg" alt="">
+        </a>
+    </header>
+
+    <button class="menu-lateral-overlay" id="menuOverlay" type="button" aria-label="Fechar navegação" hidden></button>
+    <aside class="menu-lateral-dashboard" id="dashboard" aria-label="Navegação principal" aria-hidden="true" inert>
+        <nav class="menu-lateral-items" aria-label="Navegação principal">
+            <a class="menu-lateral-item" href="/">Home</a>
+            <a class="menu-lateral-item" href="/HTML/Catalogo.html" aria-current="page">Catálogo</a>
+            <a class="menu-lateral-item" href="/HTML/Biblioteca.html">Biblioteca</a>
+            <a class="menu-lateral-item" href="/HTML/Perfil.html">Meu perfil</a>
+            <a class="menu-lateral-item" href="/HTML/CadLog.html?mode=login">Login</a>
+        </nav>
+    </aside>
+
+    <main class="catalog-page">
+        <section class="genre-section" aria-label="Filtros por gênero">
+            <button class="genre-toggle" id="genreToggle" type="button" aria-expanded="false" aria-controls="genrePanel">
+                <span>Gêneros</span>
+                <span class="genre-chevron" aria-hidden="true"></span>
+            </button>
+            <div class="genre-panel" id="genrePanel" hidden>
+                <div class="genre-filters" id="genreFilters"></div>
+            </div>
+        </section>
+
+        <section class="catalog-section" aria-labelledby="catalogTitle">
+            <div class="catalog-heading">
+                <div>
+                    <p class="catalog-eyebrow">Descubra sua próxima leitura</p>
+                    <h2 id="catalogTitle">Catálogo</h2>
+                </div>
+                <label class="catalog-search">
+                    <span class="visually-hidden">Buscar obras</span>
+                    <svg aria-hidden="true" viewBox="0 0 24 24">
+                        <circle cx="10.8" cy="10.8" r="6.8"></circle>
+                        <path d="m16 16 5 5"></path>
+                    </svg>
+                    <input id="catalogSearch" type="search" placeholder="Buscar obra ou autor">
+                </label>
+            </div>
+            <p class="catalog-format-filter" id="catalogFormatFilter" hidden>
+                <span id="catalogFormatLabel"></span>
+                <button id="clearFormatFilter" type="button">Remover filtro</button>
+            </p>
+            <p class="catalog-status" id="catalogStatus" role="status" aria-live="polite">Carregando obras...</p>
+            <div class="catalog-grid" id="catalogGrid" aria-label="Obras publicadas"></div>
+        </section>
+    </main>
+
+    <script type="module" src="../JAVA/MenuLat.js"></script>
+    <script type="module" src="../JS/Catalogo.js"></script>
+</body>
+</html>

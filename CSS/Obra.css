@@ -187,6 +187,67 @@ a {
     font-size: 12px;
 }
 
+.work-format-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 30px;
+    margin-top: 12px;
+    padding: 6px 12px;
+    border: 1px solid #f1cf43;
+    border-radius: 999px;
+    background: #e8c52d;
+    color: #29231a;
+    font-size: 12px;
+    font-weight: 700;
+    transition: background-color 150ms ease, border-color 150ms ease, transform 150ms ease;
+}
+
+.work-format-link[hidden] {
+    display: none;
+}
+
+.work-format-link:hover {
+    transform: translateY(-1px);
+    border-color: #ffe77a;
+    background: #f5d94f;
+}
+
+.work-format-link:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: 3px;
+}
+
+.work-genres {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.work-genre-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 28px;
+    padding: 5px 10px;
+    border: 1px solid #ffffff24;
+    border-radius: 999px;
+    background: #ffffff0a;
+    color: #e0d9eb;
+    font-size: 12px;
+    transition: border-color 150ms ease, background-color 150ms ease, color 150ms ease;
+}
+
+.work-genre-link:hover {
+    border-color: #b779ff;
+    background: #9c45ff24;
+    color: #fff;
+}
+
+.work-genre-link:focus-visible {
+    outline: 2px solid #b779ff;
+    outline-offset: 3px;
+}
+
 .chapter-section {
     margin-top: 38px;
 }

@@ -6,8 +6,36 @@ const chapterList = document.querySelector("#chapterList");
 const workTitle = document.querySelector("#workTitle");
 const workDescription = document.querySelector("#workDescription");
 const workAuthor = document.querySelector("#workAuthor");
+const workFormat = document.querySelector("#workFormat");
+const workGenres = document.querySelector("#workGenres");
 const workCover = document.querySelector("#workCover");
 const manageLink = document.querySelector(".manage-link");
+
+function getGenres(work) {
+    const value = work.gender ?? work.Gender ?? [];
+    const values = Array.isArray(value) ? value : String(value).split(/[,;]/);
+    return [...new Set(values.map((genre) => String(genre).trim()).filter(Boolean))];
+}
+
+function getWorkFormat(value) {
+    const normalized = String(value || "")
+        .trim()
+        .toLocaleLowerCase("pt-BR")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z]/g, "");
+
+    if (["hq", "hqs", "quadrinho", "quadrinhos"].includes(normalized)) {
+        return { value: "hq", label: "HQs" };
+    }
+    if (["manhwa", "manhwas"].includes(normalized)) {
+        return { value: "manhwa", label: "Manhwas" };
+    }
+    if (["manga", "mangas"].includes(normalized)) {
+        return { value: "manga", label: "Mangás" };
+    }
+    return null;
+}
 
 async function showAdminLink() {
     try {
@@ -76,6 +104,25 @@ async function renderChapters() {
     workTitle.textContent = work.title;
     workDescription.textContent = work.description || "Sem descrição.";
     workAuthor.textContent = work.author || "Autor não informado";
+    const format = getWorkFormat(work.formato);
+    workFormat.hidden = !format;
+    if (format) {
+        workFormat.href = `/HTML/Catalogo.html?formato=${encodeURIComponent(format.value)}`;
+        workFormat.textContent = format.label;
+        workFormat.setAttribute("aria-label", `Ver obras no formato ${format.label}`);
+    } else {
+        workFormat.removeAttribute("href");
+        workFormat.removeAttribute("aria-label");
+        workFormat.textContent = "";
+    }
+    workGenres.replaceChildren(...getGenres(work).map((genre) => {
+        const link = document.createElement("a");
+        link.className = "work-genre-link";
+        link.href = `/HTML/Catalogo.html?genero=${encodeURIComponent(genre)}`;
+        link.textContent = genre;
+        link.setAttribute("aria-label", `Ver obras do gênero ${genre}`);
+        return link;
+    }));
     if (work.cover) {
         const coverImage = document.createElement("img");
         coverImage.src = work.cover;

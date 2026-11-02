@@ -98,6 +98,16 @@ function sendAppwriteError(res, error, message) {
   });
 }
 
+function sendWorkSaveError(res, error, message) {
+  if (typeof error?.message === 'string' && /Unknown attribute: ["']?gender/i.test(error.message)) {
+    console.error(`${message}:`, error);
+    return res.status(500).json({
+      error: 'A coleção de obras do Appwrite não possui o atributo opcional "gender" (String, até 2048 caracteres). Crie-o na coleção configurada em APPWRITE_WORKS_COLLECTION_ID e aguarde ficar disponível.'
+    });
+  }
+  return sendAppwriteError(res, error, message);
+}
+
 async function listAllDocuments(collectionId, filters = []) {
   const documents = [];
   let offset = 0;
@@ -432,6 +442,8 @@ app.get('/api/works', async (req, res) => {
         author: getWorkAttribute(work.Author),
         description: getWorkAttribute(work.Description),
         cover: getWorkAttribute(work.coverUrl),
+        gender: work.gender ?? work.Gender ?? work.Genres ?? work.Genre ?? '',
+        formato: work.formato ?? '',
         createdAt: work.$createdAt,
         coverFileId: '',
         chapters: (chaptersByWork.get(work.$id) || [])
@@ -444,13 +456,14 @@ app.get('/api/works', async (req, res) => {
 });
 
 app.post('/api/works', requireAuthenticatedUser, requireAdminUser, async (req, res) => {
-  const { title, author = '', description = '', cover = '', coverFileId = '' } = req.body || {};
+  const { title, author = '', gender = '', formato, description = '', cover = '', coverFileId = '' } = req.body || {};
   if (typeof title !== 'string' || !title.trim()
     || title.length > 255
-    || [author, description, cover, coverFileId].some((value) => typeof value !== 'string')
-    || author.length > 255 || description.length > 10000 || cover.length > 2048 || coverFileId.length > 255
+    || !['hq', 'manhwa', 'manga'].includes(formato)
+    || [author, gender, description, cover, coverFileId].some((value) => typeof value !== 'string')
+    || author.length > 255 || gender.length > 2048 || description.length > 10000 || cover.length > 2048 || coverFileId.length > 255
     || !isImageKitAsset(cover)) {
-    return res.status(400).json({ error: 'Informe o nome da obra e envie uma capa válida ao ImageKit.' });
+    return res.status(400).json({ error: 'Informe o nome e formato da obra e envie uma capa válida ao ImageKit.' });
   }
   try {
     const document = await databases.createDocument(
@@ -461,6 +474,8 @@ app.post('/api/works', requireAuthenticatedUser, requireAdminUser, async (req, r
         Title: title.trim(),
         createBy: req.appwriteUser.$id,
         Author: [author],
+        gender: gender.trim(),
+        formato,
         Description: [description],
         coverUrl: [cover]
       }
@@ -470,6 +485,8 @@ app.post('/api/works', requireAuthenticatedUser, requireAdminUser, async (req, r
         id: document.$id,
         title: getWorkAttribute(document.Title),
         author: getWorkAttribute(document.Author),
+        gender: document.gender ?? '',
+        formato: document.formato ?? '',
         description: getWorkAttribute(document.Description),
         cover: getWorkAttribute(document.coverUrl),
         coverFileId: '',
@@ -477,18 +494,19 @@ app.post('/api/works', requireAuthenticatedUser, requireAdminUser, async (req, r
       }
     });
   } catch (error) {
-    return sendAppwriteError(res, error, 'Não foi possível salvar a obra no Appwrite.');
+    return sendWorkSaveError(res, error, 'Não foi possível salvar a obra no Appwrite.');
   }
 });
 
 app.put('/api/works/:id', requireAuthenticatedUser, requireAdminUser, async (req, res) => {
-  const { title, author = '', description = '', cover = '', coverFileId = '' } = req.body || {};
+  const { title, author = '', gender = '', formato, description = '', cover = '', coverFileId = '' } = req.body || {};
   if (typeof title !== 'string' || !title.trim()
     || title.length > 255
-    || [author, description, cover, coverFileId].some((value) => typeof value !== 'string')
-    || author.length > 255 || description.length > 10000 || cover.length > 2048 || coverFileId.length > 255
+    || !['hq', 'manhwa', 'manga'].includes(formato)
+    || [author, gender, description, cover, coverFileId].some((value) => typeof value !== 'string')
+    || author.length > 255 || gender.length > 2048 || description.length > 10000 || cover.length > 2048 || coverFileId.length > 255
     || !isImageKitAsset(cover)) {
-    return res.status(400).json({ error: 'Informe o nome da obra e envie uma capa válida ao ImageKit.' });
+    return res.status(400).json({ error: 'Informe o nome e formato da obra e envie uma capa válida ao ImageKit.' });
   }
   try {
     const document = await databases.updateDocument(
@@ -498,6 +516,8 @@ app.put('/api/works/:id', requireAuthenticatedUser, requireAdminUser, async (req
       {
         Title: title.trim(),
         Author: [author],
+        gender: gender.trim(),
+        formato,
         Description: [description],
         coverUrl: [cover]
       }
@@ -507,13 +527,15 @@ app.put('/api/works/:id', requireAuthenticatedUser, requireAdminUser, async (req
         id: document.$id,
         title: getWorkAttribute(document.Title),
         author: getWorkAttribute(document.Author),
+        gender: document.gender ?? '',
+        formato: document.formato ?? '',
         description: getWorkAttribute(document.Description),
         cover: getWorkAttribute(document.coverUrl),
         coverFileId: ''
       }
     });
   } catch (error) {
-    return sendAppwriteError(res, error, 'Não foi possível atualizar a obra no Appwrite.');
+    return sendWorkSaveError(res, error, 'Não foi possível atualizar a obra no Appwrite.');
   }
 });
 
