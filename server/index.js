@@ -9,6 +9,7 @@ import { fileURLToPath } from 'url';
 import { Account, Client, Databases, ID, Query, Users } from 'node-appwrite';
 import ImageKit from 'imagekit';
 import { readChapterArchive } from './chapterArchive.js';
+import { optimizeImageForImageKit } from './imageOptimization.js';
 
 const app = express();
 const rootDirectory = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -415,16 +416,18 @@ app.post('/api/uploads', requireAuthenticatedUser, requireModeratorUser, express
   const rawFileName = typeof req.query.filename === 'string' ? req.query.filename : 'imagem';
   const fileName = path.basename(rawFileName).replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 180) || 'imagem';
   try {
+    const optimized = await optimizeImageForImageKit(req.body, fileName);
     const uploaded = await imageKit.upload({
-      file: req.body,
-      fileName,
+      file: optimized.buffer,
+      fileName: optimized.fileName,
       folder: '/hokupedia',
       useUniqueFileName: true
     });
     return res.status(201).json({
-      name: fileName,
+      name: optimized.fileName,
       url: uploaded.url,
-      fileId: uploaded.fileId
+      fileId: uploaded.fileId,
+      format: optimized.format
     });
   } catch (error) {
     console.error('ImageKit upload failed:', error);
@@ -448,16 +451,18 @@ app.post('/api/uploads/work-request-cover', requireAuthenticatedUser, requireMod
   const rawFileName = typeof req.query.filename === 'string' ? req.query.filename : 'capa';
   const fileName = path.basename(rawFileName).replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 180) || 'capa';
   try {
+    const optimized = await optimizeImageForImageKit(req.body, fileName);
     const uploaded = await imageKit.upload({
-      file: req.body,
-      fileName,
+      file: optimized.buffer,
+      fileName: optimized.fileName,
       folder: `/hokupedia/work-requests/${req.appwriteUser.$id}`,
       useUniqueFileName: true
     });
     return res.status(201).json({
-      name: fileName,
+      name: optimized.fileName,
       url: uploaded.url,
-      fileId: uploaded.fileId
+      fileId: uploaded.fileId,
+      format: optimized.format
     });
   } catch (error) {
     console.error('Work request cover upload failed:', error);
@@ -550,17 +555,18 @@ app.post('/api/uploads/chapter-archive', requireAuthenticatedUser, requireModera
   const uploadedFiles = [];
   try {
     for (const page of pages) {
+      const optimized = await optimizeImageForImageKit(page.buffer, page.name);
       const image = await imageKit.upload({
-        file: page.buffer,
-        fileName: page.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 180) || 'pagina',
+        file: optimized.buffer,
+        fileName: optimized.fileName.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 180) || 'pagina.webp',
         folder: '/hokupedia',
         useUniqueFileName: true
       });
       uploadedFiles.push({
-        name: page.name,
+        name: optimized.fileName,
         url: image.url,
         fileId: image.fileId,
-        format: page.format
+        format: optimized.format
       });
     }
     return res.status(201).json({ pages: uploadedFiles });

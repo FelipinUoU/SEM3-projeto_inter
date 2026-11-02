@@ -41,11 +41,11 @@ Contas que estavam no MySQL e obras/páginas anteriormente gravadas no `localSto
 
 A rota `http://localhost:3001/Leitura` também abre o leitor principal. A tela está em `HTML/Leitura.html`, com estilos em `CSS/Leitura.css` e lógica em `JS/Leitura.js`. As imagens de demonstração ficam em `public/reader`.
 
-Obras e capítulos ficam no Appwrite; capas e páginas ficam no ImageKit. Preferências de idioma, capitalização e fonte da tradução continuam no armazenamento local do navegador. O histórico (incluindo o último capítulo aberto de cada obra) e os favoritos da biblioteca também são locais, mas ficam separados pelo identificador da conta Appwrite neste navegador; não são sincronizados entre dispositivos.
+Obras e capítulos ficam no Appwrite; capas e páginas ficam no ImageKit. Preferências de idioma, escopo (página atual ou capítulo inteiro), capitalização e fonte da tradução continuam no armazenamento local do navegador. Novas imagens acima de 400 KB são recomprimidas como WebP com qualidade priorizada; GIFs animados são preservados. O histórico (incluindo o último capítulo aberto de cada obra) e os favoritos da biblioteca também são locais, mas ficam separados pelo identificador da conta Appwrite neste navegador; não são sincronizados entre dispositivos.
 
 O servidor mantém as chaves Gemini fora do cliente e tenta cada chave configurada em ordem. Se todas falharem, o leitor mostra os detalhes sem expor as chaves.
 
-As análises OCR e traduções ficam em cache na memória do capítulo aberto, por conteúdo de imagem e idioma. Cada página mantém os balões traduzidos ao rolar, trocar entre os modos vertical e horizontal ou navegar para outra página do mesmo capítulo. Balões quadrados ou retangulares são identificados e recebem tradução com cantos retos. Alterar fonte ou capitalização não repete a chamada à IA; ao sair do capítulo, as traduções e o cache são descartados.
+O Gemini localiza, transcreve e traduz os balões em uma chamada por página. Para reduzir o envio sem alterar os originais, a imagem enviada à IA é convertida para JPEG com qualidade 90 e redimensionada somente quando passa de 2560 px no maior lado. Isso também vale para capítulos antigos. Nas configurações, escolha traduzir a página atual ou todas as páginas do capítulo; a tradução em lote usa até duas chamadas simultâneas e pode ser interrompida. Os resultados ficam em cache na memória por conteúdo de imagem e idioma. Cada página mantém os balões traduzidos ao rolar ou trocar entre os modos vertical e horizontal. Balões quadrados ou retangulares recebem tradução com cantos retos. Alterar fonte ou capitalização não repete a chamada à IA; ao sair do capítulo, as traduções e o cache são descartados.
 
 Para testar as telas diretamente:
 

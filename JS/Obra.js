@@ -1,5 +1,4 @@
 import { createAuthorIcon } from "./authorIcon.js";
-import "../JAVA/AuthHeader.js";
 import {
     getCurrentLibraryUser,
     loadAnonymousReadChapters,
@@ -14,11 +13,75 @@ const workAuthor = document.querySelector("#workAuthor");
 const workFormat = document.querySelector("#workFormat");
 const workGenres = document.querySelector("#workGenres");
 const workCover = document.querySelector("#workCover");
-const manageLink = document.querySelector(".manage-link");
+const workCoverPreview = document.querySelector("#workCoverPreview");
+const workCoverPreviewImage = document.querySelector("#workCoverPreviewImage");
 const favoriteButton = document.querySelector("#favoriteButton");
 const favoriteFeedback = document.querySelector("#favoriteFeedback");
 let currentWork;
 let currentUser;
+
+workCover.addEventListener("click", () => {
+    const coverImage = workCover.querySelector("img");
+    if (!coverImage) return;
+    workCoverPreviewImage.src = coverImage.src;
+    workCoverPreviewImage.alt = coverImage.alt;
+    workCoverPreview.showModal();
+});
+
+document.querySelector(".work-cover-preview-close").addEventListener("click", () => {
+    workCoverPreview.close();
+});
+
+workCoverPreview.addEventListener("click", (event) => {
+    if (event.target === workCoverPreview) workCoverPreview.close();
+});
+
+workCoverPreview.addEventListener("close", () => {
+    workCover.focus();
+});
+
+const chapterLanguages = {
+    "pt-BR": {
+        name: "Português (Brasil)",
+        flag: "🇧🇷",
+        artwork: '<rect width="30" height="20" fill="#009b3a"/><path d="M15 2 27 10 15 18 3 10Z" fill="#ffdf00"/><circle cx="15" cy="10" r="4.3" fill="#002776"/>'
+    },
+    ja: {
+        name: "Japonês",
+        flag: "🇯🇵",
+        artwork: '<rect width="30" height="20" fill="#fff"/><circle cx="15" cy="10" r="6" fill="#bc002d"/>'
+    },
+    en: {
+        name: "Inglês",
+        flag: "🇺🇸",
+        artwork: '<rect width="30" height="20" fill="#fff"/><path fill="#b22234" d="M0 0h30v1.54H0zm0 3.08h30v1.54H0zm0 3.08h30V7.7H0zm0 3.08h30v1.54H0zm0 3.08h30v1.54H0zm0 3.08h30v1.54H0zm0 3.08h30v1.54H0z"/><path fill="#3c3b6e" d="M0 0h13v10.77H0z"/><path fill="#fff" d="m2 2 1 .8 1-.8-.4 1.2L5 4H3.7l-.7 1-.1-1H1.5l1-.8zM7 2l1 .8 1-.8-.4 1.2L10 4H8.7L8 5l-.1-1H6.5l1-.8zM2 6l1 .8 1-.8-.4 1.2L5 8H3.7L3 9l-.1-1H1.5l1-.8zM7 6l1 .8 1-.8-.4 1.2L10 8H8.7L8 9l-.1-1H6.5l1-.8z"/>'
+    },
+    es: {
+        name: "Espanhol",
+        flag: "🇪🇸",
+        artwork: '<rect width="30" height="20" fill="#aa151b"/><path fill="#f1bf00" d="M0 5h30v10H0z"/>'
+    },
+    fr: {
+        name: "Francês",
+        flag: "🇫🇷",
+        artwork: '<rect width="10" height="20" fill="#0055a4"/><rect x="10" width="10" height="20" fill="#fff"/><rect x="20" width="10" height="20" fill="#ef4135"/>'
+    },
+    ko: {
+        name: "Coreano",
+        flag: "🇰🇷",
+        artwork: '<rect width="30" height="20" fill="#fff"/><path d="M15 4a3 3 0 0 1 0 6 3 3 0 0 0 0 6 6 6 0 0 0 0-12" fill="#cd2e3a"/><path d="M15 4a3 3 0 0 0 0 6 3 3 0 0 1 0 6 6 6 0 0 1 0-12" fill="#0047a0"/><path stroke="#111" stroke-width="1.1" d="m4 5 5 2M3.5 7l5 2m16-4-5 2m6 0-5 2M4 15l5-2m-5 4 5-2m16 0-5-2m6 0-5-2"/>'
+    },
+    "zh-CN": {
+        name: "Chinês (simplificado)",
+        flag: "🇨🇳",
+        artwork: '<rect width="30" height="20" fill="#de2910"/><path fill="#ffde00" d="m6 3 1.2 2.4 2.6.4-1.9 1.8.5 2.6L6 9l-2.4 1.2.5-2.6-1.9-1.8 2.6-.4z"/>'
+    },
+    "zh-TW": {
+        name: "Chinês (tradicional)",
+        flag: "🇹🇼",
+        artwork: '<rect width="30" height="20" fill="#fe0000"/><path fill="#000095" d="M0 0h13v11H0z"/><circle cx="6.5" cy="5.5" r="3" fill="#fff"/><circle cx="6.5" cy="5.5" r="1.4" fill="#000095"/>'
+    }
+};
 
 function getGenres(work) {
     const value = work.gender ?? work.Gender ?? [];
@@ -46,21 +109,6 @@ function getWorkFormat(value) {
     return null;
 }
 
-async function showManageLink() {
-    try {
-        if (!currentUser || !manageLink) return;
-        const isAdmin = currentUser.email?.trim().toLowerCase() === "hokupedia@gmail.com"
-            || currentUser.labels?.includes("admin");
-        manageLink.textContent = isAdmin || currentUser.labels?.includes("moderator")
-            ? "Gerenciar obras"
-            : "Solicitar moderação";
-        manageLink.setAttribute("aria-label", manageLink.textContent);
-        manageLink.hidden = false;
-    } catch (error) {
-        console.error("Não foi possível verificar o acesso administrativo:", error);
-    }
-}
-
 function loadOpenedChapters() {
     try {
         const chapters = currentUser
@@ -76,7 +124,9 @@ function loadOpenedChapters() {
 
 function updateFavoriteButton(isFavorite) {
     favoriteButton.disabled = false;
-    favoriteButton.textContent = isFavorite ? "★ Remover dos favoritos" : "☆ Adicionar aos favoritos";
+    favoriteButton.textContent = isFavorite ? "★" : "☆";
+    favoriteButton.setAttribute("aria-label", isFavorite ? "Remover dos favoritos" : "Adicionar aos favoritos");
+    favoriteButton.title = isFavorite ? "Remover dos favoritos" : "Adicionar aos favoritos";
     favoriteButton.setAttribute("aria-pressed", String(isFavorite));
     favoriteButton.classList.toggle("is-favorite", isFavorite);
 }
@@ -121,7 +171,7 @@ async function renderChapters() {
         console.error("Não foi possível carregar os dados da obra:", error);
         workTitle.textContent = "Erro ao carregar obra";
         workDescription.textContent = error.message || "Não foi possível carregar os dados do Appwrite.";
-        workAuthor.textContent = "HokuPédia";
+        workAuthor.textContent = "";
         favoriteButton.disabled = true;
         return;
     }
@@ -129,7 +179,7 @@ async function renderChapters() {
     if (!work) {
         workTitle.textContent = "Obra não encontrada";
         workDescription.textContent = "Selecione uma obra cadastrada para continuar.";
-        workAuthor.textContent = "HokuPédia";
+        workAuthor.textContent = "";
         const emptyState = document.createElement("p");
         emptyState.className = "empty-state";
         emptyState.textContent = "Nenhuma obra cadastrada. Adicione uma obra pelo gerenciamento.";
@@ -166,11 +216,15 @@ async function renderChapters() {
         coverImage.src = work.cover;
         coverImage.alt = `Capa de ${work.title}`;
         workCover.replaceChildren(coverImage);
-        workCover.removeAttribute("aria-hidden");
+        workCover.setAttribute("aria-label", `Ampliar capa de ${work.title}`);
+        workCover.disabled = false;
+        workCover.hidden = false;
     }
     document.title = `${work.title} — Hub de Obra | HokuPédia`;
     if (!currentUser) {
-        favoriteButton.textContent = "Entrar para favoritar";
+        favoriteButton.textContent = "☆";
+        favoriteButton.setAttribute("aria-label", "Entrar para favoritar");
+        favoriteButton.title = "Entrar para favoritar";
         favoriteButton.disabled = false;
         favoriteButton.setAttribute("aria-pressed", "false");
     } else {
@@ -192,65 +246,90 @@ async function renderChapters() {
     }
 
     const openedChapters = loadOpenedChapters();
+    const chapterGroups = new Map();
     for (const [index, chapter] of work.chapters.entries()) {
-        const chapterId = chapter.id || `${work.id}-chapter-${index + 1}`;
-        const chapterNumber = Number.isInteger(chapter.number) && chapter.number > 0
+        const number = Number.isInteger(chapter.number) && chapter.number > 0
             ? chapter.number
             : index + 1;
-        const chapterTitle = typeof chapter.title === "string" ? chapter.title.trim() : "";
-        const displayName = `Cap ${chapterNumber}${chapterTitle ? ` — ${chapterTitle}` : ""}`;
-        const link = document.createElement("a");
-        link.className = "chapter-card";
-        link.href = `/HTML/Leitura.html?obra=${encodeURIComponent(work.id)}&capitulo=${encodeURIComponent(chapterId)}`;
-        link.setAttribute("aria-label", `Abrir ${displayName}`);
-        const hasBeenOpened = openedChapters.has(`${work.id}:${chapterId}`);
-        if (hasBeenOpened) link.classList.add("chapter-card--opened");
+        const group = chapterGroups.get(number) || [];
+        group.push({ chapter, index });
+        chapterGroups.set(number, group);
+    }
 
-        const flag = document.createElement("span");
-        flag.className = "chapter-flag";
-        const chapterLanguage = chapter.language || "pt-BR";
-        const flagValue = chapterLanguage === "pt-BR" ? "🇧🇷"
-            : chapterLanguage === "ja" ? "🇯🇵"
-                : chapterLanguage === "es" ? "🇪🇸" : "🇺🇸";
-        flag.setAttribute("aria-label", chapterLanguage);
-        flag.textContent = flagValue;
-        link.append(flag);
+    for (const [number, versions] of chapterGroups) {
+        const card = document.createElement("section");
+        card.className = "chapter-card";
+        const heading = document.createElement("h3");
+        heading.className = "chapter-card-title";
+        heading.textContent = `Capítulo ${number}`;
+        card.append(heading);
 
-        const divider = document.createElement("span");
-        divider.className = "chapter-divider";
-        divider.setAttribute("aria-hidden", "true");
-        link.append(divider);
+        const languageList = document.createElement("div");
+        languageList.className = "chapter-language-list";
+        for (const { chapter, index } of versions) {
+            const chapterId = chapter.id || `${work.id}-chapter-${index + 1}`;
+            const chapterLanguage = chapter.language || "pt-BR";
+            const language = chapterLanguages[chapterLanguage] || {
+                name: chapterLanguage,
+                flag: "🌐"
+            };
+            const link = document.createElement("a");
+            link.className = "chapter-language-link";
+            link.href = `/HTML/Leitura.html?obra=${encodeURIComponent(work.id)}&capitulo=${encodeURIComponent(chapterId)}`;
+            const title = typeof chapter.title === "string" && chapter.title.trim()
+                ? chapter.title.trim()
+                : "Sem título";
+            link.setAttribute("aria-label", `Abrir Capítulo ${number}: ${title} em ${language.name}`);
+            if (openedChapters.has(`${work.id}:${chapterId}`)) {
+                link.classList.add("chapter-card--opened");
+            }
 
-        const title = document.createElement("span");
-        title.className = "chapter-title";
-        title.textContent = displayName;
-        link.append(title);
+            const flag = document.createElement("span");
+            flag.className = "chapter-flag";
+            flag.setAttribute("aria-hidden", "true");
+            flag.textContent = language.flag;
+            if (language.artwork) {
+                const flagArtwork = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+                flagArtwork.classList.add("chapter-flag-artwork");
+                flagArtwork.setAttribute("viewBox", "0 0 30 20");
+                flagArtwork.setAttribute("focusable", "false");
+                flagArtwork.innerHTML = language.artwork;
+                flag.append(flagArtwork);
+            }
 
-        if (hasBeenOpened) {
-            const readBadge = document.createElement("span");
-            readBadge.className = "chapter-read-badge";
-            readBadge.textContent = "Já aberto";
-            readBadge.setAttribute("aria-label", "Você já abriu este capítulo");
-            link.append(readBadge);
+            const chapterVersionTitle = document.createElement("span");
+            chapterVersionTitle.className = "chapter-version-title";
+            chapterVersionTitle.textContent = title;
+            chapterVersionTitle.title = title;
+
+            const author = document.createElement("span");
+            author.className = "chapter-author";
+            if (openedChapters.has(`${work.id}:${chapterId}`)) {
+                const readBadge = document.createElement("span");
+                readBadge.className = "chapter-read-badge";
+                readBadge.textContent = "Já aberto";
+                readBadge.setAttribute("aria-label", "Você já abriu este capítulo");
+                author.append(readBadge);
+            }
+            author.append(createAuthorIcon());
+            const authorName = document.createElement("span");
+            authorName.textContent = chapter.author || "Usuário desconhecido";
+            author.append(authorName);
+
+            const contributor = document.createElement("span");
+            contributor.className = "chapter-contributor";
+            contributor.append(author);
+
+            const arrow = document.createElement("span");
+            arrow.className = "chapter-arrow";
+            arrow.setAttribute("aria-hidden", "true");
+            arrow.textContent = "›";
+            link.append(flag, chapterVersionTitle, contributor, arrow);
+            languageList.append(link);
         }
-
-        const author = document.createElement("span");
-        author.className = "chapter-author";
-        author.append(createAuthorIcon());
-
-        const authorName = document.createElement("span");
-        authorName.textContent = chapter.author || "Usuário desconhecido";
-        author.append(authorName);
-        link.append(author);
-
-        const arrow = document.createElement("span");
-        arrow.className = "chapter-arrow";
-        arrow.setAttribute("aria-hidden", "true");
-        arrow.textContent = "›";
-        link.append(arrow);
-
-        chapterList.append(link);
+        card.append(languageList);
+        chapterList.append(card);
     }
 }
 
-renderChapters().then(showManageLink);
+renderChapters();
