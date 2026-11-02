@@ -1,7 +1,45 @@
+import { account } from "../JS/JAVA/appwriteClient.js";
+
+const adminEmail = "hokupedia@gmail.com";
 const menuButton = document.getElementById("menuBtn");
 const dashboard = document.getElementById("dashboard");
 const overlay = document.getElementById("menuOverlay");
 const dashboardItems = document.querySelectorAll(".menu-lateral-item");
+const navigation = document.querySelector(".menu-lateral-items");
+const headerLogin = document.querySelector(".header-login");
+
+async function updateNavigationForUser() {
+    try {
+        const user = await account.get();
+        if (headerLogin) {
+            const profileImage = document.createElement("img");
+            profileImage.src = "/Img/Perfil/PerfilExemplo.svg";
+            profileImage.alt = "Perfil";
+
+            headerLogin.className = "header-profile";
+            headerLogin.href = "/HTML/Biblioteca.html";
+            headerLogin.setAttribute("aria-label", `Abrir perfil de ${user.name || user.email}`);
+            headerLogin.replaceChildren(profileImage);
+        }
+
+        if (user.email.trim().toLowerCase() === adminEmail && navigation
+            && !navigation.querySelector("[data-admin-navigation]")) {
+            const manageWorksLink = document.createElement("a");
+            manageWorksLink.className = "menu-lateral-item";
+            manageWorksLink.href = "/HTML/GerenciarObras.html";
+            manageWorksLink.textContent = "Gerenciar Obras";
+            manageWorksLink.dataset.adminNavigation = "true";
+            navigation.querySelector('a[href="/HTML/Biblioteca.html"]')
+                ?.insertAdjacentElement("afterend", manageWorksLink);
+        }
+    } catch (error) {
+        if (error.code !== 401) {
+            console.error("Não foi possível verificar a sessão do usuário:", error);
+        }
+    }
+}
+
+void updateNavigationForUser();
 
 function setDashboardOpen(isOpen) {
     if (!dashboard || !menuButton || !overlay) return;

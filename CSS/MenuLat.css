@@ -41,6 +41,24 @@ body > header .logo,
     color: #2b1a42;
 }
 
+.header-profile {
+    display: block;
+    width: 38px;
+    height: 38px;
+    flex: 0 0 38px;
+    margin-left: auto;
+    overflow: hidden;
+    border: 1px solid rgba(213, 189, 0, 0.75);
+    border-radius: 50%;
+}
+
+.header-profile img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
 .menu-lateral-button {
     width: 34px;
     height: 32px;
@@ -74,6 +92,11 @@ body > header .logo,
 }
 
 .header-login:focus-visible {
+    outline: 2px solid transparent;
+    outline-offset: 3px;
+}
+
+.header-profile:focus-visible {
     outline: 2px solid transparent;
     outline-offset: 3px;
 }
