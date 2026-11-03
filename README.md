@@ -1,60 +1,100 @@
-# Hokupedia
+# HokuPédia
 
-Biblioteca comunitária de leitura de mangás e HQs, com tradução de quadros por IA.
+Biblioteca comunitária para leitura de mangás, manhwas e HQs, com tradução de páginas por IA.
 
-## Appwrite, ImageKit e servidor
+## Requisitos
 
-O Appwrite substitui o MySQL para autenticação e persistência de obras, capítulos e páginas. O ImageKit armazena capas e páginas; a chave privada permanece no servidor. Não é necessário executar um serviço MySQL.
+- Node.js 20.19 ou superior (ou 22.12 ou superior)
+- npm
+- Projeto Appwrite configurado
+- Conta ImageKit para armazenar capas e páginas
 
-### Configuração
+## Configuração
 
-1. Instale o **Node.js 22 LTS ou superior** e as dependências (`npm install`).
-2. Copie `.env.example` para `.env` na raiz do projeto e configure as variáveis `APPWRITE_*`, `IMAGEKIT_*` e, se usar, pelo menos uma chave de IA válida (`GEMINI_API_KEY`, `OPENAI_API_KEY`, `QWEN_API_KEY` ou `GROQ_API_KEY`). Substitua os valores de exemplo; textos como `cole_sua_chave_aqui` não são chaves válidas. Reinicie o servidor depois de alterar o arquivo. Não versione esse arquivo.
-3. No Appwrite, habilite autenticação por e-mail e senha e cadastre uma Web platform para o host da aplicação (por exemplo, `localhost` no desenvolvimento) e para o domínio de produção. O domínio configurado também precisa permitir o retorno dos links de recuperação para `/HTML/CadLog.html`. Crie uma API key com leitura e escrita de databases/documents e dos usuários (`users.read` e `users.write`), e configure o database e as três collections com os IDs das variáveis. Crie estes atributos:
+Crie um arquivo `.env` na raiz do projeto. Não há um `.env.example` no repositório. Preencha as variáveis do servidor:
 
-   | Collection | Atributos |
-   | --- | --- |
-   | `Obras` | `Title` string (255, obrigatório), `createBy` string (ID do usuário, obrigatório), `Author` array de strings (255), `Description` array de strings (10000), `coverUrl` array de strings (2048), `gender` string (2048, opcional), `formato` string (36, obrigatório; `hq`, `manhwa` ou `manga`) |
-   | `Capitulos` | `workId` string (36), `number` integer, `title` array de strings (255), `language` string (16), `pageCount` integer, `status` string, `createBy` string |
-   | `Paginas` | `chapterId` string (36), `number` integer, `originalName` string (255), `imageUrl` string (2048), `imageFileId` string (255), `format` string (32) |
+```env
+APPWRITE_ENDPOINT=https://<regiao>.cloud.appwrite.io/v1
+APPWRITE_PROJECT_ID=<id-do-projeto>
+APPWRITE_API_KEY=<chave-privada-do-servidor>
+APPWRITE_DATABASE_ID=<id-do-database>
+APPWRITE_WORKS_COLLECTION_ID=<id-da-collection-obras>
+APPWRITE_CHAPTERS_COLLECTION_ID=<id-da-collection-capitulos>
+APPWRITE_PAGES_COLLECTION_ID=<id-da-collection-paginas>
 
-   Ao cadastrar uma obra no painel, informe nome, autor, gêneros, formato e descrição e selecione uma capa. Crie o atributo opcional `gender` como **String** de até 2048 caracteres e o atributo obrigatório `formato` como **String** de até 36 caracteres na coleção `Obras` do Appwrite configurada em `APPWRITE_WORKS_COLLECTION_ID`; aguarde ambos ficarem disponíveis antes de cadastrar ou editar obras. As categorias são selecionadas em uma lista expansível e salvas juntas no atributo `gender`. O formato deve ser `hq`, `manhwa` ou `manga`, e alimenta os filtros por HQs, Manhwas e Mangás na página inicial. Obras cadastradas antes da inclusão de `formato` precisam ser editadas para receber uma classificação e aparecer nos filtros específicos. O servidor envia a imagem ao ImageKit e salva no documento `Obras` os campos `Title`, `createBy`, `Author`, `Description`, `coverUrl` (URL da imagem), `gender` e `formato`. A tabela em `Database/schema.sql` é legado e não altera os atributos da coleção Appwrite. O cadastro é recusado se a capa não tiver sido enviada ao endpoint ImageKit configurado.
-   Para cadastrar ou substituir as páginas de um capítulo, envie um único arquivo `.zip` contendo apenas imagens PNG, JPG/JPEG, WEBP, GIF ou AVIF. A ordem das páginas segue a ordenação natural dos nomes dos arquivos (por exemplo, `1.jpg`, `2.jpg`, `10.jpg`). ZIPs criptografados, arquivos que não sejam imagens e imagens cujo conteúdo não corresponda à extensão são recusados. Cada imagem tem limite de 20 MB por padrão; o ZIP tem limite de 100 MB (`MAX_CHAPTER_ARCHIVE_BYTES`) e o total descompactado é limitado a 200 MB.
-   Crie índices ascendentes para `Capitulos.workId` e `Paginas.chapterId`, usados nas consultas relacionadas. O servidor acessa os documentos com a API key; não a exponha ao navegador.
-   Configure `APPWRITE_MODERATION_REQUESTS_COLLECTION_ID` para a collection de pedidos de moderação (`userId` string de 36 caracteres, `motivos` string de 5000, `idiomasPreferencia` string de 255 e `status` string de 50). Para pedidos de obra, configure `APPWRITE_WORK_REQUESTS_COLLECTION_ID` com `userId` e `moderadorId` string de 36 caracteres, `nomeObra` string de 255, `Author` string de 255, `sinopse` string de 10000, `coverUrl` string de 2048, `gender` string de 255, `formato` string de 16 e `status` string de 50. O pedido de obra não armazena idiomas: eles são definidos nos capítulos. **O atributo do pedido deve se chamar exatamente `Author` (A maiúsculo), tipo String e até 255 caracteres**; o autor é obrigatório no formulário do moderador e, ao aprovar, o servidor o transfere para `Author` (array de strings) na collection `Obras`. **Crie também `gender` String de tamanho 255 na collection de pedidos e na collection `Obras`**; o servidor envia as categorias selecionadas nesse atributo. A capa é salva em `coverUrl`; o `fileId` do ImageKit não precisa de atributo próprio, pois é localizado pela URL ao excluir pedidos. `gender` e `formato` podem ser opcionais na collection de pedidos para manter compatibilidade com pedidos antigos; ao aprová-los, o servidor usa valores padrão se esses dados não existirem. O status dos pedidos é `PENDENTE`, `APROVADO` ou `REPROVADO`.
+IMAGEKIT_PUBLIC_KEY=<chave-publica>
+IMAGEKIT_PRIVATE_KEY=<chave-privada>
+IMAGEKIT_URL_ENDPOINT=https://ik.imagekit.io/<seu-id>
 
-   O moderador envia um capítulo completo com todas as páginas; o servidor cria o documento em `Capitulos` com status `published` e vincula suas páginas em `Paginas`. Pedidos de moderação e de novas obras são analisados na tela de homologação do administrador.
+# Necessária somente para usar a tradução por IA
+GEMINI_API_KEY=<sua-chave>
+```
 
-   As collections de pedidos devem ser acessíveis somente pelo servidor/API key. Além dos escopos de leitura e escrita de documentos, habilite `users.read` e `users.write` na API key para que a tela de homologação mostre os nomes das contas e a aprovação de moderação atribua o label `moderator`. Contas sem esse label são usuários comuns. O administrador é reconhecido pelo e-mail administrativo configurado no servidor ou pelo label `admin`. Configure os IDs das collections no `.env` da raiz; nunca envie a API key ao navegador.
-4. No painel do ImageKit, configure a chave pública, a chave privada e a URL endpoint. Permita no CORS do ImageKit o domínio da aplicação (incluindo `localhost:3001`) para o leitor poder carregar páginas no canvas usado pela tradução. `VITE_APPWRITE_ENDPOINT` e `VITE_APPWRITE_PROJECT_ID` são valores públicos e devem ficar no `.env` da raiz para o Vite. Nunca use o prefixo `VITE_` em chaves privadas.
-5. Execute `npm run server` e abra `http://localhost:3001`. A rota `http://localhost:3001/api/health` confirma a conexão com o Appwrite e informa se o ImageKit está configurado.
+O Appwrite precisa de autenticação por e-mail e senha habilitada e uma Web platform cadastrada para o host da aplicação. Crie uma API key com acesso de leitura e escrita a databases e documents, além de `users.read` e `users.write`. Mantenha a chave privada no servidor: nunca use o prefixo `VITE_` nela.
 
-Cadastro, login e recuperação de senha usam Appwrite Auth na tela unificada `HTML/CadLog.html`. A recuperação envia um código de 6 dígitos por e-mail, válido por 15 minutos, que é inserido na mesma tela junto com a nova senha. Alterações no catálogo e uploads exigem uma sessão Appwrite válida. Fotos de perfil são comprimidas para no máximo 200 KB, enviadas ao ImageKit e salvas nas preferências da conta, ficando disponíveis em outros dispositivos. As capas dos pedidos de obra são enviadas para uma pasta individual do moderador e apagadas do ImageKit quando o administrador reprova o pedido. O limite padrão é 20 MB por imagem, 100 MB por ZIP e 500 páginas por capítulo; ajuste `MAX_IMAGE_BYTES`, `MAX_CHAPTER_ARCHIVE_BYTES` e `MAX_CHAPTER_PAGES` no servidor se necessário. Ao excluir uma obra, o servidor apaga primeiro a capa e as páginas dessa obra no ImageKit (somente arquivos da pasta `/hokupedia/`) e depois remove os registros da obra, capítulos e páginas no Appwrite. A exclusão de um capítulo isolado continua removendo apenas os registros do Appwrite.
+O cliente usa um endpoint e um project ID padrão do Appwrite. Se precisar apontar para outro projeto, configure também `VITE_APPWRITE_ENDPOINT` e `VITE_APPWRITE_PROJECT_ID` no `.env`; esses dois valores são públicos.
 
-A busca global por título aparece em todas as telas, exceto no leitor. Ela sugere obras publicadas sem filtrar o conteúdo da tela atual; ao selecionar uma sugestão, abre a página da obra. Se não houver correspondência, exibe “Nenhuma obra encontrada.”.
+### Collections do Appwrite
 
-Contas que estavam no MySQL e obras/páginas anteriormente gravadas no `localStorage` não são importadas automaticamente. Cadastre as contas no Appwrite e reenvie as imagens pelo gerenciamento; mantenha cópias dos dados antigos antes de desativar o MySQL ou limpar os dados locais.
+Crie as collections abaixo no database configurado. Os limites de String são em caracteres.
 
-## Tela de leitura e tradução
+| Collection | Atributos |
+| --- | --- |
+| `Obras` | `Title` String(255), `createBy` String(36), `Author` String[](255), `Description` String[](10000), `coverUrl` String[](2048), `gender` String(2048, opcional), `formato` String(36) |
+| `Capitulos` | `workId` String(36), `number` Integer, `title` String[](255), `language` String(16), `pageCount` Integer, `status` String(50), `createBy` String(36) |
+| `Paginas` | `chapterId` String(36), `number` Integer, `originalName` String(255), `imageUrl` String(2048), `imageFileId` String(255), `format` String(32) |
 
-1. Inicie o servidor com `npm run server` e abra `http://localhost:3001`.
-2. Acesse `http://localhost:3001/HTML/GerenciarObras.html`, faça login, cadastre uma obra e um capítulo com imagens, e abra o Hub da obra para selecionar o capítulo.
-3. Para habilitar a tradução, configure uma ou mais chaves de IA no `.env` e reinicie o servidor. Não compartilhe nem envie o arquivo `.env`; ele é ignorado pelo Git.
+Crie também índices ascendentes para `Capitulos.workId` e `Paginas.chapterId`. Os formatos de obra aceitos são `hq`, `manhwa` e `manga`.
 
-A rota `http://localhost:3001/Leitura` também abre o leitor principal. A tela está em `HTML/Leitura.html`, com estilos em `CSS/Leitura.css` e lógica em `JS/Leitura.js`. As imagens de demonstração ficam em `public/reader`.
+Para habilitar os pedidos analisados na tela de homologação, crie as collections e configure os IDs abaixo. Elas devem ser acessíveis somente pelo servidor:
 
-Obras e capítulos ficam no Appwrite; capas e páginas ficam no ImageKit. Preferências de idioma, escopo (página atual ou capítulo inteiro), capitalização e fonte da tradução continuam no armazenamento local do navegador. Novas imagens acima de 400 KB são recomprimidas como WebP com qualidade priorizada; GIFs animados são preservados. O histórico (incluindo o último capítulo aberto de cada obra) e os favoritos da biblioteca também são locais, mas ficam separados pelo identificador da conta Appwrite neste navegador; não são sincronizados entre dispositivos.
+```env
+APPWRITE_MODERATION_REQUESTS_COLLECTION_ID=<id-da-collection>
+APPWRITE_WORK_REQUESTS_COLLECTION_ID=<id-da-collection>
+```
 
-O servidor mantém as chaves Gemini fora do cliente e tenta primeiro `GEMINI_API_KEY`; configure as quatro chaves como `GEMINI_API_KEY`, `GEMINI_API_KEY_2`, `GEMINI_API_KEY_3` e `GEMINI_API_KEY_4`. O servidor aceita os sufixos numéricos em ordem, sem limite fixo de quantidade. Cada solicitação começa pela primeira chave e só usa as seguintes se a atual falhar (não há rodízio quando ela funciona). Em erro 429, a chave limitada é pulada sem nova tentativa e o servidor tenta a próxima; em erro 503, há tentativas com espera antes de avançar. O terminal do servidor informa o número de chaves configuradas, cada tentativa e quando muda de chave, sem exibir os valores. Reinicie `npm run server` depois de editar o `.env`. Se todas falharem, o leitor mostra os detalhes sem expor as chaves.
+A collection de pedidos de moderação precisa de `userId` String(36), `motivos` String(5000), `idiomasPreferencia` String(255) e `status` String(50). A collection de pedidos de obra precisa de `userId` e `moderadorId` String(36), `nomeObra` String(255), `Author` String(255), `sinopse` String(10000), `coverUrl` String(2048), `gender` String(255), `formato` String(16) e `status` String(50). Os status usados são `PENDENTE`, `APROVADO` e `REPROVADO`.
 
-O Gemini analisa os balões e depois traduz as falas em duas chamadas por página. Para reduzir o envio sem alterar os originais, a imagem enviada à IA é convertida para JPEG com qualidade 90 e redimensionada somente quando passa de 2560 px no maior lado. Isso também vale para capítulos antigos. Nas configurações, escolha traduzir a página atual ou todas as páginas do capítulo; a tradução em lote usa até duas páginas simultâneas e pode ser interrompida. Para acompanhar as etapas, abra o console do navegador (F12) e filtre por `[HokuPédia IA]`; ele informa o preparo da imagem, cada chamada, tempo de resposta, páginas em processamento e erros, sem registrar imagens ou chaves. Se a análise dos balões terminar mas a tradução falhar, ela é salva localmente por página; ao tentar novamente, inclusive depois de recarregar o leitor, o sistema reutiliza a análise e repete somente a etapa de tradução. No modo em lote, páginas já traduzidas também são puladas. As traduções prontas, incluindo posição e texto dos balões, são salvas no armazenamento local do navegador por capítulo, página e idioma, e reaparecem ao reabrir o capítulo no mesmo navegador. O botão de olho mostra ou esconde as traduções sem apagá-las; “Apagar tradução” remove as traduções e análises locais do capítulo atual. Balões quadrados ou retangulares recebem tradução com cantos retos. Alterar fonte ou capitalização não repete a chamada à IA. A preferência de tradução é local a este navegador e não é sincronizada entre dispositivos ou navegadores.
+O servidor identifica administradores pelo label `admin` ou pelo e-mail administrativo definido no código. A aprovação de pedidos de moderação atribui o label `moderator`.
+
+### ImageKit e tradução
+
+Configure as três variáveis `IMAGEKIT_*` para habilitar envio e remoção de imagens. Permita o domínio da aplicação nas configurações de CORS do ImageKit para que o leitor possa desenhar as imagens no canvas durante a tradução.
+
+A tradução usa Gemini. Para configurar mais de uma chave, adicione variáveis como `GEMINI_API_KEY_2`, `GEMINI_API_KEY_3` etc. As chaves numeradas são usadas como alternativas se a anterior falhar. Reinicie o servidor ao alterar o `.env`.
+
+## Executar
+
+Na raiz do projeto:
+
+```bash
+npm install
+npm run server
+```
+
+Abra <http://localhost:3001>. O servidor também inicia o Vite em modo de desenvolvimento. A rota <http://localhost:3001/api/health> verifica a conexão com o Appwrite e informa se o ImageKit está configurado.
 
 Para testar as telas diretamente:
 
-- `http://localhost:3001/CadLog`
-- `http://localhost:3001/HTML/CadLog.html?mode=register` para cadastro
-- `http://localhost:3001/HTML/CadLog.html?mode=login` para login
-- `http://localhost:3001/HTML/GerenciarObras.html` para solicitar acesso ou gerenciar obras, conforme o perfil
-- `http://localhost:3001/HTML/Homologacao.html` para aprovar pedidos (administrador)
+- Início: <http://localhost:3001/>
+- Cadastro e login: <http://localhost:3001/HTML/CadLog.html>
+- Gerenciamento de obras: <http://localhost:3001/HTML/GerenciarObras.html>
+- Homologação de pedidos (administrador): <http://localhost:3001/HTML/Homologacao.html>
 
-Cadastro e login compartilham a tela `HTML/CadLog.html`; as rotas antigas `/Cadastro` e `/Login` continuam apontando para ela.
+Comandos úteis:
+
+```bash
+npm run build
+npm test
+npm run lint
+```
+
+## Recursos e limites
+
+- Cadastro, login e recuperação de senha pelo Appwrite Auth.
+- Catálogo, biblioteca, perfis, capítulos e páginas armazenados no Appwrite; imagens armazenadas no ImageKit.
+- Leitor com tradução assistida por Gemini.
+- Pedidos de acesso à moderação e de inclusão de obras, sujeitos à aprovação do administrador.
+- Favoritos, histórico, preferências e traduções ficam no armazenamento local do navegador e não são sincronizados entre dispositivos.
+
+O limite padrão é 20 MB por imagem, 100 MB por arquivo ZIP, 200 MB descompactados e 500 páginas por capítulo. Os capítulos são enviados como ZIP de imagens PNG, JPG/JPEG, WEBP, GIF ou AVIF; a ordem é definida pelos nomes dos arquivos. Para ajustar os limites do servidor, configure `MAX_IMAGE_BYTES`, `MAX_CHAPTER_ARCHIVE_BYTES` e `MAX_CHAPTER_PAGES` no `.env`.

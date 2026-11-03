@@ -180,8 +180,7 @@ body {
 }
 
 .novidades,
-.capnovos,
-.recomendados {
+.capnovos {
   width: min(100% - 30px, 1100px);
   margin: 30px auto 0;
   padding: 18px 0 12px;
@@ -190,8 +189,7 @@ body {
 }
 
 .novidades h2,
-.capnovos h2,
-.recomendados h2 {
+.capnovos h2 {
   margin: 0 0 10px;
   color: #fff;
   font: bold clamp(1.7rem, 2vw, 3rem) Georgia, serif;

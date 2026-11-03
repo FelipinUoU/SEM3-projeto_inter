@@ -9,6 +9,7 @@ import { fileURLToPath } from 'url';
 import { Account, Client, Databases, ID, Query, Users } from 'node-appwrite';
 import ImageKit from 'imagekit';
 import { readChapterArchive } from './chapterArchive.js';
+import { getCachedValue, invalidateCache } from './cache.js';
 import { optimizeImageForImageKit } from './imageOptimization.js';
 
 const app = express();
@@ -23,6 +24,7 @@ const MAX_PROFILE_AVATAR_BYTES = 200 * 1024;
 const MAX_CHAPTER_PAGES = Number.parseInt(process.env.MAX_CHAPTER_PAGES || '500', 10);
 const MAX_CHAPTER_ARCHIVE_BYTES = Number.parseInt(process.env.MAX_CHAPTER_ARCHIVE_BYTES || '104857600', 10);
 const MAX_CHAPTER_UNPACKED_BYTES = 209715200;
+const WORK_DATA_CACHE_TTL_MS = 5 * 60 * 1000;
 const ADMIN_EMAIL = 'hokupedia@gmail.com';
 const appwriteEndpoint = process.env.APPWRITE_ENDPOINT;
 const appwriteProjectId = process.env.APPWRITE_PROJECT_ID;
@@ -68,6 +70,15 @@ const providerTimeoutMs = 180000;
 
 app.use(express.json({ limit: '15mb' }));
 app.use(cors({ origin: '*' }));
+app.use((req, res, next) => {
+  res.on('finish', () => {
+    const changesWorkData = /^\/api\/(?:works(?:\/|$)|chapters\/|pedido_obra\/[^/]+\/aprovar$)/.test(req.path);
+    if (req.method !== 'GET' && res.statusCode < 400 && changesWorkData) {
+      invalidateCache('works:');
+    }
+  });
+  next();
+});
 
 function requireAppwriteConfiguration() {
   const missing = [
@@ -629,65 +640,106 @@ app.delete('/api/uploads/:fileId', requireAuthenticatedUser, requireAdminUser, a
   }
 });
 
+app.get('/api/catalog/works', async (req, res) => {
+  try {
+    const data = await getCachedValue('works:catalog', WORK_DATA_CACHE_TTL_MS, async () => {
+      const [workDocuments, chapterDocuments] = await Promise.all([
+        listAllDocuments(worksCollectionId),
+        listAllDocuments(chaptersCollectionId)
+      ]);
+      const chaptersByWork = new Map();
+      for (const chapter of chapterDocuments) {
+        if (String(chapter.status || '').toUpperCase() === 'REPROVADO') continue;
+        const chapters = chaptersByWork.get(chapter.workId) || [];
+        chapters.push({
+          status: chapter.status,
+          number: chapter.number,
+          title: getWorkAttribute(chapter.title),
+          createdAt: chapter.$createdAt
+        });
+        chaptersByWork.set(chapter.workId, chapters);
+      }
+      return {
+        works: workDocuments.map((work) => ({
+          id: work.$id,
+          title: getWorkAttribute(work.Title),
+          author: getWorkAttribute(work.Author),
+          gender: work.gender ?? work.Gender ?? work.Genres ?? work.Genre ?? '',
+          formato: work.formato ?? '',
+          createdAt: work.$createdAt,
+          cover: getWorkAttribute(work.coverUrl),
+          chapters: chaptersByWork.get(work.$id) || []
+        }))
+      };
+    });
+    return res.json(data);
+  } catch (error) {
+    return sendAppwriteError(res, error, 'Não foi possível carregar o catálogo do Appwrite.');
+  }
+});
+
 app.get('/api/works', async (req, res) => {
   try {
-    const [workDocuments, chapterDocuments, pageDocuments] = await Promise.all([
-      listAllDocuments(worksCollectionId),
-      listAllDocuments(chaptersCollectionId),
-      listAllDocuments(pagesCollectionId)
-    ]);
-    const chapterAuthorIds = [...new Set(
-      chapterDocuments.map((chapter) => chapter.createBy).filter(Boolean)
-    )];
-    const chapterAuthors = new Map(await Promise.all(
-      chapterAuthorIds.map(async (userId) => [userId, await getChapterAuthorName(userId)])
-    ));
-    const pagesByChapter = new Map();
-    for (const page of pageDocuments) {
-      const pages = pagesByChapter.get(page.chapterId) || [];
-      pages.push({
-        id: page.$id,
-        name: page.originalName,
-        url: page.imageUrl,
-        fileId: page.imageFileId,
-        format: page.format,
-        position: page.number - 1
-      });
-      pagesByChapter.set(page.chapterId, pages);
-    }
-    const chaptersByWork = new Map();
-    for (const chapter of chapterDocuments) {
-      if (String(chapter.status || '').toUpperCase() === 'REPROVADO') continue;
-      const pages = (pagesByChapter.get(chapter.$id) || [])
-        .sort((left, right) => left.position - right.position);
-      const workChapters = chaptersByWork.get(chapter.workId) || [];
-      workChapters.push({
-        id: chapter.$id,
-        number: chapter.number,
-        title: getWorkAttribute(chapter.title),
-        language: chapter.language,
-        status: chapter.status,
-        createdAt: chapter.$createdAt,
-        author: chapterAuthors.get(chapter.createBy) || 'Usuário desconhecido',
-        pages
-      });
-      chaptersByWork.set(chapter.workId, workChapters);
-    }
-    return res.json({
-      works: workDocuments.map((work) => ({
-        id: work.$id,
-        title: getWorkAttribute(work.Title),
-        author: getWorkAttribute(work.Author),
-        gender: work.gender ?? work.Gender ?? work.Genres ?? work.Genre ?? '',
-        formato: work.formato ?? '',
-        description: getWorkAttribute(work.Description),
-        cover: getWorkAttribute(work.coverUrl),
-        createdAt: work.$createdAt,
-        coverFileId: '',
-        chapters: (chaptersByWork.get(work.$id) || [])
-          .sort((left, right) => left.number - right.number)
-      }))
+    const data = await getCachedValue('works:published', WORK_DATA_CACHE_TTL_MS, async () => {
+      const [workDocuments, chapterDocuments, pageDocuments] = await Promise.all([
+        listAllDocuments(worksCollectionId),
+        listAllDocuments(chaptersCollectionId),
+        listAllDocuments(pagesCollectionId)
+      ]);
+      const chapterAuthorIds = [...new Set(
+        chapterDocuments.map((chapter) => chapter.createBy).filter(Boolean)
+      )];
+      const chapterAuthors = new Map(await Promise.all(
+        chapterAuthorIds.map(async (userId) => [userId, await getChapterAuthorName(userId)])
+      ));
+      const pagesByChapter = new Map();
+      for (const page of pageDocuments) {
+        const pages = pagesByChapter.get(page.chapterId) || [];
+        pages.push({
+          id: page.$id,
+          name: page.originalName,
+          url: page.imageUrl,
+          fileId: page.imageFileId,
+          format: page.format,
+          position: page.number - 1
+        });
+        pagesByChapter.set(page.chapterId, pages);
+      }
+      const chaptersByWork = new Map();
+      for (const chapter of chapterDocuments) {
+        if (String(chapter.status || '').toUpperCase() === 'REPROVADO') continue;
+        const pages = (pagesByChapter.get(chapter.$id) || [])
+          .sort((left, right) => left.position - right.position);
+        const workChapters = chaptersByWork.get(chapter.workId) || [];
+        workChapters.push({
+          id: chapter.$id,
+          number: chapter.number,
+          title: getWorkAttribute(chapter.title),
+          language: chapter.language,
+          status: chapter.status,
+          createdAt: chapter.$createdAt,
+          author: chapterAuthors.get(chapter.createBy) || 'Usuário desconhecido',
+          pages
+        });
+        chaptersByWork.set(chapter.workId, workChapters);
+      }
+      return {
+        works: workDocuments.map((work) => ({
+          id: work.$id,
+          title: getWorkAttribute(work.Title),
+          author: getWorkAttribute(work.Author),
+          gender: work.gender ?? work.Gender ?? work.Genres ?? work.Genre ?? '',
+          formato: work.formato ?? '',
+          description: getWorkAttribute(work.Description),
+          cover: getWorkAttribute(work.coverUrl),
+          createdAt: work.$createdAt,
+          coverFileId: '',
+          chapters: (chaptersByWork.get(work.$id) || [])
+            .sort((left, right) => left.number - right.number)
+        }))
+      };
     });
+    return res.json(data);
   } catch (error) {
     return sendAppwriteError(res, error, 'Não foi possível carregar as obras do Appwrite.');
   }

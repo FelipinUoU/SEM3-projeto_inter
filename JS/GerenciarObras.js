@@ -1,8 +1,11 @@
 import { createAuthorIcon } from "./authorIcon.js";
 import { findSimilarAuthorSuggestions } from "./authorSuggestions.js";
+import { apiRequest } from "./apiRequest.js";
 import { confirmInPage } from "./confirmationDialog.js";
+import { invalidatePublicCatalogCache, loadPublicCatalog } from "./catalogCache.js";
 import { setExpandableDescription } from "./expandableDescription.js";
 import { account } from "./JAVA/appwriteClient.js";
+import { normalizeWorkFormat } from "./workFormat.js";
 
 const adminEmail = "hokupedia@gmail.com";
 const imageTypes = new Set(["image/avif", "image/gif", "image/jpeg", "image/png", "image/webp"]);
@@ -109,35 +112,6 @@ let currentUserName = "";
 let workRequestPolling;
 let isRefreshingWorkRequest = false;
 
-async function apiRequest(url, options = {}) {
-    const { authenticated = false, ...requestOptions } = options;
-    const headers = new Headers(requestOptions.headers);
-    if (requestOptions.body && !(requestOptions.body instanceof Blob)) {
-        headers.set("Content-Type", "application/json");
-        requestOptions.body = JSON.stringify(requestOptions.body);
-    }
-    if (authenticated) {
-        const { jwt } = await account.createJWT();
-        headers.set("X-Appwrite-JWT", jwt);
-    }
-    const response = await fetch(url, { ...requestOptions, headers });
-    const contentType = response.headers.get("content-type") || "";
-    const data = contentType.includes("application/json") ? await response.json() : {};
-    if (!response.ok) {
-        const message = typeof data.error === "string"
-            ? data.error
-            : data.error?.message || `A solicitação falhou (HTTP ${response.status}).`;
-        throw Object.assign(new Error(message), { status: response.status });
-    }
-    if (!contentType.includes("application/json")) {
-        throw Object.assign(
-            new Error(`Resposta inesperada do servidor (HTTP ${response.status}).`),
-            { status: response.status }
-        );
-    }
-    return data;
-}
-
 function getDeleteErrorMessage(error, resource) {
     if (error.status === 401) return "Sua sessão expirou. Faça login novamente antes de excluir.";
     if (error.status === 403) {
@@ -179,10 +153,8 @@ async function uploadChapterArchive(file) {
 
 async function loadCatalogWorks() {
     try {
-        const data = await apiRequest("/api/works");
-        if (Array.isArray(data.works)) {
-            catalogWorks = data.works;
-        }
+        const data = await loadPublicCatalog();
+        catalogWorks = data.works;
     } catch (error) {
         console.error("Não foi possível carregar o catálogo de autores:", error);
     }
@@ -655,20 +627,6 @@ function createField({ id, label, name, value = "", type = "text", placeholder =
     if (type !== "textarea") input.type = type;
     wrapper.append(input);
     return wrapper;
-}
-
-function normalizeWorkFormat(value) {
-    const normalized = String(value || "")
-        .trim()
-        .toLocaleLowerCase("pt-BR")
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/[^a-z]/g, "");
-
-    if (["hq", "hqs", "quadrinho", "quadrinhos"].includes(normalized)) return "hq";
-    if (["manhwa", "manhwas"].includes(normalized)) return "manhwa";
-    if (["manga", "mangas"].includes(normalized)) return "manga";
-    return "";
 }
 
 function createWorkFormatField(selected = "") {
@@ -1238,6 +1196,7 @@ async function handleWorkSubmit(form) {
             existing ? `/api/works/${encodeURIComponent(workId)}` : "/api/works",
             { method: existing ? "PUT" : "POST", body: updated, authenticated: true }
         );
+        invalidatePublicCatalogCache();
         works = existing
             ? works.map((work) => work.id === workId
                 ? { ...result.work, id: workId, chapters: work.chapters }
@@ -1312,6 +1271,7 @@ async function handleChapterSubmit(form) {
                 authenticated: true
             }
         );
+        invalidatePublicCatalogCache();
         work.chapters = existing
             ? work.chapters.map((chapter) => chapter.id === chapterId
                 ? { ...result.chapter, authorName: currentUserName }
@@ -1387,6 +1347,7 @@ async function handleAction(action, card, chapterRow, actionButton) {
                         method: "DELETE",
                         authenticated: true
                     });
+                    invalidatePublicCatalogCache();
                     works = works.filter((item) => item.id !== workId);
                     catalogWorks = catalogWorks.filter((item) => item.id !== workId);
                     renderWorks();
@@ -1416,6 +1377,7 @@ async function handleAction(action, card, chapterRow, actionButton) {
                         method: "DELETE",
                         authenticated: true
                     });
+                    invalidatePublicCatalogCache();
                     work.chapters = work.chapters.filter((chapter) => chapter.id !== chapterId);
                     renderWorks();
                     showFeedback("Capítulo e imagens excluídos do Appwrite e do ImageKit.");

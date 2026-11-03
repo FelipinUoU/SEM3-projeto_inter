@@ -1,3 +1,6 @@
+import { loadPublicCatalog } from "./catalogCache.js";
+import { normalizeWorkFormat } from "./workFormat.js";
+
 const catalogGrid = document.querySelector("#catalogGrid");
 const catalogStatus = document.querySelector("#catalogStatus");
 const genreToggle = document.querySelector("#genreToggle");
@@ -10,20 +13,6 @@ const clearFormatFilter = document.querySelector("#clearFormatFilter");
 let works = [];
 let selectedGenre = new URLSearchParams(window.location.search).get("genero") || "";
 let selectedFormat = new URLSearchParams(window.location.search).get("formato") || "";
-
-function normalizeWorkFormat(value) {
-    const normalized = String(value || "")
-        .trim()
-        .toLocaleLowerCase("pt-BR")
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/[^a-z]/g, "");
-
-    if (["hq", "hqs", "quadrinho", "quadrinhos"].includes(normalized)) return "hq";
-    if (["manhwa", "manhwas"].includes(normalized)) return "manhwa";
-    if (["manga", "mangas"].includes(normalized)) return "manga";
-    return "";
-}
 
 function getFormatLabel(format) {
     return { hq: "HQs", manhwa: "Manhwas", manga: "Mangás" }[format] || "";
@@ -148,20 +137,7 @@ function renderWorks() {
 }
 
 async function loadWorks() {
-    const response = await fetch("/api/works");
-    const contentType = response.headers.get("content-type") || "";
-    const data = contentType.includes("application/json") ? await response.json() : null;
-
-    if (!response.ok) {
-        throw new Error(data?.error || `Não foi possível carregar as obras (HTTP ${response.status}).`);
-    }
-    if (!Array.isArray(data?.works)) {
-        throw new Error("A resposta do catálogo não contém uma lista válida de obras.");
-    }
-    if (data.works.some((work) => !work || typeof work.id !== "string" || typeof work.title !== "string")) {
-        throw new Error("A resposta do catálogo contém uma obra inválida.");
-    }
-
+    const data = await loadPublicCatalog();
     works = data.works;
     selectedFormat = normalizeWorkFormat(selectedFormat);
     const genres = [...new Set(works.flatMap(getGenres))];

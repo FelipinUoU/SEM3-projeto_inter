@@ -1,4 +1,6 @@
 import { account } from "./JAVA/appwriteClient.js";
+import { apiRequest } from "./apiRequest.js";
+import { invalidatePublicCatalogCache } from "./catalogCache.js";
 import { confirmInPage } from "./confirmationDialog.js";
 
 const feedback = document.querySelector("#feedback");
@@ -9,24 +11,6 @@ const sections = {
 const coverPreviewDialog = document.querySelector("#coverPreviewDialog");
 const coverPreviewImage = document.querySelector("#coverPreviewImage");
 const adminEmail = "hokupedia@gmail.com";
-
-async function apiRequest(url, options = {}) {
-    const headers = new Headers(options.headers);
-    if (options.body) {
-        headers.set("Content-Type", "application/json");
-        options.body = JSON.stringify(options.body);
-    }
-    const { jwt } = await account.createJWT();
-    headers.set("X-Appwrite-JWT", jwt);
-    const response = await fetch(url, { ...options, headers });
-    const contentType = response.headers.get("content-type") || "";
-    const data = contentType.includes("application/json") ? await response.json() : {};
-    if (!response.ok) throw new Error(data.error || `A solicitação falhou (HTTP ${response.status}).`);
-    if (!contentType.includes("application/json")) {
-        throw new Error(`Resposta inesperada do servidor (HTTP ${response.status}).`);
-    }
-    return data;
-}
 
 function showFeedback(message, isError = false) {
     feedback.textContent = message;
@@ -225,7 +209,7 @@ function renderList(container, requests, kind, titleFor) {
 }
 
 async function loadRequests() {
-    const data = await apiRequest("/api/homologacao");
+    const data = await apiRequest("/api/homologacao", { authenticated: true });
     if (!Array.isArray(data.moderationRequests)
         || !Array.isArray(data.workRequests)) {
         throw new Error("A resposta do servidor não contém as listas de homologação esperadas.");
@@ -272,8 +256,10 @@ document.addEventListener("click", async (event) => {
     try {
         const requestType = kind === "moderation" ? "moderacao" : "obra";
         await apiRequest(`/api/pedido_${requestType}/${encodeURIComponent(requestId)}/${decision}`, {
-            method: "POST"
+            method: "POST",
+            authenticated: true
         });
+        if (kind === "work" && decision === "aprovar") invalidatePublicCatalogCache();
         await loadRequests();
         showFeedback(decision === "aprovar" ? "Pedido aprovado." : "Pedido reprovado.");
     } catch (error) {
