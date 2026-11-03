@@ -1148,7 +1148,7 @@ async function handleAction(action, card, chapterRow, actionButton) {
         case "delete-chapter":
             if (work && await confirmInPage({
                 title: "Excluir capítulo?",
-                message: `Excluir “${chapterRow.querySelector(".chapter-row-title").textContent}”? Esta ação não pode ser desfeita.`,
+                message: `Excluir “${chapterRow.querySelector(".chapter-row-title").textContent}” e suas imagens do ImageKit? Esta ação não pode ser desfeita.`,
                 confirmLabel: "Excluir capítulo",
                 destructive: true
             })) {
@@ -1159,7 +1159,7 @@ async function handleAction(action, card, chapterRow, actionButton) {
                     });
                     work.chapters = work.chapters.filter((chapter) => chapter.id !== chapterId);
                     renderWorks();
-                    showFeedback("Capítulo excluído do Appwrite.");
+                    showFeedback("Capítulo e imagens excluídos do Appwrite e do ImageKit.");
                 } catch (error) {
                     console.error("Não foi possível excluir o capítulo:", error);
                     showFeedback(error.message || "Não foi possível excluir o capítulo.", true);
