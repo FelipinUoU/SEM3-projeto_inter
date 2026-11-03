@@ -1305,11 +1305,12 @@ a {
 
 .chapter-page-add {
     display: grid;
-    width: 136px;
-    min-height: 181px;
+    width: 102px;
+    min-height: 136px;
     align-content: center;
     justify-items: center;
     gap: 8px;
+    margin-top: 44px;
     padding: 14px;
     background: #d9d9d9;
     color: #19181b;
@@ -1620,6 +1621,7 @@ a {
     .chapter-page-add {
         width: min(100%, 136px);
         min-height: 140px;
+        margin-top: 0;
     }
 
     .chapter-page-formats {
