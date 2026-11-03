@@ -89,6 +89,8 @@ const addWorkButton = document.querySelector("#addWorkButton");
 const feedback = document.querySelector("#feedback");
 const operationProgressDialog = document.querySelector("#operationProgressDialog");
 const operationProgressMessage = document.querySelector("#operationProgressMessage");
+const imagePreviewDialog = document.querySelector("#imagePreviewDialog");
+const imagePreviewImage = document.querySelector("#imagePreviewImage");
 const pageTitle = document.querySelector("#pageTitle");
 const workManagementRegion = document.querySelector("#workManagementRegion");
 const moderationRequestRegion = document.querySelector("#moderationRequestRegion");
@@ -103,6 +105,9 @@ let catalogWorks = [];
 let currentEditingWorkId = "";
 let workRequests = [];
 let selectedArchive;
+let selectedArchivePages;
+let selectedChapterImages = [];
+let selectedChapterExistingPages = [];
 let selectedCoverFile;
 const pendingChapterSubmissions = new WeakSet();
 let coverPreviewUrl;
@@ -125,9 +130,19 @@ function getDeleteErrorMessage(error, resource) {
 }
 
 async function uploadImage(file) {
+    const extension = file.name.split(".").pop()?.toLowerCase();
+    const contentType = imageTypes.has(file.type) ? file.type : ({
+        avif: "image/avif",
+        gif: "image/gif",
+        jpg: "image/jpeg",
+        jpeg: "image/jpeg",
+        png: "image/png",
+        webp: "image/webp"
+    })[extension];
+    if (!contentType) throw new Error("Selecione uma imagem JPG, PNG, GIF, WEBP ou AVIF.");
     return apiRequest(`/api/uploads?filename=${encodeURIComponent(file.name)}`, {
         method: "POST",
-        headers: { "Content-Type": file.type },
+        headers: { "Content-Type": contentType },
         body: file,
         authenticated: true
     });
@@ -150,6 +165,19 @@ async function uploadChapterArchive(file) {
         authenticated: true
     });
 }
+
+document.addEventListener("click", (event) => {
+    const previewButton = event.target.closest("button[data-image-preview-url]");
+    if (previewButton) {
+        imagePreviewImage.src = previewButton.dataset.imagePreviewUrl;
+        imagePreviewImage.alt = previewButton.getAttribute("aria-label") || "Imagem do capítulo";
+        imagePreviewDialog.showModal();
+        return;
+    }
+    if (event.target.closest(".image-preview-close") || event.target === imagePreviewDialog) {
+        imagePreviewDialog.close();
+    }
+});
 
 async function loadCatalogWorks() {
     try {
@@ -906,6 +934,21 @@ function createLanguageSelect(selected = "pt-BR") {
 }
 
 function renderChapterForm(work, chapter, targetRegion) {
+    selectedArchive = undefined;
+    selectedArchivePages = undefined;
+    selectedChapterImages = [];
+    selectedChapterExistingPages = (chapter?.pages || []).map((page) => {
+        if (typeof page === "string") {
+            return { name: "Página", url: page, fileId: "", format: "" };
+        }
+        return {
+            ...page,
+            name: page.name || page.originalName || "Página",
+            url: page.url || page.imageUrl || "",
+            fileId: page.fileId || page.imageFileId || ""
+        };
+    });
+
     const panel = createEditorPanel(chapter ? "Editar Capítulo" : `Novo Capítulo — ${work.title}`);
     const form = document.createElement("form");
     form.className = "editor-form";
@@ -940,101 +983,185 @@ function renderChapterForm(work, chapter, targetRegion) {
     form.append(chapterFields);
 
     const row = document.createElement("div");
-    row.className = "form-row";
+    row.className = "form-row chapter-language-row";
     row.append(createLanguageSelect(chapter?.language || "pt-BR"));
-    const formatField = document.createElement("div");
-    formatField.className = "field";
-    formatField.append(document.createTextNode("Formato do arquivo"));
-    const formatText = document.createElement("div");
-    formatText.className = "selected-files";
-    formatText.textContent = "Envie um arquivo .zip com as imagens PNG, JPG, JPEG, WEBP, GIF ou AVIF.";
-    formatField.append(formatText);
-    row.append(formatField);
     form.append(row);
 
+    const uploadArea = document.createElement("div");
+    uploadArea.className = "chapter-page-upload";
     const uploadLabel = document.createElement("label");
-    uploadLabel.className = "upload-label";
+    uploadLabel.className = "chapter-page-add";
     uploadLabel.htmlFor = "chapterPages";
     const uploadIcon = document.createElement("span");
-    uploadIcon.className = "upload-icon";
     uploadIcon.setAttribute("aria-hidden", "true");
     uploadIcon.textContent = "↑";
     uploadLabel.append(uploadIcon);
     const uploadStrong = document.createElement("strong");
-    uploadStrong.textContent = "Clique para selecionar um arquivo .zip";
+    uploadStrong.textContent = "Clique para adicionar";
     uploadLabel.append(uploadStrong);
-    const uploadHint = document.createElement("span");
-    uploadHint.textContent = "O ZIP deve conter apenas imagens e não pode ter senha.";
-    uploadLabel.append(uploadHint);
 
     const fileInput = document.createElement("input");
     fileInput.className = "file-input";
     fileInput.id = "chapterPages";
-    fileInput.name = "archive";
+    fileInput.name = "chapterPages";
     fileInput.type = "file";
-    fileInput.accept = ".zip,application/zip,application/x-zip-compressed";
-    form.append(uploadLabel, fileInput);
+    fileInput.accept = ".zip,application/zip,application/x-zip-compressed,image/avif,image/gif,image/jpeg,image/png,image/webp";
+    fileInput.multiple = true;
+    uploadLabel.append(fileInput);
 
+    const gallery = document.createElement("div");
+    gallery.className = "chapter-page-gallery";
+    const formatsHint = document.createElement("p");
+    formatsHint.className = "chapter-page-formats";
+    formatsHint.textContent = "Formatos aceitos: JPG, PNG, GIF, WEBP, AVIF e ZIP.";
+    const pageStrip = document.createElement("div");
+    pageStrip.className = "chapter-page-strip";
+    pageStrip.setAttribute("role", "list");
+    pageStrip.setAttribute("aria-label", "Imagens do capítulo");
     const selectedFilesLabel = document.createElement("p");
-    selectedFilesLabel.className = "selected-files";
-    selectedFilesLabel.id = "selectedFiles";
-    const existingNames = chapter?.pages?.map((page) => (
-        typeof page === "string" ? page : page.name
-    )) || [];
-    selectedFilesLabel.textContent = existingNames.length
-        ? `Arquivos registrados: ${existingNames.map((name) => name || "Página").join(", ")}`
-        : "Nenhum arquivo selecionado.";
-    form.append(selectedFilesLabel, createFormActions(chapter ? "Salvar" : "Adicionar capítulo"));
+    selectedFilesLabel.className = "selected-files chapter-page-status";
+    selectedFilesLabel.setAttribute("role", "status");
+    gallery.append(formatsHint, pageStrip, selectedFilesLabel);
+    uploadArea.append(uploadLabel, gallery);
+    form.append(uploadArea, createFormActions(chapter ? "Salvar" : "Adicionar capítulo"));
+
+    function renderChapterPages() {
+        pageStrip.replaceChildren();
+        const pages = selectedChapterExistingPages.map((page, index) => ({
+            ...page,
+            source: "existing",
+            index
+        })).concat(selectedChapterImages.map((image, index) => ({
+            name: image.file.name,
+            url: image.previewUrl,
+            source: "selected",
+            index
+        })));
+
+        for (const page of pages) {
+            const card = document.createElement("figure");
+            card.className = "page-preview";
+            card.setAttribute("role", "listitem");
+            const openButton = document.createElement("button");
+            openButton.className = "page-preview-open";
+            openButton.type = "button";
+            openButton.dataset.imagePreviewUrl = page.url;
+            openButton.setAttribute("aria-label", `Visualizar ${page.name}`);
+            const image = document.createElement("img");
+            image.src = page.url;
+            image.alt = page.name;
+            openButton.append(image);
+            card.append(openButton);
+
+            const removeButton = document.createElement("button");
+            removeButton.className = "page-preview-remove";
+            removeButton.type = "button";
+            removeButton.dataset.removePage = page.source;
+            removeButton.dataset.pageIndex = String(page.index);
+            removeButton.setAttribute("aria-label", `Remover ${page.name}`);
+            removeButton.textContent = "×";
+            card.append(removeButton);
+
+            const caption = document.createElement("figcaption");
+            caption.textContent = page.name;
+            card.append(caption);
+            pageStrip.append(card);
+        }
+
+        if (selectedArchive) {
+            const archiveCard = document.createElement("figure");
+            archiveCard.className = "page-preview page-preview-archive";
+            archiveCard.setAttribute("role", "listitem");
+            const archiveName = document.createElement("span");
+            archiveName.className = "page-preview-archive-icon";
+            archiveName.setAttribute("aria-hidden", "true");
+            archiveName.textContent = "ZIP";
+            archiveCard.append(archiveName);
+            const removeArchive = document.createElement("button");
+            removeArchive.className = "page-preview-remove";
+            removeArchive.type = "button";
+            removeArchive.dataset.removePage = "archive";
+            removeArchive.setAttribute("aria-label", `Remover arquivo ${selectedArchive.name}`);
+            removeArchive.textContent = "×";
+            archiveCard.append(removeArchive);
+            const caption = document.createElement("figcaption");
+            caption.textContent = selectedArchive.name;
+            archiveCard.append(caption);
+            pageStrip.append(archiveCard);
+        }
+
+        const pageCount = selectedChapterExistingPages.length + selectedChapterImages.length;
+        selectedFilesLabel.textContent = selectedArchive
+            ? `ZIP selecionado: ${selectedArchive.name}. As páginas serão adicionadas ao capítulo.`
+            : pageCount
+                ? `${pageCount} ${pageCount === 1 ? "imagem pronta" : "imagens prontas"} para o capítulo.`
+                : "Nenhuma imagem selecionada. Adicione imagens ou um arquivo ZIP.";
+    }
+
+    function addChapterFiles(files) {
+        if (files.length === 0) return;
+        const zipFiles = files.filter((file) => file.name.toLowerCase().endsWith(".zip"));
+        if (zipFiles.length > 0) {
+            if (files.length !== 1 || zipFiles.length !== 1 || selectedChapterImages.length > 0) {
+                showFeedback("Adicione um único ZIP por vez, sem misturá-lo com imagens.", true);
+                return;
+            }
+            selectedArchive = zipFiles[0];
+            selectedArchivePages = undefined;
+        } else {
+            if (selectedArchive) {
+                showFeedback("Remova o ZIP selecionado antes de adicionar imagens avulsas.", true);
+                return;
+            }
+            if (files.some((file) => !imageTypes.has(file.type) && !/\.(avif|gif|jpe?g|png|webp)$/i.test(file.name))) {
+                showFeedback("Selecione imagens JPG, PNG, GIF, WEBP ou AVIF.", true);
+                return;
+            }
+            selectedChapterImages.push(...files.map((file) => ({
+                file,
+                previewUrl: URL.createObjectURL(file),
+                uploadedPage: undefined
+            })));
+        }
+        showFeedback("");
+        renderChapterPages();
+    }
 
     fileInput.addEventListener("change", () => {
-        const [file] = fileInput.files;
-        if (!file) return;
-        if (!file.name.toLowerCase().endsWith(".zip")) {
-            fileInput.value = "";
-            selectedArchive = undefined;
-            selectedFilesLabel.textContent = existingNames.length
-                ? `Arquivos registrados: ${existingNames.join(", ")}`
-                : "Nenhum arquivo selecionado.";
-            showFeedback("Selecione somente um arquivo com extensão .zip.", true);
-            return;
-        }
-        selectedArchive = file;
-        selectedFilesLabel.textContent = `ZIP selecionado: ${file.name} (${(file.size / (1024 * 1024)).toFixed(1)} MB)`;
-        showFeedback("");
+        addChapterFiles([...fileInput.files]);
+        fileInput.value = "";
     });
 
-    uploadLabel.addEventListener("dragover", (event) => {
-        event.preventDefault();
-        uploadLabel.classList.add("is-dragging");
-    });
-    uploadLabel.addEventListener("dragleave", () => uploadLabel.classList.remove("is-dragging"));
-    uploadLabel.addEventListener("drop", (event) => {
-        event.preventDefault();
-        uploadLabel.classList.remove("is-dragging");
-        const files = [...(event.dataTransfer?.files || [])];
-        if (files.length > 1) {
+    pageStrip.addEventListener("click", (event) => {
+        const removeButton = event.target.closest("button[data-remove-page]");
+        if (!removeButton) return;
+        const { removePage, pageIndex } = removeButton.dataset;
+        if (removePage === "archive") {
             selectedArchive = undefined;
-            fileInput.value = "";
-            selectedFilesLabel.textContent = "Selecione somente um arquivo .zip.";
-            showFeedback("Arraste somente um arquivo .zip por capítulo.", true);
-            return;
+            selectedArchivePages = undefined;
+        } else if (removePage === "existing") {
+            selectedChapterExistingPages.splice(Number(pageIndex), 1);
+        } else if (removePage === "selected") {
+            const [removed] = selectedChapterImages.splice(Number(pageIndex), 1);
+            if (removed) URL.revokeObjectURL(removed.previewUrl);
         }
-        const [file] = files;
-        if (!file) return;
-        if (!file.name.toLowerCase().endsWith(".zip")) {
-            selectedArchive = undefined;
-            fileInput.value = "";
-            selectedFilesLabel.textContent = existingNames.length
-                ? `Arquivos registrados: ${existingNames.join(", ")}`
-                : "Nenhum arquivo selecionado.";
-            showFeedback("Arraste somente um arquivo com extensão .zip.", true);
-            return;
-        }
-        selectedArchive = file;
-        selectedFilesLabel.textContent = `ZIP selecionado: ${file.name} (${(file.size / (1024 * 1024)).toFixed(1)} MB)`;
-        showFeedback("");
+        renderChapterPages();
     });
 
+    uploadArea.addEventListener("dragover", (event) => {
+        event.preventDefault();
+        uploadArea.classList.add("is-dragging");
+    });
+    uploadArea.addEventListener("dragleave", (event) => {
+        if (!uploadArea.contains(event.relatedTarget)) uploadArea.classList.remove("is-dragging");
+    });
+    uploadArea.addEventListener("drop", (event) => {
+        event.preventDefault();
+        uploadArea.classList.remove("is-dragging");
+        addChapterFiles([...(event.dataTransfer?.files || [])]);
+    });
+
+    renderChapterPages();
     panel.append(form);
     targetRegion.replaceChildren(panel);
     document.querySelector("#chapterNumber").focus();
@@ -1088,6 +1215,10 @@ function createFormActions(saveLabel = "Salvar", isWorkForm = false) {
 
 function closeEditor() {
     selectedArchive = undefined;
+    selectedArchivePages = undefined;
+    selectedChapterImages.forEach((image) => URL.revokeObjectURL(image.previewUrl));
+    selectedChapterImages = [];
+    selectedChapterExistingPages = [];
     selectedCoverFile = undefined;
     if (coverPreviewUrl) URL.revokeObjectURL(coverPreviewUrl);
     coverPreviewUrl = undefined;
@@ -1228,9 +1359,9 @@ async function handleChapterSubmit(form) {
         showFeedback("Informe um número de capítulo inteiro maior que zero.", true);
         return;
     }
-    let pages = existing?.pages || [];
-    if (!selectedArchive && pages.length === 0) {
-        showFeedback("Selecione um arquivo .zip com as páginas do capítulo.", true);
+    let pages = [...selectedChapterExistingPages];
+    if (!selectedArchive && selectedChapterImages.length === 0 && pages.length === 0) {
+        showFeedback("Adicione ao menos uma imagem ou um arquivo ZIP com as páginas do capítulo.", true);
         return;
     }
 
@@ -1245,17 +1376,30 @@ async function handleChapterSubmit(form) {
 
     try {
         if (selectedArchive) {
-            if (submitButton) submitButton.textContent = "Enviando páginas…";
-            showOperationProgress("Enviando e processando as páginas do capítulo. Aguarde; isso pode levar alguns minutos conforme o tamanho do arquivo.");
-            ({ pages } = await uploadChapterArchive(selectedArchive));
+            if (!selectedArchivePages) {
+                if (submitButton) submitButton.textContent = "Enviando páginas…";
+                showOperationProgress("Enviando e processando as páginas do ZIP. Aguarde; isso pode levar alguns minutos conforme o tamanho do arquivo.");
+                ({ pages: selectedArchivePages } = await uploadChapterArchive(selectedArchive));
+            }
+            pages.push(...selectedArchivePages);
+        }
+        for (const [index, image] of selectedChapterImages.entries()) {
+            if (!image.uploadedPage) {
+                if (submitButton) submitButton.textContent = `Enviando imagem ${index + 1}/${selectedChapterImages.length}…`;
+                showOperationProgress(`Enviando imagem ${index + 1} de ${selectedChapterImages.length}. Aguarde.`);
+                image.uploadedPage = await uploadImage(image.file);
+            }
+            pages.push(image.uploadedPage);
         }
         if (pages.length === 0) {
-            showFeedback("Selecione um arquivo .zip com as páginas do capítulo.", true);
+            showFeedback("Adicione ao menos uma imagem ao capítulo.", true);
             return;
         }
 
         if (submitButton) submitButton.textContent = "Salvando capítulo…";
-        if (selectedArchive) showOperationProgress("Páginas enviadas. Salvando o capítulo, aguarde.");
+        if (selectedArchive || selectedChapterImages.length) {
+            showOperationProgress("Páginas enviadas. Salvando o capítulo, aguarde.");
+        }
         const result = await apiRequest(
             existing
                 ? `/api/chapters/${encodeURIComponent(chapterId)}`
@@ -1280,7 +1424,10 @@ async function handleChapterSubmit(form) {
                 .sort((left, right) => left.number - right.number);
         renderWorks();
         closeEditor();
-        showFeedback(existing ? "Capítulo atualizado no Appwrite." : "Capítulo adicionado ao Appwrite.");
+        showFeedback(
+            result.cleanupWarning || (existing ? "Capítulo atualizado no Appwrite." : "Capítulo adicionado ao Appwrite."),
+            Boolean(result.cleanupWarning)
+        );
     } catch (error) {
         console.error("Não foi possível enviar ou salvar o capítulo:", error);
         showFeedback(error.message || "Não foi possível enviar ou salvar o capítulo.", true);

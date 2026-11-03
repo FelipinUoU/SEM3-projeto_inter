@@ -1292,6 +1292,138 @@ a {
     line-height: 1.5;
 }
 
+.chapter-language-row {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.chapter-page-upload {
+    display: grid;
+    grid-template-columns: 136px minmax(0, 1fr);
+    align-items: start;
+    gap: 28px;
+}
+
+.chapter-page-add {
+    display: grid;
+    width: 136px;
+    min-height: 181px;
+    align-content: center;
+    justify-items: center;
+    gap: 8px;
+    padding: 14px;
+    background: #d9d9d9;
+    color: #19181b;
+    text-align: center;
+    cursor: pointer;
+    transition: background-color 150ms ease, outline-color 150ms ease;
+}
+
+.chapter-page-add span {
+    color: #267cc0;
+    font-size: 27px;
+    line-height: 1;
+}
+
+.chapter-page-add strong {
+    max-width: 100px;
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 1.35;
+}
+
+.chapter-page-add:hover,
+.chapter-page-upload.is-dragging .chapter-page-add {
+    background: #c8dff1;
+    outline: 2px solid #48aaff;
+    outline-offset: 2px;
+}
+
+.chapter-page-gallery {
+    min-width: 0;
+}
+
+.chapter-page-formats {
+    margin: 0 0 24px;
+    color: #f0edf3;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+.chapter-page-strip {
+    display: flex;
+    min-height: 181px;
+    align-items: flex-start;
+    gap: 26px;
+    overflow-x: auto;
+    padding: 0 0 8px;
+    border-bottom: 1px solid #f0edf3;
+    scrollbar-color: #d8d8d8 #343238;
+    scrollbar-width: thin;
+    scroll-snap-type: x proximity;
+}
+
+.chapter-page-strip .page-preview {
+    position: relative;
+    flex: 0 0 102px;
+    width: 102px;
+    min-width: 102px;
+    scroll-snap-align: start;
+}
+
+.chapter-page-strip .page-preview img {
+    height: 136px;
+}
+
+.page-preview-remove {
+    position: absolute;
+    z-index: 1;
+    top: 4px;
+    right: 4px;
+    display: grid;
+    width: 25px;
+    height: 25px;
+    place-items: center;
+    padding: 0;
+    border: 1px solid #ffffff85;
+    border-radius: 50%;
+    background: #171619e8;
+    color: #fff;
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.page-preview-remove:hover {
+    background: #b82e3b;
+}
+
+.page-preview-remove:focus-visible {
+    outline: 2px solid #aeb9ff;
+    outline-offset: 2px;
+}
+
+.page-preview-archive {
+    display: grid;
+    height: 136px;
+    align-content: center;
+    justify-items: center;
+    gap: 8px;
+    padding: 8px;
+    background: #242328;
+    color: #d4d0d9;
+    text-align: center;
+}
+
+.page-preview-archive-icon {
+    color: #48aaff;
+    font-size: 24px;
+    font-weight: 700;
+}
+
+.chapter-page-status {
+    margin: 8px 0 0;
+}
+
 .page-preview-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
@@ -1363,6 +1495,20 @@ a {
     max-height: calc(100vh - 64px);
     object-fit: contain;
     cursor: default;
+}
+
+.image-preview-close {
+    position: absolute;
+    top: 18px;
+    right: 24px;
+    width: 42px;
+    height: 42px;
+    border: 1px solid #ffffff50;
+    border-radius: 50%;
+    background: #171619;
+    color: #fff;
+    font-size: 28px;
+    cursor: pointer;
 }
 
 .page-preview figcaption {
@@ -1464,6 +1610,24 @@ a {
 
     .editor-panel {
         padding: 17px;
+    }
+
+    .chapter-page-upload {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 16px;
+    }
+
+    .chapter-page-add {
+        width: min(100%, 136px);
+        min-height: 140px;
+    }
+
+    .chapter-page-formats {
+        margin-bottom: 14px;
+    }
+
+    .chapter-page-strip {
+        gap: 14px;
     }
 
     .management-page.has-work-creation-form {

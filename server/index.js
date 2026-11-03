@@ -1131,10 +1131,32 @@ app.put('/api/chapters/:id', requireAuthenticatedUser, requireModeratorUser, asy
     const cleanupResults = await Promise.allSettled(existingPages.map((page) => (
       databases.deleteDocument(appwriteDatabaseId, pagesCollectionId, page.$id)
     )));
-    cleanupResults.forEach((result) => {
-      if (result.status === 'rejected') console.error('Could not delete a replaced chapter page:', result.reason);
+    const successfullyDeletedPages = [];
+    cleanupResults.forEach((result, index) => {
+      if (result.status === 'rejected') {
+        console.error('Could not delete a replaced chapter page:', result.reason);
+        return;
+      }
+      successfullyDeletedPages.push(existingPages[index]);
     });
+    const retainedFileIds = new Set(pages.map((page) => page.fileId).filter(Boolean));
+    const removedImagePages = successfullyDeletedPages.filter((page) => (
+      page.imageFileId && !retainedFileIds.has(page.imageFileId)
+    ));
+    const imageCleanupResults = await Promise.allSettled(removedImagePages.map((page) => (
+      deleteImageKitFile(page.imageFileId, '/hokupedia/', page.imageUrl)
+    )));
+    imageCleanupResults.forEach((result) => {
+      if (result.status === 'rejected') {
+        console.error('Could not delete a removed chapter image from ImageKit:', result.reason);
+      }
+    });
+    const cleanupWarning = cleanupResults.some((result) => result.status === 'rejected')
+      || imageCleanupResults.some((result) => result.status === 'rejected')
+      ? 'Capítulo salvo, mas algumas imagens removidas não puderam ser excluídas do armazenamento.'
+      : undefined;
     return res.json({
+      ...(cleanupWarning ? { cleanupWarning } : {}),
       chapter: {
         id: chapter.$id,
         number: chapter.number,
