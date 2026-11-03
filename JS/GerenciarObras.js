@@ -275,8 +275,8 @@ function renderWorkCard(work) {
 
     const description = document.createElement("p");
     description.className = "work-description";
-    setExpandableDescription(description, work.description || "Sem descrição.");
     details.append(description);
+    setExpandableDescription(description, work.description || "Sem descrição.");
 
     const actions = document.createElement("div");
     actions.className = "work-actions";
