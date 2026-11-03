@@ -195,6 +195,26 @@ a {
     line-height: 1.5;
 }
 
+.work-description.is-collapsed {
+    max-height: 3em;
+    overflow: hidden;
+}
+
+.description-toggle {
+    margin-top: 6px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #e8c52d;
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.description-toggle[hidden] {
+    display: none;
+}
+
 .work-author {
     display: flex;
     flex-wrap: wrap;

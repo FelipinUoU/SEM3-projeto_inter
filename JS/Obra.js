@@ -1,4 +1,5 @@
 import { createAuthorIcon } from "./authorIcon.js";
+import { setExpandableDescription } from "./expandableDescription.js";
 import {
     getCurrentLibraryUser,
     loadAnonymousReadChapters,
@@ -170,7 +171,7 @@ async function renderChapters() {
     } catch (error) {
         console.error("Não foi possível carregar os dados da obra:", error);
         workTitle.textContent = "Erro ao carregar obra";
-        workDescription.textContent = error.message || "Não foi possível carregar os dados do Appwrite.";
+        setExpandableDescription(workDescription, error.message || "Não foi possível carregar os dados do Appwrite.");
         workAuthor.textContent = "";
         favoriteButton.disabled = true;
         return;
@@ -178,7 +179,7 @@ async function renderChapters() {
 
     if (!work) {
         workTitle.textContent = "Obra não encontrada";
-        workDescription.textContent = "Selecione uma obra cadastrada para continuar.";
+        setExpandableDescription(workDescription, "Selecione uma obra cadastrada para continuar.");
         workAuthor.textContent = "";
         const emptyState = document.createElement("p");
         emptyState.className = "empty-state";
@@ -190,7 +191,7 @@ async function renderChapters() {
 
     currentWork = work;
     workTitle.textContent = work.title;
-    workDescription.textContent = work.description || "Sem descrição.";
+    setExpandableDescription(workDescription, work.description || "Sem descrição.");
     workAuthor.textContent = work.author || "Autor não informado";
     const format = getWorkFormat(work.formato);
     workFormat.hidden = !format;

@@ -339,6 +339,26 @@ a {
     line-height: 1.45;
 }
 
+.work-description.is-collapsed {
+    max-height: 2.9em;
+    overflow: hidden;
+}
+
+.description-toggle {
+    margin: 6px 0 10px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #e8c52d;
+    font-size: 12px;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.description-toggle[hidden] {
+    display: none;
+}
+
 .work-actions {
     display: flex;
     align-items: center;

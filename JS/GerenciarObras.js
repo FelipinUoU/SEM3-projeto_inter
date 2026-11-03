@@ -1,5 +1,6 @@
 import { createAuthorIcon } from "./authorIcon.js";
 import { confirmInPage } from "./confirmationDialog.js";
+import { setExpandableDescription } from "./expandableDescription.js";
 import { account } from "./JAVA/appwriteClient.js";
 
 const adminEmail = "hokupedia@gmail.com";
@@ -274,7 +275,7 @@ function renderWorkCard(work) {
 
     const description = document.createElement("p");
     description.className = "work-description";
-    description.textContent = work.description || "Sem descrição.";
+    setExpandableDescription(description, work.description || "Sem descrição.");
     details.append(description);
 
     const actions = document.createElement("div");
