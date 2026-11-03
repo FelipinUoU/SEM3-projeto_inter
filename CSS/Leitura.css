@@ -221,6 +221,48 @@ h1.titulo-manga { font-size: 26px; margin-bottom: 5px; }
     font-size: 17px;
 }
 
+.translation-visibility-trigger {
+    display: grid;
+    width: 32px;
+    height: 32px;
+    flex: 0 0 32px;
+    place-items: center;
+    padding: 0;
+    border: 1px solid #44445c;
+    border-radius: 50%;
+    background: #2a2a3d;
+    color: var(--text-color);
+    cursor: pointer;
+}
+
+.translation-visibility-trigger svg {
+    width: 18px;
+    height: 18px;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.8;
+}
+
+.translation-visibility-trigger[aria-pressed="true"] {
+    color: var(--accent-yellow);
+}
+
+.translation-visibility-trigger:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+}
+
+.translation-visibility-trigger[aria-pressed="true"] .translation-eye-open,
+.translation-visibility-trigger[aria-pressed="false"] .translation-eye-closed {
+    display: none;
+}
+
+.translation-layer.is-hidden {
+    display: none;
+}
+
 .btn-translate-gemini[disabled] {
     cursor: wait;
     opacity: 0.6;
@@ -301,6 +343,7 @@ h1.titulo-manga { font-size: 26px; margin-bottom: 5px; }
 
 .translation-dialog-actions {
     display: flex;
+    flex-wrap: wrap;
     justify-content: flex-end;
     gap: 10px;
     margin-top: 4px;
@@ -328,6 +371,12 @@ h1.titulo-manga { font-size: 26px; margin-bottom: 5px; }
     position: absolute;
     z-index: 3;
     pointer-events: none;
+}
+
+.dialog-button.danger {
+    margin-right: auto;
+    color: #fff;
+    background: #9c3038;
 }
 
 .translated-bubble {

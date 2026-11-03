@@ -1,4 +1,11 @@
 import { getCurrentLibraryUser, recordReadChapter } from "./userLibrary.js";
+import {
+    getStoredChapterTranslations,
+    getStoredPageAnalysis,
+    removeStoredPageAnalysis,
+    savePageAnalysis,
+    saveTranslatedPage
+} from "./chapterTranslations.js";
 
 const viewModeButton = document.getElementById("view-mode-btn");
 const viewDropdown = document.getElementById("view-dropdown");
@@ -6,11 +13,13 @@ const readerViewport = document.getElementById("reader-viewport");
 const pageCounter = document.getElementById("page-counter");
 const translateButton = document.getElementById("translate-btn");
 const translateText = document.getElementById("translate-text");
+const translationVisibilityButton = document.getElementById("translation-visibility-btn");
 const translationStatus = document.getElementById("translation-status");
 const settingsButton = document.getElementById("translation-settings-btn");
 const settingsDialog = document.getElementById("translation-dialog");
 const settingsForm = document.getElementById("translation-settings-form");
 const cancelSettingsButton = document.getElementById("cancel-translation-settings");
+const clearTranslationsButton = document.getElementById("clear-translations-btn");
 const languageSelect = document.getElementById("translation-language");
 const scopeSelect = document.getElementById("translation-scope");
 const capitalizationSelect = document.getElementById("translation-capitalization");
@@ -25,6 +34,12 @@ const defaultSettings = {
 const readerQuery = new URLSearchParams(window.location.search);
 const workId = readerQuery.get("obra");
 const chapterId = readerQuery.get("capitulo");
+const chapterTranslationsKey = chapterId
+    ? `hokupedia.readerTranslations.v1:${chapterId}`
+    : "";
+const chapterAnalysisKey = chapterId
+    ? `hokupedia.readerAnalysis.v1:${chapterId}`
+    : "";
 const analysisCache = new Map();
 const translationCache = new Map();
 let settings = loadSettings();
@@ -34,10 +49,10 @@ let currentPageIndex = 0;
 let currentMode = "vertical";
 let currentWork;
 let currentChapter;
-let translationLayer;
 const pageTranslationLayers = new Map();
 let translationController;
 let statusTimeout;
+let translationsVisible = true;
 
 const analysisSchema = {
     type: "OBJECT",
@@ -122,6 +137,36 @@ function setStatus(message, type = "") {
     }
 }
 
+function logAIProgress(event, details = {}) {
+    console.info(`[HokuPédia IA] ${event}`, details);
+}
+
+function restoreChapterTranslations() {
+    if (!chapterTranslationsKey) return;
+    try {
+        const record = getStoredChapterTranslations(localStorage, chapterTranslationsKey);
+        const languageTranslations = record[settings.language];
+        if (!languageTranslations || typeof languageTranslations !== "object" || Array.isArray(languageTranslations)) {
+            return;
+        }
+        for (const wrapper of wrappers) {
+            const savedBubbles = languageTranslations[wrapper.dataset.pageId];
+            if (!Array.isArray(savedBubbles)) continue;
+            try {
+                const bubbles = validateBubbles(savedBubbles);
+                const translatedBubbles = validateTranslations(savedBubbles, bubbles);
+                displayTranslations(translatedBubbles, wrapper);
+            } catch (error) {
+                console.error(`Não foi possível restaurar a tradução da página ${wrapper.dataset.page}:`, error);
+            }
+        }
+        syncCurrentTranslation();
+    } catch (error) {
+        console.error("Não foi possível restaurar as traduções deste capítulo:", error);
+        setStatus("Não foi possível carregar as traduções salvas neste navegador.", "error");
+    }
+}
+
 function getChapterName(chapter, index) {
     const number = Number.isInteger(chapter?.number) ? chapter.number : index + 1;
     return `Capítulo ${number}${chapter?.title ? ` — ${chapter.title}` : ""}`;
@@ -192,6 +237,7 @@ async function loadStoredChapter() {
             const wrapper = document.createElement("div");
             wrapper.className = "manga-page-wrapper";
             wrapper.dataset.page = String(index);
+            wrapper.dataset.pageId = String(page.id || `page-${index + 1}`);
             const image = document.createElement("img");
             image.className = "manga-page";
             image.crossOrigin = "anonymous";
@@ -205,6 +251,7 @@ async function loadStoredChapter() {
         readerViewport.setAttribute("aria-busy", "false");
         setStatus("");
         refreshPages();
+        restoreChapterTranslations();
 
         try {
             const user = await getCurrentLibraryUser();
@@ -242,9 +289,15 @@ function updateCounter() {
 }
 
 function syncCurrentTranslation() {
-    const currentTranslation = pageTranslationLayers.get(wrappers[currentPageIndex]);
-    translationLayer = currentTranslation?.layer;
-    translateButton.setAttribute("aria-pressed", String(Boolean(translationLayer)));
+    translationVisibilityButton.disabled = pageTranslationLayers.size === 0;
+    translationVisibilityButton.setAttribute("aria-pressed", String(
+        pageTranslationLayers.size > 0 && translationsVisible
+    ));
+    const label = pageTranslationLayers.size > 0 && translationsVisible
+        ? "Esconder traduções"
+        : "Mostrar traduções";
+    translationVisibilityButton.setAttribute("aria-label", label);
+    translationVisibilityButton.title = label;
 }
 
 function clearTranslation(wrapper) {
@@ -369,7 +422,19 @@ async function imageToBase64(image) {
     return { inlineData: { data: btoa(binary), mimeType: blob.type }, cacheKey };
 }
 
-async function requestAI(parts, responseSchema, controller, maxOutputTokens) {
+async function requestAI(parts, responseSchema, controller, maxOutputTokens, context) {
+    const startedAt = performance.now();
+    logAIProgress("Solicitação enviada ao backend", {
+        etapa: context.stage,
+        pagina: context.pageNumber
+    });
+    const waitingInterval = window.setInterval(() => {
+        logAIProgress("Aguardando resposta do provedor de IA", {
+            etapa: context.stage,
+            pagina: context.pageNumber,
+            segundos: Math.floor((performance.now() - startedAt) / 1000)
+        });
+    }, 10000);
     let response;
     try {
         response = await fetch("/api/gemini", {
@@ -388,9 +453,24 @@ async function requestAI(parts, responseSchema, controller, maxOutputTokens) {
             })
         });
     } catch (error) {
+        window.clearInterval(waitingInterval);
+        logAIProgress(controller.signal.aborted || error.name === "AbortError"
+            ? "Solicitação cancelada"
+            : "Falha de conexão com o backend", {
+            etapa: context.stage,
+            pagina: context.pageNumber,
+            duracaoMs: Math.round(performance.now() - startedAt)
+        });
         if (controller.signal.aborted || error.name === "AbortError") throw error;
         throw new Error("Não foi possível conectar à API de IA. Inicie o backend com `npm run server`.");
     }
+    window.clearInterval(waitingInterval);
+    logAIProgress("Resposta recebida do backend", {
+        etapa: context.stage,
+        pagina: context.pageNumber,
+        httpStatus: response.status,
+        duracaoMs: Math.round(performance.now() - startedAt)
+    });
 
     let result;
     try {
@@ -408,7 +488,13 @@ async function requestAI(parts, responseSchema, controller, maxOutputTokens) {
     const text = result.candidates?.[0]?.content?.parts?.map((part) => part.text || "").join("").trim();
     if (!text) throw new Error("O provedor de IA não retornou conteúdo.");
     try {
-        return JSON.parse(text);
+        const parsed = JSON.parse(text);
+        logAIProgress("Resposta da IA processada", {
+            etapa: context.stage,
+            pagina: context.pageNumber,
+            duracaoMs: Math.round(performance.now() - startedAt)
+        });
+        return parsed;
     } catch {
         throw new Error("O provedor de IA retornou dados em formato inesperado.");
     }
@@ -490,6 +576,7 @@ function displayTranslations(bubbles, wrapper) {
     const layer = document.createElement("div");
     layer.className = "translation-layer";
     layer.setAttribute("aria-label", "Tradução dos balões");
+    layer.classList.toggle("is-hidden", !translationsVisible);
     const elements = bubbles.map((bubble) => {
         const element = document.createElement("span");
         element.className = bubble.square
@@ -526,23 +613,80 @@ function displayTranslations(bubbles, wrapper) {
 
 async function getTranslatedBubbles(pageIndex, controller) {
     const wrapper = wrappers[pageIndex];
-    const image = await imageToBase64(wrapper.querySelector("img"));
+    const pageNumber = pageIndex + 1;
+    const imageElement = wrapper.querySelector("img");
+    const imageStartedAt = performance.now();
+    setStatus(`Preparando imagem da página ${pageNumber}…`);
+    logAIProgress("Preparando imagem da página", { pagina: pageNumber });
+    const image = await imageToBase64(imageElement);
+    logAIProgress("Imagem pronta para envio", {
+        pagina: pageNumber,
+        largura: imageElement.naturalWidth,
+        altura: imageElement.naturalHeight,
+        tamanhoKB: Math.round(image.inlineData.data.length * 0.75 / 1024),
+        duracaoMs: Math.round(performance.now() - imageStartedAt)
+    });
     if (controller.signal.aborted) throw new DOMException("Tradução cancelada.", "AbortError");
     const translationKey = `${image.cacheKey}:${settings.language}`;
     const cached = translationCache.get(translationKey);
-    if (cached) return cached;
+    if (cached) {
+        logAIProgress("Página recuperada do cache de tradução", { pagina: pageNumber });
+        return cached;
+    }
 
     let analysis = analysisCache.get(image.cacheKey);
+    let analysisWasReused = Boolean(analysis);
     if (!analysis) {
+        try {
+            analysis = getStoredPageAnalysis(
+                localStorage,
+                chapterAnalysisKey,
+                wrapper.dataset.pageId,
+                image.cacheKey
+            );
+            if (analysis) {
+                analysis = {
+                    ...analysis,
+                    bubbles: validateBubbles(analysis.bubbles)
+                };
+                analysisCache.set(image.cacheKey, analysis);
+                analysisWasReused = true;
+                logAIProgress("Análise concluída recuperada do armazenamento local", {
+                    pagina: pageNumber,
+                    baloesEncontrados: analysis.bubbles.length
+                });
+            }
+        } catch (error) {
+            console.error("Não foi possível restaurar a análise intermediária salva:", error);
+            logAIProgress("Cache da análise inválido; será refeita", { pagina: pageNumber });
+        }
+    }
+    if (!analysis) {
+        logAIProgress("Iniciando análise e identificação dos balões", { pagina: pageNumber });
         setStatus("Etapa 1/2: analisando a página e localizando os balões…");
         const analysisResult = await requestAI([{
             text: "Analise a página inteira como um sistema de visão e OCR para quadrinhos. Faça uma varredura linha por linha, de cima para baixo, identificando todos os balões de fala e pensamento com texto legível. Transcreva cada fala exatamente e informe o idioma predominante em detectedLanguage. Para cada balão, estime uma caixa que cubra o interior sem a cauda: x, y, width e height são inteiros de 0 a 1000 normalizados pela imagem inteira. Defina square como true quando o balão tiver formato quadrado ou retangular, com laterais retas e cantos predominantemente retos; use false para balões ovais ou arredondados. Não classifique quadros, legendas ou caixas de narração como balões. Ignore textos fora de balões, desenhos e efeitos sonoros. Não invente texto."
-        }, { inlineData: image.inlineData }], analysisSchema, controller, 4096);
+        }, { inlineData: image.inlineData }], analysisSchema, controller, 4096, {
+            stage: "análise dos balões",
+            pageNumber
+        });
         analysis = {
             ...analysisResult,
             bubbles: validateBubbles(analysisResult.bubbles)
         };
         analysisCache.set(image.cacheKey, analysis);
+        const analysisSaved = savePageAnalysis(
+            localStorage,
+            chapterAnalysisKey,
+            wrapper.dataset.pageId,
+            image.cacheKey,
+            analysis
+        );
+        logAIProgress("Análise concluída", {
+            pagina: pageNumber,
+            baloesEncontrados: analysis.bubbles.length,
+            salvaParaRetomada: analysisSaved
+        });
     }
     if (controller.signal.aborted) throw new DOMException("Tradução cancelada.", "AbortError");
     if (analysis.bubbles.length === 0) {
@@ -550,13 +694,25 @@ async function getTranslatedBubbles(pageIndex, controller) {
         return [];
     }
 
-    setStatus(`Etapa 2/2: traduzindo ${analysis.bubbles.length} balões para ${settings.language}…`);
+    setStatus(`Etapa 2/2: traduzindo ${analysis.bubbles.length} balões para ${settings.language}${analysisWasReused ? " (análise reutilizada)" : ""}…`);
+    logAIProgress("Iniciando tradução dos balões", {
+        pagina: pageNumber,
+        baloes: analysis.bubbles.length,
+        idioma: settings.language
+    });
     const result = await requestAI([{
         text: `Traduza integralmente para ${settings.language} cada fala abaixo. O idioma original é ${analysis.detectedLanguage}. Retorne uma tradução natural e fiel, sem resumir nem adicionar falas. Preserve cada id e retorne uma tradução não vazia para todos os itens: ${JSON.stringify(analysis.bubbles.map(({ id, originalText }) => ({ id, originalText })))}`
-    }], translationSchema, controller, Math.min(4096, Math.max(512, analysis.bubbles.length * 100)));
+    }], translationSchema, controller, Math.min(4096, Math.max(512, analysis.bubbles.length * 100)), {
+        stage: "tradução do texto",
+        pageNumber
+    });
     if (controller.signal.aborted) throw new DOMException("Tradução cancelada.", "AbortError");
     const translatedBubbles = validateTranslations(result.translations, analysis.bubbles);
     translationCache.set(translationKey, translatedBubbles);
+    logAIProgress("Tradução concluída", {
+        pagina: pageNumber,
+        baloesTraduzidos: translatedBubbles.length
+    });
     return translatedBubbles;
 }
 
@@ -571,27 +727,62 @@ function handleTranslationError(error, controller) {
         setStatus("A solicitação de tradução foi cancelada.", "error");
     } else {
         console.error("Falha ao traduzir as páginas:", error);
-        setStatus(error.message || "Não foi possível traduzir as páginas.", "error");
+        setStatus(
+            `${error.message || "Não foi possível traduzir as páginas."} Se uma etapa anterior foi concluída e salva, ela será reutilizada ao tentar novamente.`,
+            "error"
+        );
     }
 }
 
 async function translateCurrentPage() {
     if (translateButton.disabled || wrappers.length === 0) return;
     const requestedIndex = currentPageIndex;
+    const wrapper = wrappers[requestedIndex];
+    if (pageTranslationLayers.has(wrapper)) {
+        setStatus("Esta página já tem tradução salva.");
+        return;
+    }
     const controller = new AbortController();
+    const startedAt = performance.now();
     translationController = controller;
     setTranslationPending(true);
     setStatus("Analisando e traduzindo a página…");
+    logAIProgress("Tradução da página iniciada", {
+        pagina: requestedIndex + 1,
+        idioma: settings.language
+    });
     const requestTimeout = window.setTimeout(() => controller.abort("timeout"), 18 * 60 * 1000);
 
     try {
         const translatedBubbles = await getTranslatedBubbles(requestedIndex, controller);
         if (controller.signal.aborted || requestedIndex !== currentPageIndex) return;
-        displayTranslations(translatedBubbles, wrappers[requestedIndex]);
-        setStatus(translatedBubbles.length
+        displayTranslations(translatedBubbles, wrapper);
+        const saved = saveTranslatedPage(
+            localStorage,
+            chapterTranslationsKey,
+            settings.language,
+            wrapper.dataset.pageId,
+            translatedBubbles
+        );
+        if (saved) {
+            removeStoredPageAnalysis(localStorage, chapterAnalysisKey, wrapper.dataset.pageId);
+        }
+        setStatus(!saved
+            ? "A tradução foi feita, mas não pôde ser salva neste navegador."
+            : translatedBubbles.length
             ? `Página traduzida para ${settings.language}.`
             : "Nenhum balão legível foi encontrado nesta página.", translatedBubbles.length ? "success" : "error");
+        logAIProgress("Processamento da página finalizado", {
+            pagina: requestedIndex + 1,
+            duracaoMs: Math.round(performance.now() - startedAt),
+            salvoNoNavegador: saved
+        });
     } catch (error) {
+        logAIProgress("Tradução da página falhou", {
+            pagina: requestedIndex + 1,
+            duracaoMs: Math.round(performance.now() - startedAt),
+            motivo: controller.signal.aborted ? controller.signal.reason : error.message
+        });
         handleTranslationError(error, controller);
     } finally {
         window.clearTimeout(requestTimeout);
@@ -610,18 +801,24 @@ async function translateAllPages() {
         .filter(({ wrapper }) => !pageTranslationLayers.has(wrapper))
         .map(({ index }) => index);
     if (pendingIndices.length === 0) {
-        clearTranslation();
-        setStatus("Traduções ocultadas.");
+        setStatus("Todas as páginas deste capítulo já têm tradução salva.");
         return;
     }
 
     const controller = new AbortController();
+    const startedAt = performance.now();
     translationController = controller;
     setTranslationPending(true);
     setStatus(`Preparando tradução de ${pendingIndices.length} páginas…`);
+    logAIProgress("Tradução do capítulo iniciada", {
+        paginasPendentes: pendingIndices.length,
+        idioma: settings.language,
+        simultaneas: Math.min(2, pendingIndices.length)
+    });
     const requestTimeout = window.setTimeout(() => controller.abort("timeout"), 18 * 60 * 1000);
     let nextIndex = 0;
     let completed = 0;
+    let persistenceFailures = 0;
     let firstError;
 
     const worker = async () => {
@@ -629,12 +826,37 @@ async function translateAllPages() {
             const pageIndex = pendingIndices[nextIndex];
             nextIndex += 1;
             try {
+                logAIProgress("Iniciando processamento da página", {
+                    pagina: pageIndex + 1,
+                    progresso: `${completed}/${pendingIndices.length}`
+                });
                 setStatus(`Traduzindo página ${pageIndex + 1}/${wrappers.length} (${completed}/${pendingIndices.length} concluídas)…`);
                 const translatedBubbles = await getTranslatedBubbles(pageIndex, controller);
                 if (controller.signal.aborted) return;
                 displayTranslations(translatedBubbles, wrappers[pageIndex]);
+                const wrapper = wrappers[pageIndex];
+                const saved = saveTranslatedPage(
+                    localStorage,
+                    chapterTranslationsKey,
+                    settings.language,
+                    wrapper.dataset.pageId,
+                    translatedBubbles
+                );
+                if (saved) {
+                    removeStoredPageAnalysis(localStorage, chapterAnalysisKey, wrapper.dataset.pageId);
+                }
+                if (!saved) persistenceFailures += 1;
                 completed += 1;
+                logAIProgress("Página processada", {
+                    pagina: pageIndex + 1,
+                    progresso: `${completed}/${pendingIndices.length}`,
+                    salvoNoNavegador: saved
+                });
             } catch (error) {
+                logAIProgress("Processamento da página falhou", {
+                    pagina: pageIndex + 1,
+                    motivo: controller.signal.aborted ? controller.signal.reason : error.message
+                });
                 firstError = error;
             }
         }
@@ -647,9 +869,23 @@ async function translateAllPages() {
         ));
         if (firstError) throw firstError;
         if (!controller.signal.aborted) {
-            setStatus(`Tradução concluída: ${completed} páginas processadas.`, "success");
+            logAIProgress("Tradução do capítulo finalizada", {
+                paginasProcessadas: completed,
+                paginasPendentes: pendingIndices.length,
+                duracaoMs: Math.round(performance.now() - startedAt),
+                falhasAoSalvar: persistenceFailures
+            });
+            setStatus(persistenceFailures
+                ? `Tradução concluída em ${completed} páginas, mas ${persistenceFailures} não puderam ser salvas neste navegador.`
+                : `Tradução concluída: ${completed} páginas processadas.`, persistenceFailures ? "error" : "success");
         }
     } catch (error) {
+        logAIProgress("Tradução do capítulo interrompida", {
+            paginasProcessadas: completed,
+            paginasPendentes: pendingIndices.length,
+            duracaoMs: Math.round(performance.now() - startedAt),
+            motivo: controller.signal.aborted ? controller.signal.reason : error.message
+        });
         handleTranslationError(error, controller);
     } finally {
         window.clearTimeout(requestTimeout);
@@ -708,19 +944,22 @@ translateButton.addEventListener("click", () => {
     if (translationController) {
         translationController.abort("user");
     } else if (settings.scope === "all") {
-        if (wrappers.length > 0 && wrappers.every((wrapper) => pageTranslationLayers.has(wrapper))) {
-            clearTranslation();
-            setStatus("Traduções ocultadas.");
-        } else {
-            void translateAllPages();
-        }
-    } else if (translationLayer) {
-        clearTranslation(wrappers[currentPageIndex]);
-        setStatus("Tradução ocultada.");
+        void translateAllPages();
+    } else if (pageTranslationLayers.has(wrappers[currentPageIndex])) {
+        setStatus("Esta página já tem tradução salva.");
     } else {
         nearestVisiblePage();
         void translateCurrentPage();
     }
+});
+
+translationVisibilityButton.addEventListener("click", () => {
+    if (pageTranslationLayers.size === 0) return;
+    translationsVisible = !translationsVisible;
+    pageTranslationLayers.forEach(({ layer }) => {
+        layer.classList.toggle("is-hidden", !translationsVisible);
+    });
+    syncCurrentTranslation();
 });
 
 settingsButton.addEventListener("click", () => {
@@ -734,6 +973,30 @@ cancelSettingsButton.addEventListener("click", () => {
     settings = settingsBeforeDialog || { ...defaultSettings };
     settingsBeforeDialog = undefined;
     applySettingsToForm();
+});
+
+clearTranslationsButton.addEventListener("click", () => {
+    if (!chapterTranslationsKey) {
+        setStatus("Não há capítulo aberto para apagar traduções.", "error");
+        return;
+    }
+    if (!window.confirm("Apagar todas as traduções salvas deste capítulo neste navegador?")) return;
+    try {
+        localStorage.removeItem(chapterTranslationsKey);
+        localStorage.removeItem(chapterAnalysisKey);
+    } catch (error) {
+        console.error("Não foi possível apagar traduções e análises salvas:", error);
+        setStatus("Não foi possível apagar os dados salvos neste navegador.", "error");
+        return;
+    }
+    clearTranslation();
+    analysisCache.clear();
+    translationCache.clear();
+    translationsVisible = true;
+    syncCurrentTranslation();
+    settingsDialog.close();
+    settingsBeforeDialog = undefined;
+    setStatus("Traduções e análises deste capítulo apagadas deste navegador.", "success");
 });
 
 settingsDialog.addEventListener("cancel", () => {
@@ -766,6 +1029,7 @@ settingsForm.addEventListener("submit", (event) => {
     settingsDialog.close();
     if (languageChanged && hasTranslations) {
         clearTranslation();
+        restoreChapterTranslations();
         if (settings.scope === "all") void translateAllPages();
         else void translateCurrentPage();
     } else if ((!languageChanged || !hasTranslations) && (hasTranslations || scopeChanged)) {
