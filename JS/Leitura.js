@@ -25,6 +25,7 @@ const defaultSettings = {
 const readerQuery = new URLSearchParams(window.location.search);
 const workId = readerQuery.get("obra");
 const chapterId = readerQuery.get("capitulo");
+const analysisCache = new Map();
 const translationCache = new Map();
 let settings = loadSettings();
 let settingsBeforeDialog;
@@ -38,7 +39,7 @@ const pageTranslationLayers = new Map();
 let translationController;
 let statusTimeout;
 
-const pageTranslationSchema = {
+const analysisSchema = {
     type: "OBJECT",
     properties: {
         detectedLanguage: { type: "STRING" },
@@ -52,15 +53,30 @@ const pageTranslationSchema = {
                     width: { type: "INTEGER" },
                     height: { type: "INTEGER" },
                     square: { type: "BOOLEAN" },
-                    originalText: { type: "STRING" },
-                    id: { type: "INTEGER" },
-                    translation: { type: "STRING" }
+                    originalText: { type: "STRING" }
                 },
-                required: ["x", "y", "width", "height", "square", "originalText", "id", "translation"]
+                required: ["x", "y", "width", "height", "square", "originalText"]
             }
         }
     },
     required: ["detectedLanguage", "bubbles"]
+};
+const translationSchema = {
+    type: "OBJECT",
+    properties: {
+        translations: {
+            type: "ARRAY",
+            items: {
+                type: "OBJECT",
+                properties: {
+                    id: { type: "INTEGER" },
+                    translation: { type: "STRING" }
+                },
+                required: ["id", "translation"]
+            }
+        }
+    },
+    required: ["translations"]
 };
 
 function loadSettings() {
@@ -516,12 +532,30 @@ async function getTranslatedBubbles(pageIndex, controller) {
     const cached = translationCache.get(translationKey);
     if (cached) return cached;
 
-    const result = await requestAI([{
-        text: `Analise a página de quadrinhos anexada e faça OCR dos balões de fala e pensamento. Percorra a página de cima para baixo e da esquerda para a direita. Retorne detectedLanguage e, para cada balão legível, um id sequencial começando em 1, originalText transcrito fielmente, translation traduzida integralmente para ${settings.language}, e uma caixa x, y, width e height em inteiros de 0 a 1000 normalizados pela imagem inteira que cubra o interior do balão sem a cauda. Defina square como true para balões quadrados/retangulares de lados retos; false para balões ovais/arredondados. Exclua quadros, legendas, narração, textos fora de balões e efeitos sonoros. Não invente nem resuma falas.`
-    }, { inlineData: image.inlineData }], pageTranslationSchema, controller, 8192);
+    let analysis = analysisCache.get(image.cacheKey);
+    if (!analysis) {
+        setStatus("Etapa 1/2: analisando a página e localizando os balões…");
+        const analysisResult = await requestAI([{
+            text: "Analise a página inteira como um sistema de visão e OCR para quadrinhos. Faça uma varredura linha por linha, de cima para baixo, identificando todos os balões de fala e pensamento com texto legível. Transcreva cada fala exatamente e informe o idioma predominante em detectedLanguage. Para cada balão, estime uma caixa que cubra o interior sem a cauda: x, y, width e height são inteiros de 0 a 1000 normalizados pela imagem inteira. Defina square como true quando o balão tiver formato quadrado ou retangular, com laterais retas e cantos predominantemente retos; use false para balões ovais ou arredondados. Não classifique quadros, legendas ou caixas de narração como balões. Ignore textos fora de balões, desenhos e efeitos sonoros. Não invente texto."
+        }, { inlineData: image.inlineData }], analysisSchema, controller, 4096);
+        analysis = {
+            ...analysisResult,
+            bubbles: validateBubbles(analysisResult.bubbles)
+        };
+        analysisCache.set(image.cacheKey, analysis);
+    }
     if (controller.signal.aborted) throw new DOMException("Tradução cancelada.", "AbortError");
-    const bubbles = validateBubbles(result.bubbles);
-    const translatedBubbles = validateTranslations(result.bubbles, bubbles);
+    if (analysis.bubbles.length === 0) {
+        translationCache.set(translationKey, []);
+        return [];
+    }
+
+    setStatus(`Etapa 2/2: traduzindo ${analysis.bubbles.length} balões para ${settings.language}…`);
+    const result = await requestAI([{
+        text: `Traduza integralmente para ${settings.language} cada fala abaixo. O idioma original é ${analysis.detectedLanguage}. Retorne uma tradução natural e fiel, sem resumir nem adicionar falas. Preserve cada id e retorne uma tradução não vazia para todos os itens: ${JSON.stringify(analysis.bubbles.map(({ id, originalText }) => ({ id, originalText })))}`
+    }], translationSchema, controller, Math.min(4096, Math.max(512, analysis.bubbles.length * 100)));
+    if (controller.signal.aborted) throw new DOMException("Tradução cancelada.", "AbortError");
+    const translatedBubbles = validateTranslations(result.translations, analysis.bubbles);
     translationCache.set(translationKey, translatedBubbles);
     return translatedBubbles;
 }
@@ -745,5 +779,6 @@ settingsForm.addEventListener("submit", (event) => {
 window.addEventListener("pagehide", () => {
     translationController?.abort("chapter-exit");
     clearTranslation();
+    analysisCache.clear();
     translationCache.clear();
 });

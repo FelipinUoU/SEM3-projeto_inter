@@ -1703,6 +1703,12 @@ app.post('/api/gemini', async (req, res) => {
           : error.message || 'erro sem detalhes';
         failures.push(`${provider.name} (HTTP ${status}): ${message}`);
         console.error(`${provider.name} AI request failed (HTTP ${status}).`);
+        if (status === 429) {
+          return res.status(429).json({
+            error: { message: `${provider.name} (HTTP 429): ${message}` },
+            failedProviders: [provider.name]
+          });
+        }
         break;
       }
     }
