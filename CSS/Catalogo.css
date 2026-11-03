@@ -24,9 +24,9 @@ body {
     font-family: Georgia, "Times New Roman", serif;
 }
 
-.menu-lateral-header {
-    position: sticky;
-    top: 0;
+body > header.menu-lateral-header {
+    position: fixed;
+    inset: 0 0 auto;
     z-index: 40;
 }
 
@@ -55,7 +55,7 @@ body {
 .catalog-page {
     width: min(1320px, 100%);
     margin: 0 auto;
-    padding: 18px 34px 56px;
+    padding: 76px 34px 56px;
 }
 
 .genre-section {
@@ -389,7 +389,7 @@ body {
 
 @media (max-width: 700px) {
     .catalog-page {
-        padding: 12px 18px 40px;
+        padding: 70px 18px 40px;
     }
 
     .genre-section {

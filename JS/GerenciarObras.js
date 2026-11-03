@@ -72,7 +72,6 @@ const editorRegion = document.querySelector("#editorRegion");
 const managementPage = document.querySelector(".management-page");
 const addWorkButton = document.querySelector("#addWorkButton");
 const feedback = document.querySelector("#feedback");
-const workApprovalLink = document.querySelector("#workApprovalLink");
 const pageTitle = document.querySelector("#pageTitle");
 const workManagementRegion = document.querySelector("#workManagementRegion");
 const moderationRequestRegion = document.querySelector("#moderationRequestRegion");
@@ -1149,7 +1148,7 @@ async function handleAction(action, card, chapterRow, actionButton) {
         case "delete-chapter":
             if (work && await confirmInPage({
                 title: "Excluir capítulo?",
-                message: `Excluir “${chapterRow.querySelector(".chapter-row-title").textContent}”? Esta ação não pode ser desfeita.`,
+                message: `Excluir “${chapterRow.querySelector(".chapter-row-title").textContent}” e suas imagens do ImageKit? Esta ação não pode ser desfeita.`,
                 confirmLabel: "Excluir capítulo",
                 destructive: true
             })) {
@@ -1160,7 +1159,7 @@ async function handleAction(action, card, chapterRow, actionButton) {
                     });
                     work.chapters = work.chapters.filter((chapter) => chapter.id !== chapterId);
                     renderWorks();
-                    showFeedback("Capítulo excluído do Appwrite.");
+                    showFeedback("Capítulo e imagens excluídos do Appwrite e do ImageKit.");
                 } catch (error) {
                     console.error("Não foi possível excluir o capítulo:", error);
                     showFeedback(error.message || "Não foi possível excluir o capítulo.", true);
@@ -1272,11 +1271,6 @@ async function initializeManagementPage() {
         addWorkButton.innerHTML = isAdmin
             ? '<span aria-hidden="true">＋</span> Adicionar Obra'
             : '<span aria-hidden="true">＋</span> Solicitar Obra';
-        workApprovalLink.hidden = !isAdmin;
-        if (!isAdmin) {
-            document.querySelector(".storage-note").textContent =
-                "Você pode editar as obras e os capítulos criados por você. Novas obras passam por homologação do administrador.";
-        }
         await loadWorks();
         if (!isAdmin) await loadWorkRequest();
     } catch (error) {
