@@ -100,7 +100,7 @@
 
         <div class="translation-container">
             <button class="translation-settings-trigger" id="translation-settings-btn" type="button" aria-label="Configurações de tradução" title="Configurações de tradução">⚙</button>
-            <button class="btn-translate-gemini" id="translate-btn" type="button" aria-pressed="false" title="Traduzir página com IA">
+            <button class="btn-translate-gemini" id="translate-btn" type="button" title="Traduzir página com IA">
                 <svg class="gemini-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                     <defs>
                         <linearGradient id="ai-sparkle-gradient" x1="3" y1="21" x2="21" y2="3" gradientUnits="userSpaceOnUse">
@@ -113,6 +113,16 @@
                     <path fill="url(#ai-sparkle-gradient)" d="M19 15.5c.5 2 1.5 3 3.5 3.5-2 .5-3 1.5-3.5 3.5-.5-2-1.5-3-3.5-3.5 2-.5 3-1.5 3.5-3.5Z" />
                 </svg>
                 <span id="translate-text">Tradução</span>
+            </button>
+            <button class="translation-visibility-trigger" id="translation-visibility-btn" type="button" aria-label="Mostrar traduções" title="Mostrar traduções" aria-pressed="false" disabled>
+                <svg class="translation-eye-open" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z" />
+                    <circle cx="12" cy="12" r="3" />
+                </svg>
+                <svg class="translation-eye-closed" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="m3 3 18 18M10.6 5.2A10.7 10.7 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.1 3.8M6.2 6.2C3.5 8 2 12 2 12s3.6 7 10 7a10.5 10.5 0 0 0 4-.8" />
+                    <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" />
+                </svg>
             </button>
         </div>
     </div>
@@ -154,6 +164,7 @@
                 </select>
             </label>
             <div class="translation-dialog-actions">
+                <button class="dialog-button danger" id="clear-translations-btn" type="button">Apagar tradução</button>
                 <button class="dialog-button secondary" id="cancel-translation-settings" type="button">Cancelar</button>
                 <button class="dialog-button primary" type="submit">Salvar configurações</button>
             </div>

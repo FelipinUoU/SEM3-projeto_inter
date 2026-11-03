@@ -1715,6 +1715,7 @@ app.post('/api/gemini', async (req, res) => {
       gemini: new GoogleGenAI({ apiKey })
     }))
   ];
+  console.info(`Gemini AI request received; ${providers.length} provider key(s) configured.`);
   if (providers.length === 0) {
     return res.status(503).json({
       error: { message: 'Configure ao menos uma chave Gemini válida no arquivo .env e reinicie o servidor. Valores de exemplo como "cole_sua_chave_aqui" não são aceitos.' }
@@ -1735,10 +1736,11 @@ app.post('/api/gemini', async (req, res) => {
   });
 
   const failures = [];
-  for (const provider of providers) {
+  for (const [providerIndex, provider] of providers.entries()) {
     const maxAttempts = 3;
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       try {
+        console.info(`${provider.name}: attempting request (${attempt}/${maxAttempts}).`);
         const result = await generateWithProvider(
           provider,
           contents,
@@ -1771,13 +1773,10 @@ app.post('/api/gemini', async (req, res) => {
           ? 'a chave de API foi recusada ou não tem permissão. Verifique a chave no arquivo .env.'
           : error.message || 'erro sem detalhes';
         failures.push(`${provider.name} (HTTP ${status}): ${message}`);
-        console.error(`${provider.name} AI request failed (HTTP ${status}).`);
-        if (status === 429) {
-          return res.status(429).json({
-            error: { message: `${provider.name} (HTTP 429): ${message}` },
-            failedProviders: [provider.name]
-          });
-        }
+        const nextProvider = providers[providerIndex + 1];
+        console.error(`${provider.name} AI request failed (HTTP ${status}).${
+          nextProvider ? ` Trying ${nextProvider.name} next.` : ' No more provider keys configured.'
+        }`);
         break;
       }
     }
