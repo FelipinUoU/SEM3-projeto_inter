@@ -8,6 +8,17 @@ const overlay = document.getElementById("menuOverlay");
 const dashboardItems = document.querySelectorAll(".menu-lateral-item");
 const navigation = document.querySelector(".menu-lateral-items");
 
+if (dashboard && !dashboard.querySelector(".menu-lateral-about")) {
+    const aboutLink = document.createElement("a");
+    aboutLink.className = "menu-lateral-item menu-lateral-about";
+    aboutLink.href = "/HTML/SobreNos.html";
+    aboutLink.textContent = "Sobre Nós";
+    if (window.location.pathname === aboutLink.pathname) {
+        aboutLink.setAttribute("aria-current", "page");
+    }
+    dashboard.append(aboutLink);
+}
+
 async function updateNavigationForUser() {
     try {
         const user = await account.get();

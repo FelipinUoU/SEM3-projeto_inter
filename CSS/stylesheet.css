@@ -32,7 +32,8 @@ body {
   margin-left: auto;
 }
 
-.menu-lateral-header .boxbody {
+.menu-lateral-header .boxbody,
+.menu-lateral-header .header-login {
   margin-left: 0;
 }
 

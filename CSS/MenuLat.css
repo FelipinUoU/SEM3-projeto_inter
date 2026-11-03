@@ -334,6 +334,10 @@ body > header .logo a:focus-visible,
     transition: background-color 0.2s ease, color 0.2s ease;
 }
 
+.work-search ~ .header-login {
+    margin-left: 0;
+}
+
 .header-login:hover {
     background: #d5bd00;
     color: #2b1a42;
@@ -417,6 +421,8 @@ body > header .logo a:focus-visible,
     z-index: 30;
     top: 58px;
     bottom: 0;
+    display: flex;
+    flex-direction: column;
     left: 0;
     width: min(320px, 85vw);
     padding: 24px;
@@ -467,6 +473,10 @@ body > header .logo a:focus-visible,
 .menu-lateral-item:focus-visible {
     outline: 2px solid transparent;
     outline-offset: 3px;
+}
+
+.menu-lateral-about {
+    margin-top: auto;
 }
 
 @media (prefers-reduced-motion: reduce) {

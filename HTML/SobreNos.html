@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#29272f">
+    <meta name="description" content="Conheça a HokuPédia, entenda nosso compromisso com direitos autorais e saiba quem faz parte da equipe.">
+    <title>Sobre Nós | HokuPédia</title>
+    <link rel="stylesheet" href="../CSS/MenuLat.css">
+    <link rel="stylesheet" href="../CSS/SobreNos.css">
+</head>
+<body>
+    <header class="menu-lateral-header">
+        <button class="menu-lateral-button" id="menuBtn" type="button" aria-label="Abrir navegação" aria-expanded="false" aria-controls="dashboard">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <h1 class="menu-lateral-logo"><a href="/" aria-label="Ir para a página inicial">HokuPédia</a></h1>
+        <form class="work-search" role="search" autocomplete="off">
+            <label class="work-search__label" for="work-search-input">Buscar obra por nome</label>
+            <input id="work-search-input" type="search" name="q" placeholder="Buscar obra..." aria-autocomplete="list" aria-controls="work-search-results" aria-expanded="false">
+            <div class="work-search__results" id="work-search-results" role="listbox" aria-live="polite" hidden></div>
+        </form>
+        <a class="header-login" href="/HTML/CadLog.html?mode=login">Login</a>
+    </header>
+
+    <button class="menu-lateral-overlay" id="menuOverlay" type="button" aria-label="Fechar navegação" hidden></button>
+    <aside class="menu-lateral-dashboard" id="dashboard" aria-label="Navegação principal" aria-hidden="true" inert>
+        <nav class="menu-lateral-items" aria-label="Navegação principal">
+            <a class="menu-lateral-item" href="/HTML/Catalogo.html">Catálogo</a>
+            <a class="menu-lateral-item" href="/HTML/Biblioteca.html">Biblioteca</a>
+            <a class="menu-lateral-item" href="/HTML/CadLog.html?mode=login">Login</a>
+        </nav>
+    </aside>
+
+    <main class="about-page">
+        <section class="about-hero" aria-labelledby="aboutTitle">
+            <p class="about-eyebrow"><span aria-hidden="true">✦</span> HokuPédia · leitura em comunidade</p>
+            <h2 id="aboutTitle">Histórias aproximam pessoas.<br><span>A comunidade faz acontecer.</span></h2>
+            <p class="about-intro">Um espaço criado para descobrir, organizar e acompanhar histórias em quadrinhos e mangás — feito com carinho por quem também ama ler.</p>
+        </section>
+
+        <section class="about-project" aria-labelledby="projectTitle">
+            <div class="about-section-heading">
+                <p class="about-eyebrow">O projeto</p>
+                <h2 id="projectTitle">O que é a HokuPédia?</h2>
+            </div>
+            <p>A HokuPédia é um projeto acadêmico e uma biblioteca digital comunitária para explorar obras, acompanhar capítulos e organizar leituras. A proposta é reunir leitores em torno de suas histórias favoritas e experimentar recursos que tornem a leitura mais acessível, incluindo ferramentas de apoio à tradução.</p>
+            <p>O catálogo e as contribuições da comunidade ajudam a dar visibilidade às obras. A plataforma não é afiliada a autores, editoras ou distribuidoras.</p>
+        </section>
+
+        <section class="team-section" aria-labelledby="teamTitle">
+            <div class="about-section-heading">
+                <p class="about-eyebrow">Feito por pessoas</p>
+                <h2 id="teamTitle">Quem está por trás</h2>
+                <p>Quatro integrantes, muitas ideias e uma paixão em comum por boas histórias.</p>
+            </div>
+            <div class="team-grid">
+                <article class="team-card">
+                    <div class="team-card__photo" role="img" aria-label="Espaço reservado para a foto do integrante 1">
+                        <span class="team-card__photo-icon" aria-hidden="true">＋</span>
+                        <span>Adicionar foto</span>
+                    </div>
+                    <h3>Nome do integrante 1</h3>
+                    <div class="team-card__links" aria-label="Redes do integrante 1">
+                        <span class="team-card__link-placeholder">LinkedIn <small>adicionar link</small></span>
+                        <span class="team-card__link-placeholder">GitHub <small>adicionar link</small></span>
+                    </div>
+                </article>
+                <article class="team-card">
+                    <div class="team-card__photo" role="img" aria-label="Espaço reservado para a foto do integrante 2">
+                        <span class="team-card__photo-icon" aria-hidden="true">＋</span>
+                        <span>Adicionar foto</span>
+                    </div>
+                    <h3>Nome do integrante 2</h3>
+                    <div class="team-card__links" aria-label="Redes do integrante 2">
+                        <span class="team-card__link-placeholder">LinkedIn <small>adicionar link</small></span>
+                        <span class="team-card__link-placeholder">GitHub <small>adicionar link</small></span>
+                    </div>
+                </article>
+                <article class="team-card">
+                    <div class="team-card__photo" role="img" aria-label="Espaço reservado para a foto do integrante 3">
+                        <span class="team-card__photo-icon" aria-hidden="true">＋</span>
+                        <span>Adicionar foto</span>
+                    </div>
+                    <h3>Nome do integrante 3</h3>
+                    <div class="team-card__links" aria-label="Redes do integrante 3">
+                        <span class="team-card__link-placeholder">LinkedIn <small>adicionar link</small></span>
+                        <span class="team-card__link-placeholder">GitHub <small>adicionar link</small></span>
+                    </div>
+                </article>
+                <article class="team-card">
+                    <div class="team-card__photo" role="img" aria-label="Espaço reservado para a foto do integrante 4">
+                        <span class="team-card__photo-icon" aria-hidden="true">＋</span>
+                        <span>Adicionar foto</span>
+                    </div>
+                    <h3>Nome do integrante 4</h3>
+                    <div class="team-card__links" aria-label="Redes do integrante 4">
+                        <span class="team-card__link-placeholder">LinkedIn <small>adicionar link</small></span>
+                        <span class="team-card__link-placeholder">GitHub <small>adicionar link</small></span>
+                    </div>
+                </article>
+            </div>
+        </section>
+
+        <section class="copyright-panel" aria-labelledby="copyrightTitle">
+            <div class="copyright-panel__icon" aria-hidden="true">©</div>
+            <div>
+                <p class="about-eyebrow">Transparência e respeito aos criadores</p>
+                <h2 id="copyrightTitle">Direitos autorais, Safe Harbor e links oficiais</h2>
+                <p>Os direitos sobre obras, personagens, imagens, capas e traduções pertencem aos seus respectivos autores e titulares. A HokuPédia não reivindica a propriedade desse conteúdo, e sua presença na plataforma não substitui a autorização de quem detém os direitos.</p>
+
+                <h3>Notificações e remoção de conteúdo</h3>
+                <p>Buscamos adotar uma prática de notificação e análise de solicitações de remoção (notice-and-takedown): titulares ou representantes podem identificar o conteúdo e apresentar informações que permitam verificar a reivindicação. Quando recebida uma solicitação adequada, o conteúdo poderá ser restringido ou removido enquanto o caso é analisado.</p>
+                <p>“DMCA” é uma lei dos Estados Unidos. A referência a procedimentos de notice-and-takedown descreve uma prática de tratamento de notificações e não significa que a HokuPédia tenha certificação, imunidade ou enquadramento automático como “Safe Harbor”. Cada solicitação depende de análise e da legislação aplicável. <strong>Canal para notificações de direitos autorais: <a href="mailto:hokupedia@gmail.com">hokupedia@gmail.com</a>.</strong></p>
+
+                <h3>Projeto sem lucro direto com as obras</h3>
+                <p>A HokuPédia é um projeto acadêmico e não vende as obras nem cobra pelo acesso a elas. Não buscamos obter lucro direto com a comercialização de obras de terceiros. Isso não altera os direitos de seus titulares nem representa autorização para publicar ou distribuir conteúdo.</p>
+
+                <h3>Prefira fontes oficiais</h3>
+                <p>Sempre que disponíveis e verificáveis, priorizamos links para páginas oficiais de autores, editoras e plataformas autorizadas, para que leitores possam conhecer as obras e acessá-las por esses canais. Um link oficial não transfere direitos à HokuPédia nem substitui a fonte original.</p>
+            </div>
+        </section>
+
+        <footer class="about-footer">
+            <a href="/" aria-label="Voltar para a página inicial">HokuPédia</a>
+            <span>Um projeto feito para quem ama ler.</span>
+        </footer>
+    </main>
+
+    <script type="module" src="../JAVA/MenuLat.js"></script>
+    <script type="module" src="../JS/WorkSearch.js"></script>
+</body>
+</html>

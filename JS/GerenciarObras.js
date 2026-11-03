@@ -1,4 +1,5 @@
 import { createAuthorIcon } from "./authorIcon.js";
+import { findSimilarAuthorSuggestions } from "./authorSuggestions.js";
 import { confirmInPage } from "./confirmationDialog.js";
 import { setExpandableDescription } from "./expandableDescription.js";
 import { account } from "./JAVA/appwriteClient.js";
@@ -68,11 +69,23 @@ const languageNames = {
     "zh-CN": "Chinês (simplificado)",
     "zh-TW": "Chinês (tradicional)"
 };
+const languageFlags = {
+    "pt-BR": "🇧🇷",
+    ja: "🇯🇵",
+    en: "🇺🇸",
+    es: "🇪🇸",
+    fr: "🇫🇷",
+    ko: "🇰🇷",
+    "zh-CN": "🇨🇳",
+    "zh-TW": "🇹🇼"
+};
 const workList = document.querySelector("#workList");
 const editorRegion = document.querySelector("#editorRegion");
 const managementPage = document.querySelector(".management-page");
 const addWorkButton = document.querySelector("#addWorkButton");
 const feedback = document.querySelector("#feedback");
+const operationProgressDialog = document.querySelector("#operationProgressDialog");
+const operationProgressMessage = document.querySelector("#operationProgressMessage");
 const pageTitle = document.querySelector("#pageTitle");
 const workManagementRegion = document.querySelector("#workManagementRegion");
 const moderationRequestRegion = document.querySelector("#moderationRequestRegion");
@@ -83,9 +96,12 @@ const requestStatusDescription = document.querySelector("#requestStatusDescripti
 const retryModerationButton = document.querySelector("#retryModerationButton");
 const requestFeedback = document.querySelector("#requestFeedback");
 let works = [];
+let catalogWorks = [];
+let currentEditingWorkId = "";
 let workRequests = [];
 let selectedArchive;
 let selectedCoverFile;
+const pendingChapterSubmissions = new WeakSet();
 let coverPreviewUrl;
 let isAdmin = false;
 let currentUserId = "";
@@ -161,7 +177,19 @@ async function uploadChapterArchive(file) {
     });
 }
 
+async function loadCatalogWorks() {
+    try {
+        const data = await apiRequest("/api/works");
+        if (Array.isArray(data.works)) {
+            catalogWorks = data.works;
+        }
+    } catch (error) {
+        console.error("Não foi possível carregar o catálogo de autores:", error);
+    }
+}
+
 async function loadWorks() {
+    void loadCatalogWorks();
     const data = await apiRequest("/api/management/works", { authenticated: true });
     if (!Array.isArray(data.works)) {
         throw new Error("A resposta do Appwrite contém uma lista de obras inválida.");
@@ -226,6 +254,17 @@ function showFeedback(message, isError = false) {
     feedback.classList.toggle("is-error", isError);
 }
 
+function showOperationProgress(message) {
+    operationProgressMessage.textContent = message;
+    if (!operationProgressDialog.open) operationProgressDialog.showModal();
+}
+
+function closeOperationProgress() {
+    if (operationProgressDialog.open) operationProgressDialog.close();
+}
+
+operationProgressDialog.addEventListener("cancel", (event) => event.preventDefault());
+
 function createButton(label, action, className, title = label) {
     const button = document.createElement("button");
     button.type = "button";
@@ -243,7 +282,7 @@ function getChapterNumber(chapter, index) {
 
 function getChapterDisplayName(chapter, index) {
     const title = typeof chapter.title === "string" ? chapter.title.trim() : "";
-    return `Cap ${getChapterNumber(chapter, index)}${title ? ` — ${title}` : ""}`;
+    return `Capítulo ${getChapterNumber(chapter, index)}${title ? ` — ${title}` : ""}`;
 }
 
 function renderWorkCard(work) {
@@ -308,7 +347,7 @@ function renderWorkCard(work) {
         empty.textContent = "Sem Capítulos";
         chapterList.append(empty);
     } else {
-        const hasCollapsedChapters = work.chapters.length > 2;
+        const hasCollapsedChapters = work.chapters.length > 1;
         for (const [index, chapter] of work.chapters.entries()) {
             const row = document.createElement("div");
             row.className = "chapter-row";
@@ -318,9 +357,7 @@ function renderWorkCard(work) {
             }
 
             const flag = document.createElement("span");
-            flag.textContent = chapter.language === "pt-BR" ? "🇧🇷"
-                : chapter.language === "ja" ? "🇯🇵"
-                    : chapter.language === "es" ? "🇪🇸" : "🇺🇸";
+            flag.textContent = languageFlags[chapter.language] || "🌐";
             flag.setAttribute("aria-label", languageNames[chapter.language] || "Idioma");
             row.append(flag);
 
@@ -339,8 +376,8 @@ function renderWorkCard(work) {
 
             if (chapter.createBy === currentUserId) {
                 row.append(
-                    createButton("Editar", "edit-chapter", "chapter-row-action", `Editar ${getChapterDisplayName(chapter, index)}`),
-                    createButton("Excluir", "delete-chapter", "chapter-row-action", `Excluir ${getChapterDisplayName(chapter, index)}`)
+                    createButton("Editar", "edit-chapter", "chapter-row-action edit-chapter-action", `Editar ${getChapterDisplayName(chapter, index)}`),
+                    createButton("Excluir", "delete-chapter", "chapter-row-action delete-chapter-action", `Excluir ${getChapterDisplayName(chapter, index)}`)
                 );
             }
             row.dataset.chapterId = chapter.id;
@@ -364,17 +401,15 @@ function renderWorkCard(work) {
             chapterList.append(toggle);
         }
     }
-    card.append(chapterList);
     const chapterEditorRegion = document.createElement("section");
     chapterEditorRegion.className = "editor-region chapter-editor-region";
     chapterEditorRegion.dataset.workId = work.id;
     chapterEditorRegion.setAttribute("aria-live", "polite");
-    card.append(chapterEditorRegion);
     const workEditorRegion = document.createElement("section");
     workEditorRegion.className = "editor-region work-editor-region";
     workEditorRegion.dataset.workId = work.id;
     workEditorRegion.setAttribute("aria-live", "polite");
-    card.append(workEditorRegion);
+    card.append(workEditorRegion, chapterList, chapterEditorRegion);
     return card;
 }
 
@@ -439,7 +474,173 @@ function renderWorks() {
     for (const work of works) workList.append(renderWorkCard(work));
 }
 
+function getKnownWorksForAuthorSuggestions() {
+    const itemsById = new Map();
+    for (const work of catalogWorks) {
+        if (work?.id) itemsById.set(work.id, work);
+    }
+    for (const work of works) {
+        if (work?.id) itemsById.set(work.id, work);
+    }
+    for (const request of workRequests) {
+        if (request?.id && request.status?.toUpperCase() !== "REPROVADO" && request.author) {
+            itemsById.set(request.id, request);
+        }
+    }
+    return [...itemsById.values()];
+}
+
+function formatAuthorWorksSubtitle(titles) {
+    if (!Array.isArray(titles) || titles.length === 0) {
+        return "Sugestão para outra obra do mesmo autor";
+    }
+    return `Sugestão para outra obra do mesmo autor de: ${titles.join(", ")}`;
+}
+
+function createAuthorField(initialValue = "", currentWorkId = "") {
+    const wrapper = document.createElement("div");
+    wrapper.className = "field author-field";
+
+    const label = document.createElement("label");
+    label.className = "author-field-label";
+    label.htmlFor = "workAuthor";
+    label.textContent = "Autor";
+
+    const inputContainer = document.createElement("div");
+    inputContainer.className = "author-input-container";
+
+    const input = document.createElement("input");
+    input.id = "workAuthor";
+    input.name = "author";
+    input.type = "text";
+    input.value = initialValue;
+    input.placeholder = "Nome do autor";
+    input.required = true;
+    input.autocomplete = "off";
+    input.setAttribute("aria-autocomplete", "list");
+    input.setAttribute("aria-controls", "workAuthorSuggestions");
+    input.setAttribute("aria-expanded", "false");
+
+    const suggestions = document.createElement("div");
+    suggestions.className = "author-suggestions";
+    suggestions.id = "workAuthorSuggestions";
+    suggestions.setAttribute("role", "listbox");
+    suggestions.setAttribute("aria-label", "Sugestões de autores com nome parecido");
+    suggestions.hidden = true;
+
+    const sameAuthorNotice = document.createElement("p");
+    sameAuthorNotice.className = "author-same-work-notice";
+    sameAuthorNotice.hidden = true;
+
+    let activeIndex = -1;
+
+    const closeSuggestions = () => {
+        suggestions.hidden = true;
+        input.setAttribute("aria-expanded", "false");
+        activeIndex = -1;
+    };
+
+    const updateSuggestions = (openDropdown = true) => {
+        const matches = findSimilarAuthorSuggestions(
+            input.value,
+            getKnownWorksForAuthorSuggestions(),
+            { excludeWorkId: currentWorkId }
+        );
+        const exactMatch = matches.find((item) => item.isExactMatch);
+        if (exactMatch && exactMatch.works.length > 0) {
+            sameAuthorNotice.textContent = `Outra obra do mesmo autor de: ${exactMatch.works.join(", ")}`;
+            sameAuthorNotice.hidden = false;
+        } else {
+            sameAuthorNotice.textContent = "";
+            sameAuthorNotice.hidden = true;
+        }
+
+        const selectableMatches = matches.filter((item) => !item.isExactMatch);
+        suggestions.replaceChildren();
+        activeIndex = -1;
+
+        if (!openDropdown || selectableMatches.length === 0) {
+            closeSuggestions();
+            return;
+        }
+
+        for (const match of selectableMatches) {
+            const option = document.createElement("button");
+            option.type = "button";
+            option.className = "author-suggestion-option";
+            option.setAttribute("role", "option");
+
+            const header = document.createElement("span");
+            header.className = "author-suggestion-header";
+
+            const name = document.createElement("strong");
+            name.className = "author-suggestion-name";
+            name.textContent = match.author;
+
+            const badge = document.createElement("span");
+            badge.className = "author-suggestion-badge";
+            badge.textContent = "Mesmo autor";
+
+            header.append(name, badge);
+
+            const subtitle = document.createElement("span");
+            subtitle.className = "author-suggestion-works";
+            subtitle.textContent = formatAuthorWorksSubtitle(match.works);
+
+            option.append(header, subtitle);
+            option.addEventListener("mousedown", (event) => {
+                event.preventDefault();
+            });
+            option.addEventListener("click", () => {
+                input.value = match.author;
+                closeSuggestions();
+                updateSuggestions(false);
+                input.focus();
+            });
+            suggestions.append(option);
+        }
+
+        suggestions.hidden = false;
+        input.setAttribute("aria-expanded", "true");
+    };
+
+    input.addEventListener("input", () => updateSuggestions(true));
+    input.addEventListener("focus", () => {
+        if (input.value.trim().length >= 2) updateSuggestions(true);
+    });
+    input.addEventListener("blur", () => {
+        closeSuggestions();
+    });
+    input.addEventListener("keydown", (event) => {
+        const options = [...suggestions.querySelectorAll(".author-suggestion-option")];
+        if (event.key === "Escape") {
+            closeSuggestions();
+            return;
+        }
+        if (suggestions.hidden || options.length === 0) return;
+
+        if (event.key === "ArrowDown") {
+            event.preventDefault();
+            activeIndex = (activeIndex + 1) % options.length;
+            options.forEach((opt, idx) => opt.classList.toggle("is-active", idx === activeIndex));
+        } else if (event.key === "ArrowUp") {
+            event.preventDefault();
+            activeIndex = (activeIndex - 1 + options.length) % options.length;
+            options.forEach((opt, idx) => opt.classList.toggle("is-active", idx === activeIndex));
+        } else if (event.key === "Enter" && activeIndex >= 0 && options[activeIndex]) {
+            event.preventDefault();
+            options[activeIndex].click();
+        }
+    });
+
+    updateSuggestions(false);
+    inputContainer.append(input, suggestions);
+    wrapper.append(label, inputContainer, sameAuthorNotice);
+    return wrapper;
+}
+
 function createField({ id, label, name, value = "", type = "text", placeholder = "", required = false }) {
+    if (id === "workAuthor") return createAuthorField(value, currentEditingWorkId);
     const wrapper = document.createElement("label");
     wrapper.className = "field";
     wrapper.htmlFor = id;
@@ -535,7 +736,32 @@ function createGenreTagField(selected = []) {
     chevronPath.setAttribute("d", "m6 9 6 6 6-6");
     chevron.append(chevronPath);
     toggle.append(chevron);
-    heading.append(label, toggle);
+    heading.append(label);
+    const updateCollapsedTags = () => {
+        const tags = [...tagList.querySelectorAll("button[data-genre]")];
+        for (const tag of tags) tag.classList.remove("is-overflow-hidden");
+        if (toggle.getAttribute("aria-expanded") === "true" || !tagList.clientWidth) return;
+
+        const gap = Number.parseFloat(getComputedStyle(tagList).columnGap) || 0;
+        const availableWidth = tagList.clientWidth;
+        const toggleWidth = toggle.getBoundingClientRect().width;
+        let usedWidth = 0;
+        let visibleCount = 0;
+
+        for (const tag of tags) {
+            const tagWidth = tag.getBoundingClientRect().width;
+            const nextWidth = usedWidth + (visibleCount ? gap : 0) + tagWidth;
+            if (nextWidth + gap + toggleWidth > availableWidth) break;
+            usedWidth = nextWidth;
+            visibleCount += 1;
+        }
+
+        for (const tag of tags.slice(visibleCount)) {
+            tag.classList.add("is-overflow-hidden");
+        }
+    };
+    const genreResizeObserver = new ResizeObserver(updateCollapsedTags);
+    genreResizeObserver.observe(tagList);
     const selectedValues = new Set(selected);
     const input = document.createElement("input");
     input.type = "hidden";
@@ -551,6 +777,8 @@ function createGenreTagField(selected = []) {
             expanded ? "Recolher categorias" : "Mostrar todas as categorias"
         );
         tagList.classList.toggle("is-expanded", expanded);
+        wrapper.classList.toggle("is-expanded", expanded);
+        updateCollapsedTags();
     });
 
     const updateTagIcon = (tag, isSelected) => {
@@ -576,6 +804,7 @@ function createGenreTagField(selected = []) {
         updateTagIcon(tag, selectedValues.has(genre));
         tagList.append(tag);
     }
+    tagList.append(toggle);
 
     tagList.addEventListener("click", (event) => {
         const tag = event.target.closest("button[data-genre]");
@@ -584,6 +813,7 @@ function createGenreTagField(selected = []) {
         tag.setAttribute("aria-pressed", String(!isSelected));
         tag.classList.toggle("is-selected", !isSelected);
         updateTagIcon(tag, !isSelected);
+        updateCollapsedTags();
         const selectedGenres = [...tagList.querySelectorAll("button[data-genre][aria-pressed='true']")]
             .map((item) => item.dataset.genre);
         input.value = selectedGenres.join(", ");
@@ -601,6 +831,7 @@ function createGenreTagField(selected = []) {
 }
 
 function renderWorkForm(work, targetRegion = editorRegion) {
+    currentEditingWorkId = work?.id || "";
     const isEditing = Boolean(work);
     const isRequest = !isAdmin && !isEditing;
     const panel = createEditorPanel(isEditing ? "Editar Obra" : isRequest ? "Solicitar nova obra" : "Adicionar Obra");
@@ -1023,6 +1254,7 @@ async function handleWorkSubmit(form) {
 }
 
 async function handleChapterSubmit(form) {
+    if (pendingChapterSubmissions.has(form)) return;
     const formData = new FormData(form);
     const work = works.find((item) => item.id === form.dataset.workId);
     if (!work) {
@@ -1038,21 +1270,33 @@ async function handleChapterSubmit(form) {
         return;
     }
     let pages = existing?.pages || [];
-    if (selectedArchive) {
-        try {
-            ({ pages } = await uploadChapterArchive(selectedArchive));
-        } catch (error) {
-            console.error("Não foi possível enviar o arquivo do capítulo:", error);
-            showFeedback(error.message || "Não foi possível enviar o arquivo do capítulo.", true);
-            return;
-        }
-    }
-    if (pages.length === 0) {
+    if (!selectedArchive && pages.length === 0) {
         showFeedback("Selecione um arquivo .zip com as páginas do capítulo.", true);
         return;
     }
 
+    const submitButton = form.querySelector(".submit-button");
+    const formButtons = [...form.querySelectorAll("button")];
+    const originalButtonLabel = submitButton?.textContent || "";
+    pendingChapterSubmissions.add(form);
+    form.setAttribute("aria-busy", "true");
+    formButtons.forEach((button) => {
+        button.disabled = true;
+    });
+
     try {
+        if (selectedArchive) {
+            if (submitButton) submitButton.textContent = "Enviando páginas…";
+            showOperationProgress("Enviando e processando as páginas do capítulo. Aguarde; isso pode levar alguns minutos conforme o tamanho do arquivo.");
+            ({ pages } = await uploadChapterArchive(selectedArchive));
+        }
+        if (pages.length === 0) {
+            showFeedback("Selecione um arquivo .zip com as páginas do capítulo.", true);
+            return;
+        }
+
+        if (submitButton) submitButton.textContent = "Salvando capítulo…";
+        if (selectedArchive) showOperationProgress("Páginas enviadas. Salvando o capítulo, aguarde.");
         const result = await apiRequest(
             existing
                 ? `/api/chapters/${encodeURIComponent(chapterId)}`
@@ -1078,8 +1322,16 @@ async function handleChapterSubmit(form) {
         closeEditor();
         showFeedback(existing ? "Capítulo atualizado no Appwrite." : "Capítulo adicionado ao Appwrite.");
     } catch (error) {
-        console.error("Não foi possível salvar o capítulo:", error);
-        showFeedback(error.message || "Não foi possível salvar o capítulo.", true);
+        console.error("Não foi possível enviar ou salvar o capítulo:", error);
+        showFeedback(error.message || "Não foi possível enviar ou salvar o capítulo.", true);
+    } finally {
+        closeOperationProgress();
+        pendingChapterSubmissions.delete(form);
+        form.removeAttribute("aria-busy");
+        formButtons.forEach((button) => {
+            button.disabled = false;
+        });
+        if (submitButton?.isConnected) submitButton.textContent = originalButtonLabel;
     }
 }
 
@@ -1129,12 +1381,14 @@ async function handleAction(action, card, chapterRow, actionButton) {
                 destructive: true
             })) {
                 actionButton.disabled = true;
+                showOperationProgress(`Apagando “${work.title}”, seus capítulos e imagens. Aguarde; esta operação pode levar alguns minutos.`);
                 try {
                     await apiRequest(`/api/works/${encodeURIComponent(workId)}`, {
                         method: "DELETE",
                         authenticated: true
                     });
                     works = works.filter((item) => item.id !== workId);
+                    catalogWorks = catalogWorks.filter((item) => item.id !== workId);
                     renderWorks();
                     closeEditor();
                     showFeedback("Obra, capítulos e imagens excluídos do Appwrite e do ImageKit.");
@@ -1142,6 +1396,7 @@ async function handleAction(action, card, chapterRow, actionButton) {
                     console.error("Não foi possível excluir a obra:", error);
                     showFeedback(getDeleteErrorMessage(error, "obra"), true);
                 } finally {
+                    closeOperationProgress();
                     if (actionButton.isConnected) actionButton.disabled = false;
                 }
             }
@@ -1153,6 +1408,9 @@ async function handleAction(action, card, chapterRow, actionButton) {
                 confirmLabel: "Excluir capítulo",
                 destructive: true
             })) {
+                actionButton.disabled = true;
+                const chapterTitle = chapterRow.querySelector(".chapter-row-title").textContent;
+                showOperationProgress(`Apagando “${chapterTitle}” e suas imagens. Aguarde.`);
                 try {
                     await apiRequest(`/api/chapters/${encodeURIComponent(chapterId)}`, {
                         method: "DELETE",
@@ -1164,6 +1422,9 @@ async function handleAction(action, card, chapterRow, actionButton) {
                 } catch (error) {
                     console.error("Não foi possível excluir o capítulo:", error);
                     showFeedback(error.message || "Não foi possível excluir o capítulo.", true);
+                } finally {
+                    closeOperationProgress();
+                    if (actionButton.isConnected) actionButton.disabled = false;
                 }
             }
             break;
@@ -1214,7 +1475,7 @@ workList.addEventListener("click", async (event) => {
         title: isRejected ? "Excluir pedido negado?" : "Cancelar análise?",
         message: isRejected
             ? `Excluir o registro do pedido negado “${request.title}”? Esta ação não pode ser desfeita.`
-            : `Cancelar a análise do pedido “${request.title}”?`,
+            : `Cancelar a análise do pedido “${request.title}”? A capa e as informações enviadas serão apagadas.`,
         confirmLabel: isRejected ? "Excluir pedido" : "Cancelar análise",
         destructive: true
     });
@@ -1231,7 +1492,7 @@ workList.addEventListener("click", async (event) => {
         if (!workRequests.some((item) => item.status?.toUpperCase() === "PENDENTE")) {
             stopWorkRequestPolling();
         }
-        showFeedback(isRejected ? "Pedido negado excluído." : "Análise do pedido cancelada.");
+        showFeedback(isRejected ? "Pedido negado excluído." : "Análise cancelada. A capa e as informações do pedido foram excluídas.");
     } catch (error) {
         console.error("Não foi possível excluir ou cancelar o pedido de obra:", error);
         showFeedback(getDeleteErrorMessage(error, "pedido de obra"), true);

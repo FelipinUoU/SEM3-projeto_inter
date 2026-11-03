@@ -1275,7 +1275,6 @@ app.post('/api/pedido_obra', requireAuthenticatedUser, requireModeratorUser, asy
         Author: author.trim(),
         sinopse,
         coverUrl,
-        coverFileId,
         gender: gender.trim(),
         formato,
         status: 'PENDENTE'
@@ -1306,13 +1305,6 @@ app.post('/api/pedido_obra', requireAuthenticatedUser, requireModeratorUser, asy
         error: 'A collection configurada em APPWRITE_WORK_REQUESTS_COLLECTION_ID não possui o atributo Author. Crie um atributo String chamado Author, com tamanho 255, e tente novamente.'
       });
     }
-    if (error?.type === 'document_invalid_structure'
-      && /Unknown attribute:\s*["']coverFileId["']/i.test(appwriteErrorDetails)) {
-      console.error('The work requests collection is missing its coverFileId attribute:', error);
-      return res.status(503).json({
-        error: 'A collection configurada em APPWRITE_WORK_REQUESTS_COLLECTION_ID não possui o atributo coverFileId. Crie um atributo String chamado coverFileId, com tamanho 255, e tente novamente.'
-      });
-    }
     return sendAppwriteError(res, error, 'Não foi possível criar o pedido de obra no Appwrite.');
   }
 });
@@ -1335,6 +1327,7 @@ app.get('/api/pedido_obra/me', requireAuthenticatedUser, requireModeratorUser, a
         id: request.$id,
         status: request.status,
         title: request.nomeObra,
+        author: getWorkAttribute(request.Author ?? request.author),
         gender: typeof request.gender === 'string' && request.gender.trim()
           ? request.gender.trim()
           : 'Não informado',
@@ -1366,12 +1359,32 @@ app.delete('/api/pedido_obra/:id', requireAuthenticatedUser, requireModeratorUse
     if (!['PENDENTE', 'REPROVADO'].includes(status)) {
       return res.status(409).json({ error: 'Somente pedidos pendentes ou negados podem ser excluídos.' });
     }
+    const hasStoredCoverFileId = typeof request.coverFileId === 'string' && request.coverFileId.length > 0;
+    const hasCoverUrl = isImageKitAsset(request.coverUrl);
+    if ((hasStoredCoverFileId || hasCoverUrl) && !imageKit) {
+      return res.status(503).json({
+        error: 'Configure as chaves do ImageKit no servidor para remover a capa do pedido.'
+      });
+    }
+    let coverFileId = hasStoredCoverFileId ? request.coverFileId : '';
+    if (!coverFileId && hasCoverUrl) {
+      deletionStep = 'localizar a capa do pedido no ImageKit';
+      coverFileId = await findImageKitFileIdByUrl(request.coverUrl);
+    }
+    if (coverFileId) {
+      deletionStep = 'excluir a capa do pedido no ImageKit';
+      const allowedFolderPrefix = hasStoredCoverFileId
+        ? `/hokupedia/work-requests/${request.moderadorId || request.userId}/`
+        : '/hokupedia/';
+      await deleteImageKitFile(coverFileId, allowedFolderPrefix, hasCoverUrl ? request.coverUrl : undefined);
+    }
     deletionStep = status === 'PENDENTE' ? 'cancelar a análise do pedido' : 'excluir o pedido negado';
     await databases.deleteDocument(appwriteDatabaseId, workRequestsCollectionId, req.params.id);
     return res.json({ deleted: true });
   } catch (error) {
     console.error(`Não foi possível ${deletionStep}:`, error);
-    return res.status(getAppwriteStatus(error)).json({
+    const status = deletionStep.includes('ImageKit') ? 502 : getAppwriteStatus(error);
+    return res.status(status).json({
       error: `Falha ao ${deletionStep}: ${error?.message || 'erro inesperado do Appwrite.'}`
     });
   }

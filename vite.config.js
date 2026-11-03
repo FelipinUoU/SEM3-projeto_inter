@@ -28,6 +28,7 @@ export default defineConfig({
         homologacao: resolve(process.cwd(), 'HTML/Homologacao.html'),
         obra: resolve(process.cwd(), 'HTML/Obra.html'),
         leitura: resolve(process.cwd(), 'HTML/Leitura.html'),
+        sobreNos: resolve(process.cwd(), 'HTML/SobreNos.html'),
       },
     },
   },
