@@ -7,22 +7,33 @@
     <title>Homologação | HokuPédia</title>
     <link rel="stylesheet" href="../CSS/Confirmacao.css">
     <link rel="stylesheet" href="../CSS/Moderacao.css">
+    <link rel="stylesheet" href="../CSS/MenuLat.css">
 </head>
 <body class="workflow-body">
-    <header class="workflow-header">
-        <a class="workflow-brand" href="/" aria-label="HokuPédia — tela inicial">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
-            <span>HokuPedia</span>
-        </a>
+    <header class="menu-lateral-header">
+        <button class="menu-lateral-button" id="menuBtn" type="button" aria-label="Abrir dashboard" aria-expanded="false" aria-controls="dashboard">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <h1 class="menu-lateral-logo"><a href="/" aria-label="Ir para a página inicial">HokuPédia</a></h1>
         <form class="work-search" role="search" autocomplete="off">
             <label class="work-search__label" for="work-search-input">Buscar obra por nome</label>
             <input id="work-search-input" type="search" name="q" placeholder="Buscar obra..." aria-autocomplete="list" aria-controls="work-search-results" aria-expanded="false">
             <div class="work-search__results" id="work-search-results" role="listbox" aria-live="polite" hidden></div>
         </form>
-        <a class="workflow-profile" href="/HTML/GerenciarObras.html" aria-label="Abrir gerenciamento de obras">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
-        </a>
+        <a class="header-login" href="/HTML/CadLog.html?mode=login">Login</a>
     </header>
+    <button class="menu-lateral-overlay" id="menuOverlay" type="button" aria-label="Fechar dashboard" hidden></button>
+    <aside class="menu-lateral-dashboard" id="dashboard" aria-label="Navegação principal" aria-hidden="true" inert>
+        <nav class="menu-lateral-items" aria-label="Navegação principal">
+            <a class="menu-lateral-item" href="/">Home</a>
+            <a class="menu-lateral-item" href="/HTML/Catalogo.html">Catálogo</a>
+            <a class="menu-lateral-item" href="/HTML/Biblioteca.html">Biblioteca</a>
+            <a class="menu-lateral-item" href="/HTML/GerenciarObras.html">Gerenciar Obras</a>
+            <a class="menu-lateral-item" href="/HTML/Homologacao.html" data-admin-only hidden aria-current="page">Homologação</a>
+        </nav>
+    </aside>
 
     <main class="homologation-main">
         <div class="homologation-heading">
@@ -30,7 +41,6 @@
                 <p class="workflow-eyebrow">Painel do administrador</p>
                 <h1>Tela de Homologação</h1>
             </div>
-            <a class="management-link" href="/HTML/GerenciarObras.html">Gerenciar catálogo</a>
         </div>
         <p class="workflow-feedback" id="feedback" role="status" aria-live="polite"></p>
 
@@ -49,6 +59,7 @@
         <img class="cover-preview-large" id="coverPreviewImage" alt="">
     </dialog>
 
+    <script type="module" src="../JAVA/MenuLat.js"></script>
     <script type="module" src="../JS/WorkSearch.js"></script>
     <script type="module" src="../JS/Homologacao.js"></script>
 </body>

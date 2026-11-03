@@ -72,7 +72,6 @@ const editorRegion = document.querySelector("#editorRegion");
 const managementPage = document.querySelector(".management-page");
 const addWorkButton = document.querySelector("#addWorkButton");
 const feedback = document.querySelector("#feedback");
-const workApprovalLink = document.querySelector("#workApprovalLink");
 const pageTitle = document.querySelector("#pageTitle");
 const workManagementRegion = document.querySelector("#workManagementRegion");
 const moderationRequestRegion = document.querySelector("#moderationRequestRegion");
@@ -1272,11 +1271,6 @@ async function initializeManagementPage() {
         addWorkButton.innerHTML = isAdmin
             ? '<span aria-hidden="true">＋</span> Adicionar Obra'
             : '<span aria-hidden="true">＋</span> Solicitar Obra';
-        workApprovalLink.hidden = !isAdmin;
-        if (!isAdmin) {
-            document.querySelector(".storage-note").textContent =
-                "Você pode editar as obras e os capítulos criados por você. Novas obras passam por homologação do administrador.";
-        }
         await loadWorks();
         if (!isAdmin) await loadWorkRequest();
     } catch (error) {
