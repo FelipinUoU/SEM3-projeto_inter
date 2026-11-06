@@ -10,6 +10,7 @@ import { Account, Client, Users as AppwriteUsers } from 'node-appwrite';
 import ImageKit from 'imagekit';
 import nodemailer from 'nodemailer';
 import { readChapterArchive } from './chapterArchive.js';
+import { getCachedValue, invalidateCache } from './cache.js';
 import { optimizeImageForImageKit } from './imageOptimization.js';
 import {
   authenticateNeonSession,
@@ -56,6 +57,7 @@ const MAX_PROFILE_AVATAR_BYTES = 200 * 1024;
 const MAX_CHAPTER_PAGES = Number.parseInt(process.env.MAX_CHAPTER_PAGES || '500', 10);
 const MAX_CHAPTER_ARCHIVE_BYTES = Number.parseInt(process.env.MAX_CHAPTER_ARCHIVE_BYTES || '104857600', 10);
 const MAX_CHAPTER_UNPACKED_BYTES = 209715200;
+const WORK_DATA_CACHE_TTL_MS = 5 * 60 * 1000;
 const appwriteEndpoint = process.env.APPWRITE_ENDPOINT;
 const appwriteProjectId = process.env.APPWRITE_PROJECT_ID;
 const appwriteApiKey = process.env.APPWRITE_API_KEY;
@@ -100,6 +102,12 @@ const providerTimeoutMs = 180000;
 app.use(express.json({ limit: '15mb' }));
 app.use(cors({ origin: '*' }));
 app.use((req, res, next) => {
+  res.on('finish', () => {
+    const changesWorkData = /^\/api\/(?:works(?:\/|$)|chapters(?:\/|$)|pedido_obra\/[^/]+\/aprovar$)/.test(req.path);
+    if (req.method !== 'GET' && res.statusCode < 400 && changesWorkData) {
+      invalidateCache('works:');
+    }
+  });
   const cookies = req.get('Cookie') || '';
   req.cookies = Object.fromEntries(cookies.split(';').map((part) => {
     const separator = part.indexOf('=');
@@ -872,65 +880,106 @@ app.delete('/api/uploads/:fileId', requireAuthenticatedUser, requireAdminUser, a
   }
 });
 
+app.get('/api/catalog/works', async (req, res) => {
+  try {
+    const data = await getCachedValue('works:catalog', WORK_DATA_CACHE_TTL_MS, async () => {
+      const [workDocuments, chapterDocuments] = await Promise.all([
+        listAllDocuments(worksCollectionId),
+        listAllDocuments(chaptersCollectionId)
+      ]);
+      const chaptersByWork = new Map();
+      for (const chapter of chapterDocuments) {
+        if (String(chapter.status || '').toUpperCase() === 'REPROVADO') continue;
+        const chapters = chaptersByWork.get(chapter.workId) || [];
+        chapters.push({
+          status: chapter.status,
+          number: chapter.number,
+          title: getWorkAttribute(chapter.title),
+          createdAt: chapter.$createdAt
+        });
+        chaptersByWork.set(chapter.workId, chapters);
+      }
+      return {
+        works: workDocuments.map((work) => ({
+          id: work.$id,
+          title: getWorkAttribute(work.Title),
+          author: getWorkAttribute(work.Author),
+          gender: work.gender ?? work.Gender ?? work.Genres ?? work.Genre ?? '',
+          formato: work.formato ?? '',
+          createdAt: work.$createdAt,
+          cover: getWorkAttribute(work.coverUrl),
+          chapters: chaptersByWork.get(work.$id) || []
+        }))
+      };
+    });
+    return res.json(data);
+  } catch (error) {
+    return sendAppwriteError(res, error, 'Não foi possível carregar o catálogo do Appwrite.');
+  }
+});
+
 app.get('/api/works', async (req, res) => {
   try {
-    const [workDocuments, chapterDocuments, pageDocuments] = await Promise.all([
-      listAllDocuments(worksCollectionId),
-      listAllDocuments(chaptersCollectionId),
-      listAllDocuments(pagesCollectionId)
-    ]);
-    const chapterAuthorIds = [...new Set(
-      chapterDocuments.map((chapter) => chapter.createBy).filter(Boolean)
-    )];
-    const chapterAuthors = new Map(await Promise.all(
-      chapterAuthorIds.map(async (userId) => [userId, await getChapterAuthorName(userId)])
-    ));
-    const pagesByChapter = new Map();
-    for (const page of pageDocuments) {
-      const pages = pagesByChapter.get(page.chapterId) || [];
-      pages.push({
-        id: page.$id,
-        name: page.originalName,
-        url: page.imageUrl,
-        fileId: page.imageFileId,
-        format: page.format,
-        position: page.number - 1
-      });
-      pagesByChapter.set(page.chapterId, pages);
-    }
-    const chaptersByWork = new Map();
-    for (const chapter of chapterDocuments) {
-      if (String(chapter.status || '').toUpperCase() === 'REPROVADO') continue;
-      const pages = (pagesByChapter.get(chapter.$id) || [])
-        .sort((left, right) => left.position - right.position);
-      const workChapters = chaptersByWork.get(chapter.workId) || [];
-      workChapters.push({
-        id: chapter.$id,
-        number: chapter.number,
-        title: getWorkAttribute(chapter.title),
-        language: chapter.language,
-        status: chapter.status,
-        createdAt: chapter.$createdAt,
-        author: chapterAuthors.get(chapter.createBy) || 'Usuário desconhecido',
-        pages
-      });
-      chaptersByWork.set(chapter.workId, workChapters);
-    }
-    return res.json({
-      works: workDocuments.map((work) => ({
-        id: work.$id,
-        title: getWorkAttribute(work.Title),
-        author: getWorkAttribute(work.Author),
-        gender: work.gender ?? work.Gender ?? work.Genres ?? work.Genre ?? '',
-        formato: work.formato ?? '',
-        description: getWorkAttribute(work.Description),
-        cover: getWorkAttribute(work.coverUrl),
-        createdAt: work.$createdAt,
-        coverFileId: '',
-        chapters: (chaptersByWork.get(work.$id) || [])
-          .sort((left, right) => left.number - right.number)
-      }))
+    const data = await getCachedValue('works:published', WORK_DATA_CACHE_TTL_MS, async () => {
+      const [workDocuments, chapterDocuments, pageDocuments] = await Promise.all([
+        listAllDocuments(worksCollectionId),
+        listAllDocuments(chaptersCollectionId),
+        listAllDocuments(pagesCollectionId)
+      ]);
+      const chapterAuthorIds = [...new Set(
+        chapterDocuments.map((chapter) => chapter.createBy).filter(Boolean)
+      )];
+      const chapterAuthors = new Map(await Promise.all(
+        chapterAuthorIds.map(async (userId) => [userId, await getChapterAuthorName(userId)])
+      ));
+      const pagesByChapter = new Map();
+      for (const page of pageDocuments) {
+        const pages = pagesByChapter.get(page.chapterId) || [];
+        pages.push({
+          id: page.$id,
+          name: page.originalName,
+          url: page.imageUrl,
+          fileId: page.imageFileId,
+          format: page.format,
+          position: page.number - 1
+        });
+        pagesByChapter.set(page.chapterId, pages);
+      }
+      const chaptersByWork = new Map();
+      for (const chapter of chapterDocuments) {
+        if (String(chapter.status || '').toUpperCase() === 'REPROVADO') continue;
+        const pages = (pagesByChapter.get(chapter.$id) || [])
+          .sort((left, right) => left.position - right.position);
+        const workChapters = chaptersByWork.get(chapter.workId) || [];
+        workChapters.push({
+          id: chapter.$id,
+          number: chapter.number,
+          title: getWorkAttribute(chapter.title),
+          language: chapter.language,
+          status: chapter.status,
+          createdAt: chapter.$createdAt,
+          author: chapterAuthors.get(chapter.createBy) || 'Usuário desconhecido',
+          pages
+        });
+        chaptersByWork.set(chapter.workId, workChapters);
+      }
+      return {
+        works: workDocuments.map((work) => ({
+          id: work.$id,
+          title: getWorkAttribute(work.Title),
+          author: getWorkAttribute(work.Author),
+          gender: work.gender ?? work.Gender ?? work.Genres ?? work.Genre ?? '',
+          formato: work.formato ?? '',
+          description: getWorkAttribute(work.Description),
+          cover: getWorkAttribute(work.coverUrl),
+          createdAt: work.$createdAt,
+          coverFileId: '',
+          chapters: (chaptersByWork.get(work.$id) || [])
+            .sort((left, right) => left.number - right.number)
+        }))
+      };
     });
+    return res.json(data);
   } catch (error) {
     return sendAppwriteError(res, error, 'Não foi possível carregar as obras do Neon.');
   }
@@ -1322,10 +1371,32 @@ app.put('/api/chapters/:id', requireAuthenticatedUser, requireModeratorUser, asy
     const cleanupResults = await Promise.allSettled(existingPages.map((page) => (
       databases.deleteDocument(appwriteDatabaseId, pagesCollectionId, page.$id)
     )));
-    cleanupResults.forEach((result) => {
-      if (result.status === 'rejected') console.error('Could not delete a replaced chapter page:', result.reason);
+    const successfullyDeletedPages = [];
+    cleanupResults.forEach((result, index) => {
+      if (result.status === 'rejected') {
+        console.error('Could not delete a replaced chapter page:', result.reason);
+        return;
+      }
+      successfullyDeletedPages.push(existingPages[index]);
     });
+    const retainedFileIds = new Set(pages.map((page) => page.fileId).filter(Boolean));
+    const removedImagePages = successfullyDeletedPages.filter((page) => (
+      page.imageFileId && !retainedFileIds.has(page.imageFileId)
+    ));
+    const imageCleanupResults = await Promise.allSettled(removedImagePages.map((page) => (
+      deleteImageKitFile(page.imageFileId, '/hokupedia/', page.imageUrl)
+    )));
+    imageCleanupResults.forEach((result) => {
+      if (result.status === 'rejected') {
+        console.error('Could not delete a removed chapter image from ImageKit:', result.reason);
+      }
+    });
+    const cleanupWarning = cleanupResults.some((result) => result.status === 'rejected')
+      || imageCleanupResults.some((result) => result.status === 'rejected')
+      ? 'Capítulo salvo, mas algumas imagens removidas não puderam ser excluídas do armazenamento.'
+      : undefined;
     return res.json({
+      ...(cleanupWarning ? { cleanupWarning } : {}),
       chapter: {
         id: chapter.$id,
         number: chapter.number,
@@ -1509,7 +1580,6 @@ app.post('/api/pedido_obra', requireAuthenticatedUser, requireModeratorUser, asy
         Author: author.trim(),
         sinopse,
         coverUrl,
-        coverFileId,
         gender: gender.trim(),
         formato,
         status: 'PENDENTE'
@@ -1544,6 +1614,7 @@ app.get('/api/pedido_obra/me', requireAuthenticatedUser, requireModeratorUser, a
         id: request.$id,
         status: request.status,
         title: request.nomeObra,
+        author: getWorkAttribute(request.Author ?? request.author),
         gender: typeof request.gender === 'string' && request.gender.trim()
           ? request.gender.trim()
           : 'Não informado',
@@ -1572,12 +1643,32 @@ app.delete('/api/pedido_obra/:id', requireAuthenticatedUser, requireModeratorUse
     if (!['PENDENTE', 'REPROVADO'].includes(status)) {
       return res.status(409).json({ error: 'Somente pedidos pendentes ou negados podem ser excluídos.' });
     }
+    const hasStoredCoverFileId = typeof request.coverFileId === 'string' && request.coverFileId.length > 0;
+    const hasCoverUrl = isImageKitAsset(request.coverUrl);
+    if ((hasStoredCoverFileId || hasCoverUrl) && !imageKit) {
+      return res.status(503).json({
+        error: 'Configure as chaves do ImageKit no servidor para remover a capa do pedido.'
+      });
+    }
+    let coverFileId = hasStoredCoverFileId ? request.coverFileId : '';
+    if (!coverFileId && hasCoverUrl) {
+      deletionStep = 'localizar a capa do pedido no ImageKit';
+      coverFileId = await findImageKitFileIdByUrl(request.coverUrl);
+    }
+    if (coverFileId) {
+      deletionStep = 'excluir a capa do pedido no ImageKit';
+      const allowedFolderPrefix = hasStoredCoverFileId
+        ? `/hokupedia/work-requests/${request.moderadorId || request.userId}/`
+        : '/hokupedia/';
+      await deleteImageKitFile(coverFileId, allowedFolderPrefix, hasCoverUrl ? request.coverUrl : undefined);
+    }
     deletionStep = status === 'PENDENTE' ? 'cancelar a análise do pedido' : 'excluir o pedido negado';
     await databases.deleteDocument(appwriteDatabaseId, workRequestsCollectionId, req.params.id);
     return res.json({ deleted: true });
   } catch (error) {
     console.error(`Não foi possível ${deletionStep}:`, error);
-    return res.status(getAppwriteStatus(error)).json({
+    const errorStatus = deletionStep.includes('ImageKit') ? 502 : getAppwriteStatus(error);
+    return res.status(errorStatus).json({
       error: `Falha ao ${deletionStep}: ${error?.message || 'erro inesperado no Neon.'}`
     });
   }
@@ -1906,6 +1997,7 @@ app.post('/api/gemini', async (req, res) => {
       gemini: new GoogleGenAI({ apiKey })
     }))
   ];
+  console.info(`Gemini AI request received; ${providers.length} provider key(s) configured.`);
   if (providers.length === 0) {
     return res.status(503).json({
       error: { message: 'Configure ao menos uma chave Gemini válida no arquivo .env e reinicie o servidor. Valores de exemplo como "cole_sua_chave_aqui" não são aceitos.' }
@@ -1926,10 +2018,11 @@ app.post('/api/gemini', async (req, res) => {
   });
 
   const failures = [];
-  for (const provider of providers) {
+  for (const [providerIndex, provider] of providers.entries()) {
     const maxAttempts = 3;
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       try {
+        console.info(`${provider.name}: attempting request (${attempt}/${maxAttempts}).`);
         const result = await generateWithProvider(
           provider,
           contents,
@@ -1962,13 +2055,10 @@ app.post('/api/gemini', async (req, res) => {
           ? 'a chave de API foi recusada ou não tem permissão. Verifique a chave no arquivo .env.'
           : error.message || 'erro sem detalhes';
         failures.push(`${provider.name} (HTTP ${status}): ${message}`);
-        console.error(`${provider.name} AI request failed (HTTP ${status}).`);
-        if (status === 429) {
-          return res.status(429).json({
-            error: { message: `${provider.name} (HTTP 429): ${message}` },
-            failedProviders: [provider.name]
-          });
-        }
+        const nextProvider = providers[providerIndex + 1];
+        console.error(`${provider.name} AI request failed (HTTP ${status}).${
+          nextProvider ? ` Trying ${nextProvider.name} next.` : ' No more provider keys configured.'
+        }`);
         break;
       }
     }

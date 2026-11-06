@@ -128,6 +128,15 @@ a {
     background: #ffd071;
 }
 
+.submit-button {
+    background: #195EA1;
+    color: #fff;
+}
+
+.submit-button:hover {
+    background: #144d84;
+}
+
 .add-work-button span {
     font-size: 19px;
     line-height: 1;
@@ -180,14 +189,16 @@ a {
     align-items: center;
     justify-content: center;
     padding: 0 14px;
-    border: 1px solid #ffffff24;
-    border-radius: 8px;
-    color: #d1cdd7;
+    border: 1px solid #ff4242;
+    border-radius: 4px;
+    background: transparent;
+    color: #ff4242;
     font-size: 13px;
+    cursor: pointer;
 }
 
 .cancel-button:hover {
-    background: #ffffff0a;
+    background: #ff424222;
 }
 
 .feedback {
@@ -203,6 +214,58 @@ a {
 
 .feedback.is-error {
     color: #ff9c9c;
+}
+
+.operation-progress-dialog {
+    display: flex;
+    width: min(440px, calc(100% - 32px));
+    align-items: center;
+    gap: 18px;
+    margin: auto;
+    padding: 28px;
+    border: 1px solid #ffffff20;
+    border-radius: 14px;
+    background: #1e1d23;
+    color: #f6f5f7;
+    box-shadow: 0 24px 80px #0009;
+}
+
+.operation-progress-dialog:not([open]) {
+    display: none;
+}
+
+.operation-progress-dialog::backdrop {
+    background: #08070bb8;
+    backdrop-filter: blur(3px);
+}
+
+.operation-progress-dialog p {
+    margin: 0;
+    color: #e4e0e9;
+    font-size: 14px;
+    line-height: 1.55;
+}
+
+.operation-progress-spinner {
+    width: 28px;
+    height: 28px;
+    flex: 0 0 28px;
+    border: 3px solid #ffffff2b;
+    border-top-color: #48aaff;
+    border-radius: 50%;
+    animation: operation-progress-spin 0.8s linear infinite;
+}
+
+@keyframes operation-progress-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .operation-progress-spinner {
+        animation-duration: 2s;
+    }
 }
 
 .work-list {
@@ -333,6 +396,7 @@ a {
 }
 
 .work-description {
+    min-height: 2.9em;
     margin: 0;
     color: #bcb8c1;
     font-size: 12px;
@@ -340,6 +404,7 @@ a {
 }
 
 .work-description.is-collapsed {
+    height: 2.9em;
     max-height: 2.9em;
     overflow: hidden;
 }
@@ -361,7 +426,7 @@ a {
 
 .work-actions {
     display: flex;
-    align-items: center;
+    align-items: stretch;
     gap: 12px;
 }
 
@@ -371,6 +436,7 @@ a {
     align-items: center;
     justify-content: center;
     gap: 6px;
+    min-height: 28px;
     padding: 4px;
     border: 0;
     background: transparent;
@@ -388,7 +454,7 @@ a {
 }
 
 .hub-action {
-    color: #d1cdd7;
+    color: #f0b84b;
 }
 
 .chapter-action {
@@ -446,10 +512,12 @@ a {
     grid-column: 1;
     grid-row: 1;
     display: grid;
-    width: 30px;
-    height: 30px;
+    width: 100%;
+    height: auto;
+    min-height: 36px;
+    align-self: stretch;
     place-items: center;
-    justify-self: center;
+    justify-self: stretch;
     padding: 0;
     border: 0;
     border-radius: 6px;
@@ -523,15 +591,35 @@ a {
 }
 
 .chapter-row-action {
-    padding: 4px;
-    border: 0;
-    background: transparent;
-    color: #c8c3cd;
+    min-height: 28px;
+    padding: 4px 9px;
+    border: 1px solid transparent;
+    border-radius: 6px;
     cursor: pointer;
+    transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
 }
 
-.chapter-row-action:hover {
-    color: #fff;
+.edit-chapter-action {
+    border-color: #64d68c55;
+    background: #64d68c14;
+    color: #64d68c;
+}
+
+.edit-chapter-action:hover {
+    border-color: #64d68c;
+    background: #64d68c26;
+}
+
+.delete-chapter-action {
+    border-color: #ff424255;
+    background: #ff424214;
+    color: #ff8585;
+}
+
+.delete-chapter-action:hover {
+    border-color: #ff4242;
+    background: #ff424226;
+    color: #ff6868;
 }
 
 .empty-works {
@@ -548,6 +636,10 @@ a {
 
 .editor-region:empty {
     display: none;
+}
+
+#editorRegion:not(:empty) {
+    margin-bottom: 16px;
 }
 
 .chapter-editor-region {
@@ -576,6 +668,10 @@ a {
     border: 0;
     border-radius: 20px;
     background: #1e1e1e;
+}
+
+.work-editor-region .work-creation-panel {
+    background: #171619;
 }
 
 .work-creation-panel .editor-heading {
@@ -646,14 +742,39 @@ a {
 }
 
 .work-creation-form .genre-tag-list {
+    align-items: center;
     gap: 7px;
     max-height: 35px;
     overflow: hidden;
     transition: max-height 180ms ease;
 }
 
+.work-creation-form .genre-field {
+    position: relative;
+    z-index: 1;
+}
+
+.work-creation-form .genre-field.is-expanded {
+    z-index: 5;
+}
+
+.work-creation-form .genre-tag.is-overflow-hidden {
+    display: none;
+}
+
 .work-creation-form .genre-tag-list.is-expanded {
-    max-height: 500px;
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    width: 100%;
+    max-height: min(220px, 40vh);
+    align-content: start;
+    overflow-y: auto;
+    padding: 8px;
+    border: 1px solid #ffffff24;
+    border-radius: 8px;
+    background: #1e1e1e;
+    box-shadow: 0 8px 24px #0006;
 }
 
 .genre-field-heading {
@@ -759,9 +880,26 @@ a {
     filter: brightness(1.15);
 }
 
+.work-creation-form .form-actions .work-form-save {
+    min-height: 42px;
+    gap: 8px;
+    padding: 0 16px;
+    border: 0;
+    border-radius: 9px;
+    background: #195EA1;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.work-creation-form .form-actions .work-form-save:hover {
+    background: #144d84;
+    filter: none;
+}
+
 .work-creation-form .form-actions svg {
-    width: 34px;
-    height: 34px;
+    width: 18px;
+    height: 18px;
     fill: none;
     stroke: currentColor;
     stroke-linecap: round;
@@ -770,11 +908,11 @@ a {
 }
 
 .work-creation-form .form-actions .work-form-cancel svg {
-    color: #ff2638;
+    color: currentColor;
 }
 
 .work-creation-form .form-actions .work-form-save svg {
-    color: #168dff;
+    color: currentColor;
 }
 
 .editor-heading {
@@ -791,14 +929,40 @@ a {
 }
 
 .editor-close {
-    width: 30px;
-    height: 30px;
-    border: 1px solid #ffffff20;
-    border-radius: 6px;
+    width: 25px;
+    height: 25px;
+    padding: 4px;
+    border: 1px solid #ff4242;
+    border-radius: 4px;
     background: transparent;
-    color: #c9c5ce;
-    font-size: 19px;
+    color: #ff4242;
+    font-size: 18px;
+    line-height: 1;
     cursor: pointer;
+}
+
+.editor-close:hover {
+    background: #ff424222;
+}
+
+.work-creation-form .form-actions .work-form-cancel {
+    min-height: 40px;
+    padding: 0 14px;
+    border: 1px solid #ff4242;
+    border-radius: 4px;
+    background: transparent;
+    color: #ff4242;
+    font-size: 13px;
+}
+
+.work-creation-form .form-actions .work-form-cancel:hover {
+    background: #ff424222;
+    filter: none;
+}
+
+.work-creation-form .form-actions .work-form-cancel svg {
+    width: 18px;
+    height: 18px;
 }
 
 .editor-form {
@@ -975,6 +1139,85 @@ a {
     outline-offset: 2px;
 }
 
+.author-input-container {
+    position: relative;
+}
+
+.author-suggestions {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    left: 0;
+    z-index: 15;
+    display: grid;
+    gap: 4px;
+    max-height: 220px;
+    overflow-y: auto;
+    padding: 6px;
+    border: 1px solid #ffffff24;
+    border-radius: 10px;
+    background: #232129;
+    box-shadow: 0 12px 28px #00000070;
+}
+
+.author-suggestion-option {
+    display: grid;
+    gap: 3px;
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid transparent;
+    border-radius: 7px;
+    background: transparent;
+    color: #f6f5f7;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 140ms ease, border-color 140ms ease;
+}
+
+.author-suggestion-option:hover,
+.author-suggestion-option.is-active,
+.author-suggestion-option:focus-visible {
+    border-color: #f0b84b66;
+    background: #302d38;
+    outline: none;
+}
+
+.author-suggestion-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.author-suggestion-name {
+    color: #f6f5f7;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.author-suggestion-badge {
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: #f0b84b24;
+    color: #f0b84b;
+    font-size: 10px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.author-suggestion-works {
+    color: #c5c0ca;
+    font-size: 11px;
+    line-height: 1.35;
+}
+
+.author-same-work-notice {
+    margin: 0;
+    color: #a4e0ba;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
 .field-hint {
     color: #aaa5b2;
     font-size: 11px;
@@ -1047,6 +1290,139 @@ a {
     color: #bdb8c4;
     font-size: 11px;
     line-height: 1.5;
+}
+
+.chapter-language-row {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.chapter-page-upload {
+    display: grid;
+    grid-template-columns: 136px minmax(0, 1fr);
+    align-items: start;
+    gap: 28px;
+}
+
+.chapter-page-add {
+    display: grid;
+    width: 102px;
+    min-height: 136px;
+    align-content: center;
+    justify-items: center;
+    gap: 8px;
+    margin-top: 44px;
+    padding: 14px;
+    background: #d9d9d9;
+    color: #19181b;
+    text-align: center;
+    cursor: pointer;
+    transition: background-color 150ms ease, outline-color 150ms ease;
+}
+
+.chapter-page-add span {
+    color: #267cc0;
+    font-size: 27px;
+    line-height: 1;
+}
+
+.chapter-page-add strong {
+    max-width: 100px;
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 1.35;
+}
+
+.chapter-page-add:hover,
+.chapter-page-upload.is-dragging .chapter-page-add {
+    background: #c8dff1;
+    outline: 2px solid #48aaff;
+    outline-offset: 2px;
+}
+
+.chapter-page-gallery {
+    min-width: 0;
+}
+
+.chapter-page-formats {
+    margin: 0 0 24px;
+    color: #f0edf3;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+.chapter-page-strip {
+    display: flex;
+    min-height: 181px;
+    align-items: flex-start;
+    gap: 26px;
+    overflow-x: auto;
+    padding: 0 0 8px;
+    border-bottom: 1px solid #f0edf3;
+    scrollbar-color: #d8d8d8 #343238;
+    scrollbar-width: thin;
+    scroll-snap-type: x proximity;
+}
+
+.chapter-page-strip .page-preview {
+    position: relative;
+    flex: 0 0 102px;
+    width: 102px;
+    min-width: 102px;
+    scroll-snap-align: start;
+}
+
+.chapter-page-strip .page-preview img {
+    height: 136px;
+}
+
+.page-preview-remove {
+    position: absolute;
+    z-index: 1;
+    top: 4px;
+    right: 4px;
+    display: grid;
+    width: 25px;
+    height: 25px;
+    place-items: center;
+    padding: 0;
+    border: 1px solid #ffffff85;
+    border-radius: 50%;
+    background: #171619e8;
+    color: #fff;
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.page-preview-remove:hover {
+    background: #b82e3b;
+}
+
+.page-preview-remove:focus-visible {
+    outline: 2px solid #aeb9ff;
+    outline-offset: 2px;
+}
+
+.page-preview-archive {
+    display: grid;
+    height: 136px;
+    align-content: center;
+    justify-items: center;
+    gap: 8px;
+    padding: 8px;
+    background: #242328;
+    color: #d4d0d9;
+    text-align: center;
+}
+
+.page-preview-archive-icon {
+    color: #48aaff;
+    font-size: 24px;
+    font-weight: 700;
+}
+
+.chapter-page-status {
+    margin: 8px 0 0;
 }
 
 .page-preview-grid {
@@ -1122,6 +1498,20 @@ a {
     cursor: default;
 }
 
+.image-preview-close {
+    position: absolute;
+    top: 18px;
+    right: 24px;
+    width: 42px;
+    height: 42px;
+    border: 1px solid #ffffff50;
+    border-radius: 50%;
+    background: #171619;
+    color: #fff;
+    font-size: 28px;
+    cursor: pointer;
+}
+
 .page-preview figcaption {
     overflow: hidden;
     padding: 7px 8px;
@@ -1141,16 +1531,16 @@ a {
 .cancel-button {
     min-height: 40px;
     padding: 0 14px;
-    border: 1px solid #ffffff25;
-    border-radius: 8px;
+    border: 1px solid #ff4242;
+    border-radius: 4px;
     background: transparent;
-    color: #d5d1da;
+    color: #ff4242;
     font-size: 12px;
     cursor: pointer;
 }
 
 .cancel-button:hover {
-    background: #ffffff0c;
+    background: #ff424222;
 }
 
 @media (max-width: 680px) {
@@ -1221,6 +1611,25 @@ a {
 
     .editor-panel {
         padding: 17px;
+    }
+
+    .chapter-page-upload {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 16px;
+    }
+
+    .chapter-page-add {
+        width: min(100%, 136px);
+        min-height: 140px;
+        margin-top: 0;
+    }
+
+    .chapter-page-formats {
+        margin-bottom: 14px;
+    }
+
+    .chapter-page-strip {
+        gap: 14px;
     }
 
     .management-page.has-work-creation-form {

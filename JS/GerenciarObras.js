@@ -1,7 +1,11 @@
 import { createAuthorIcon } from "./authorIcon.js";
+import { findSimilarAuthorSuggestions } from "./authorSuggestions.js";
+import { apiRequest } from "./apiRequest.js";
 import { confirmInPage } from "./confirmationDialog.js";
+import { invalidatePublicCatalogCache, loadPublicCatalog } from "./catalogCache.js";
 import { setExpandableDescription } from "./expandableDescription.js";
 import { account } from "./JAVA/authClient.js";
+import { normalizeWorkFormat } from "./workFormat.js";
 
 const adminEmail = "hokupedia@gmail.com";
 const imageTypes = new Set(["image/avif", "image/gif", "image/jpeg", "image/png", "image/webp"]);
@@ -68,11 +72,25 @@ const languageNames = {
     "zh-CN": "Chinês (simplificado)",
     "zh-TW": "Chinês (tradicional)"
 };
+const languageFlags = {
+    "pt-BR": "🇧🇷",
+    ja: "🇯🇵",
+    en: "🇺🇸",
+    es: "🇪🇸",
+    fr: "🇫🇷",
+    ko: "🇰🇷",
+    "zh-CN": "🇨🇳",
+    "zh-TW": "🇹🇼"
+};
 const workList = document.querySelector("#workList");
 const editorRegion = document.querySelector("#editorRegion");
 const managementPage = document.querySelector(".management-page");
 const addWorkButton = document.querySelector("#addWorkButton");
 const feedback = document.querySelector("#feedback");
+const operationProgressDialog = document.querySelector("#operationProgressDialog");
+const operationProgressMessage = document.querySelector("#operationProgressMessage");
+const imagePreviewDialog = document.querySelector("#imagePreviewDialog");
+const imagePreviewImage = document.querySelector("#imagePreviewImage");
 const pageTitle = document.querySelector("#pageTitle");
 const workManagementRegion = document.querySelector("#workManagementRegion");
 const moderationRequestRegion = document.querySelector("#moderationRequestRegion");
@@ -83,45 +101,21 @@ const requestStatusDescription = document.querySelector("#requestStatusDescripti
 const retryModerationButton = document.querySelector("#retryModerationButton");
 const requestFeedback = document.querySelector("#requestFeedback");
 let works = [];
+let catalogWorks = [];
+let currentEditingWorkId = "";
 let workRequests = [];
 let selectedArchive;
+let selectedArchivePages;
+let selectedChapterImages = [];
+let selectedChapterExistingPages = [];
 let selectedCoverFile;
+const pendingChapterSubmissions = new WeakSet();
 let coverPreviewUrl;
 let isAdmin = false;
 let currentUserId = "";
 let currentUserName = "";
 let workRequestPolling;
 let isRefreshingWorkRequest = false;
-
-async function apiRequest(url, options = {}) {
-    const requestOptions = { ...options };
-    delete requestOptions.authenticated;
-    const headers = new Headers(requestOptions.headers);
-    if (requestOptions.body && !(requestOptions.body instanceof Blob)) {
-        headers.set("Content-Type", "application/json");
-        requestOptions.body = JSON.stringify(requestOptions.body);
-    }
-    const response = await fetch(url, {
-        ...requestOptions,
-        headers,
-        credentials: "same-origin"
-    });
-    const contentType = response.headers.get("content-type") || "";
-    const data = contentType.includes("application/json") ? await response.json() : {};
-    if (!response.ok) {
-        const message = typeof data.error === "string"
-            ? data.error
-            : data.error?.message || `A solicitação falhou (HTTP ${response.status}).`;
-        throw Object.assign(new Error(message), { status: response.status });
-    }
-    if (!contentType.includes("application/json")) {
-        throw Object.assign(
-            new Error(`Resposta inesperada do servidor (HTTP ${response.status}).`),
-            { status: response.status }
-        );
-    }
-    return data;
-}
 
 function getDeleteErrorMessage(error, resource) {
     if (error.status === 401) return "Sua sessão expirou. Faça login novamente antes de excluir.";
@@ -136,9 +130,19 @@ function getDeleteErrorMessage(error, resource) {
 }
 
 async function uploadImage(file) {
+    const extension = file.name.split(".").pop()?.toLowerCase();
+    const contentType = imageTypes.has(file.type) ? file.type : ({
+        avif: "image/avif",
+        gif: "image/gif",
+        jpg: "image/jpeg",
+        jpeg: "image/jpeg",
+        png: "image/png",
+        webp: "image/webp"
+    })[extension];
+    if (!contentType) throw new Error("Selecione uma imagem JPG, PNG, GIF, WEBP ou AVIF.");
     return apiRequest(`/api/uploads?filename=${encodeURIComponent(file.name)}`, {
         method: "POST",
-        headers: { "Content-Type": file.type },
+        headers: { "Content-Type": contentType },
         body: file,
         authenticated: true
     });
@@ -162,7 +166,30 @@ async function uploadChapterArchive(file) {
     });
 }
 
+document.addEventListener("click", (event) => {
+    const previewButton = event.target.closest("button[data-image-preview-url]");
+    if (previewButton) {
+        imagePreviewImage.src = previewButton.dataset.imagePreviewUrl;
+        imagePreviewImage.alt = previewButton.getAttribute("aria-label") || "Imagem do capítulo";
+        imagePreviewDialog.showModal();
+        return;
+    }
+    if (event.target.closest(".image-preview-close") || event.target === imagePreviewDialog) {
+        imagePreviewDialog.close();
+    }
+});
+
+async function loadCatalogWorks() {
+    try {
+        const data = await loadPublicCatalog();
+        catalogWorks = data.works;
+    } catch (error) {
+        console.error("Não foi possível carregar o catálogo de autores:", error);
+    }
+}
+
 async function loadWorks() {
+    void loadCatalogWorks();
     const data = await apiRequest("/api/management/works", { authenticated: true });
     if (!Array.isArray(data.works)) {
         throw new Error("A resposta do Appwrite contém uma lista de obras inválida.");
@@ -227,6 +254,17 @@ function showFeedback(message, isError = false) {
     feedback.classList.toggle("is-error", isError);
 }
 
+function showOperationProgress(message) {
+    operationProgressMessage.textContent = message;
+    if (!operationProgressDialog.open) operationProgressDialog.showModal();
+}
+
+function closeOperationProgress() {
+    if (operationProgressDialog.open) operationProgressDialog.close();
+}
+
+operationProgressDialog.addEventListener("cancel", (event) => event.preventDefault());
+
 function createButton(label, action, className, title = label) {
     const button = document.createElement("button");
     button.type = "button";
@@ -244,7 +282,7 @@ function getChapterNumber(chapter, index) {
 
 function getChapterDisplayName(chapter, index) {
     const title = typeof chapter.title === "string" ? chapter.title.trim() : "";
-    return `Cap ${getChapterNumber(chapter, index)}${title ? ` — ${title}` : ""}`;
+    return `Capítulo ${getChapterNumber(chapter, index)}${title ? ` — ${title}` : ""}`;
 }
 
 function renderWorkCard(work) {
@@ -276,8 +314,8 @@ function renderWorkCard(work) {
 
     const description = document.createElement("p");
     description.className = "work-description";
-    setExpandableDescription(description, work.description || "Sem descrição.");
     details.append(description);
+    setExpandableDescription(description, work.description || "Sem descrição.");
 
     const actions = document.createElement("div");
     actions.className = "work-actions";
@@ -309,7 +347,7 @@ function renderWorkCard(work) {
         empty.textContent = "Sem Capítulos";
         chapterList.append(empty);
     } else {
-        const hasCollapsedChapters = work.chapters.length > 2;
+        const hasCollapsedChapters = work.chapters.length > 1;
         for (const [index, chapter] of work.chapters.entries()) {
             const row = document.createElement("div");
             row.className = "chapter-row";
@@ -319,9 +357,7 @@ function renderWorkCard(work) {
             }
 
             const flag = document.createElement("span");
-            flag.textContent = chapter.language === "pt-BR" ? "🇧🇷"
-                : chapter.language === "ja" ? "🇯🇵"
-                    : chapter.language === "es" ? "🇪🇸" : "🇺🇸";
+            flag.textContent = languageFlags[chapter.language] || "🌐";
             flag.setAttribute("aria-label", languageNames[chapter.language] || "Idioma");
             row.append(flag);
 
@@ -340,8 +376,8 @@ function renderWorkCard(work) {
 
             if (chapter.createBy === currentUserId) {
                 row.append(
-                    createButton("Editar", "edit-chapter", "chapter-row-action", `Editar ${getChapterDisplayName(chapter, index)}`),
-                    createButton("Excluir", "delete-chapter", "chapter-row-action", `Excluir ${getChapterDisplayName(chapter, index)}`)
+                    createButton("Editar", "edit-chapter", "chapter-row-action edit-chapter-action", `Editar ${getChapterDisplayName(chapter, index)}`),
+                    createButton("Excluir", "delete-chapter", "chapter-row-action delete-chapter-action", `Excluir ${getChapterDisplayName(chapter, index)}`)
                 );
             }
             row.dataset.chapterId = chapter.id;
@@ -365,17 +401,15 @@ function renderWorkCard(work) {
             chapterList.append(toggle);
         }
     }
-    card.append(chapterList);
     const chapterEditorRegion = document.createElement("section");
     chapterEditorRegion.className = "editor-region chapter-editor-region";
     chapterEditorRegion.dataset.workId = work.id;
     chapterEditorRegion.setAttribute("aria-live", "polite");
-    card.append(chapterEditorRegion);
     const workEditorRegion = document.createElement("section");
     workEditorRegion.className = "editor-region work-editor-region";
     workEditorRegion.dataset.workId = work.id;
     workEditorRegion.setAttribute("aria-live", "polite");
-    card.append(workEditorRegion);
+    card.append(workEditorRegion, chapterList, chapterEditorRegion);
     return card;
 }
 
@@ -440,7 +474,173 @@ function renderWorks() {
     for (const work of works) workList.append(renderWorkCard(work));
 }
 
+function getKnownWorksForAuthorSuggestions() {
+    const itemsById = new Map();
+    for (const work of catalogWorks) {
+        if (work?.id) itemsById.set(work.id, work);
+    }
+    for (const work of works) {
+        if (work?.id) itemsById.set(work.id, work);
+    }
+    for (const request of workRequests) {
+        if (request?.id && request.status?.toUpperCase() !== "REPROVADO" && request.author) {
+            itemsById.set(request.id, request);
+        }
+    }
+    return [...itemsById.values()];
+}
+
+function formatAuthorWorksSubtitle(titles) {
+    if (!Array.isArray(titles) || titles.length === 0) {
+        return "Sugestão para outra obra do mesmo autor";
+    }
+    return `Sugestão para outra obra do mesmo autor de: ${titles.join(", ")}`;
+}
+
+function createAuthorField(initialValue = "", currentWorkId = "") {
+    const wrapper = document.createElement("div");
+    wrapper.className = "field author-field";
+
+    const label = document.createElement("label");
+    label.className = "author-field-label";
+    label.htmlFor = "workAuthor";
+    label.textContent = "Autor";
+
+    const inputContainer = document.createElement("div");
+    inputContainer.className = "author-input-container";
+
+    const input = document.createElement("input");
+    input.id = "workAuthor";
+    input.name = "author";
+    input.type = "text";
+    input.value = initialValue;
+    input.placeholder = "Nome do autor";
+    input.required = true;
+    input.autocomplete = "off";
+    input.setAttribute("aria-autocomplete", "list");
+    input.setAttribute("aria-controls", "workAuthorSuggestions");
+    input.setAttribute("aria-expanded", "false");
+
+    const suggestions = document.createElement("div");
+    suggestions.className = "author-suggestions";
+    suggestions.id = "workAuthorSuggestions";
+    suggestions.setAttribute("role", "listbox");
+    suggestions.setAttribute("aria-label", "Sugestões de autores com nome parecido");
+    suggestions.hidden = true;
+
+    const sameAuthorNotice = document.createElement("p");
+    sameAuthorNotice.className = "author-same-work-notice";
+    sameAuthorNotice.hidden = true;
+
+    let activeIndex = -1;
+
+    const closeSuggestions = () => {
+        suggestions.hidden = true;
+        input.setAttribute("aria-expanded", "false");
+        activeIndex = -1;
+    };
+
+    const updateSuggestions = (openDropdown = true) => {
+        const matches = findSimilarAuthorSuggestions(
+            input.value,
+            getKnownWorksForAuthorSuggestions(),
+            { excludeWorkId: currentWorkId }
+        );
+        const exactMatch = matches.find((item) => item.isExactMatch);
+        if (exactMatch && exactMatch.works.length > 0) {
+            sameAuthorNotice.textContent = `Outra obra do mesmo autor de: ${exactMatch.works.join(", ")}`;
+            sameAuthorNotice.hidden = false;
+        } else {
+            sameAuthorNotice.textContent = "";
+            sameAuthorNotice.hidden = true;
+        }
+
+        const selectableMatches = matches.filter((item) => !item.isExactMatch);
+        suggestions.replaceChildren();
+        activeIndex = -1;
+
+        if (!openDropdown || selectableMatches.length === 0) {
+            closeSuggestions();
+            return;
+        }
+
+        for (const match of selectableMatches) {
+            const option = document.createElement("button");
+            option.type = "button";
+            option.className = "author-suggestion-option";
+            option.setAttribute("role", "option");
+
+            const header = document.createElement("span");
+            header.className = "author-suggestion-header";
+
+            const name = document.createElement("strong");
+            name.className = "author-suggestion-name";
+            name.textContent = match.author;
+
+            const badge = document.createElement("span");
+            badge.className = "author-suggestion-badge";
+            badge.textContent = "Mesmo autor";
+
+            header.append(name, badge);
+
+            const subtitle = document.createElement("span");
+            subtitle.className = "author-suggestion-works";
+            subtitle.textContent = formatAuthorWorksSubtitle(match.works);
+
+            option.append(header, subtitle);
+            option.addEventListener("mousedown", (event) => {
+                event.preventDefault();
+            });
+            option.addEventListener("click", () => {
+                input.value = match.author;
+                closeSuggestions();
+                updateSuggestions(false);
+                input.focus();
+            });
+            suggestions.append(option);
+        }
+
+        suggestions.hidden = false;
+        input.setAttribute("aria-expanded", "true");
+    };
+
+    input.addEventListener("input", () => updateSuggestions(true));
+    input.addEventListener("focus", () => {
+        if (input.value.trim().length >= 2) updateSuggestions(true);
+    });
+    input.addEventListener("blur", () => {
+        closeSuggestions();
+    });
+    input.addEventListener("keydown", (event) => {
+        const options = [...suggestions.querySelectorAll(".author-suggestion-option")];
+        if (event.key === "Escape") {
+            closeSuggestions();
+            return;
+        }
+        if (suggestions.hidden || options.length === 0) return;
+
+        if (event.key === "ArrowDown") {
+            event.preventDefault();
+            activeIndex = (activeIndex + 1) % options.length;
+            options.forEach((opt, idx) => opt.classList.toggle("is-active", idx === activeIndex));
+        } else if (event.key === "ArrowUp") {
+            event.preventDefault();
+            activeIndex = (activeIndex - 1 + options.length) % options.length;
+            options.forEach((opt, idx) => opt.classList.toggle("is-active", idx === activeIndex));
+        } else if (event.key === "Enter" && activeIndex >= 0 && options[activeIndex]) {
+            event.preventDefault();
+            options[activeIndex].click();
+        }
+    });
+
+    updateSuggestions(false);
+    inputContainer.append(input, suggestions);
+    wrapper.append(label, inputContainer, sameAuthorNotice);
+    return wrapper;
+}
+
 function createField({ id, label, name, value = "", type = "text", placeholder = "", required = false }) {
+    if (id === "workAuthor") return createAuthorField(value, currentEditingWorkId);
     const wrapper = document.createElement("label");
     wrapper.className = "field";
     wrapper.htmlFor = id;
@@ -455,20 +655,6 @@ function createField({ id, label, name, value = "", type = "text", placeholder =
     if (type !== "textarea") input.type = type;
     wrapper.append(input);
     return wrapper;
-}
-
-function normalizeWorkFormat(value) {
-    const normalized = String(value || "")
-        .trim()
-        .toLocaleLowerCase("pt-BR")
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/[^a-z]/g, "");
-
-    if (["hq", "hqs", "quadrinho", "quadrinhos"].includes(normalized)) return "hq";
-    if (["manhwa", "manhwas"].includes(normalized)) return "manhwa";
-    if (["manga", "mangas"].includes(normalized)) return "manga";
-    return "";
 }
 
 function createWorkFormatField(selected = "") {
@@ -536,7 +722,32 @@ function createGenreTagField(selected = []) {
     chevronPath.setAttribute("d", "m6 9 6 6 6-6");
     chevron.append(chevronPath);
     toggle.append(chevron);
-    heading.append(label, toggle);
+    heading.append(label);
+    const updateCollapsedTags = () => {
+        const tags = [...tagList.querySelectorAll("button[data-genre]")];
+        for (const tag of tags) tag.classList.remove("is-overflow-hidden");
+        if (toggle.getAttribute("aria-expanded") === "true" || !tagList.clientWidth) return;
+
+        const gap = Number.parseFloat(getComputedStyle(tagList).columnGap) || 0;
+        const availableWidth = tagList.clientWidth;
+        const toggleWidth = toggle.getBoundingClientRect().width;
+        let usedWidth = 0;
+        let visibleCount = 0;
+
+        for (const tag of tags) {
+            const tagWidth = tag.getBoundingClientRect().width;
+            const nextWidth = usedWidth + (visibleCount ? gap : 0) + tagWidth;
+            if (nextWidth + gap + toggleWidth > availableWidth) break;
+            usedWidth = nextWidth;
+            visibleCount += 1;
+        }
+
+        for (const tag of tags.slice(visibleCount)) {
+            tag.classList.add("is-overflow-hidden");
+        }
+    };
+    const genreResizeObserver = new ResizeObserver(updateCollapsedTags);
+    genreResizeObserver.observe(tagList);
     const selectedValues = new Set(selected);
     const input = document.createElement("input");
     input.type = "hidden";
@@ -552,6 +763,8 @@ function createGenreTagField(selected = []) {
             expanded ? "Recolher categorias" : "Mostrar todas as categorias"
         );
         tagList.classList.toggle("is-expanded", expanded);
+        wrapper.classList.toggle("is-expanded", expanded);
+        updateCollapsedTags();
     });
 
     const updateTagIcon = (tag, isSelected) => {
@@ -577,6 +790,7 @@ function createGenreTagField(selected = []) {
         updateTagIcon(tag, selectedValues.has(genre));
         tagList.append(tag);
     }
+    tagList.append(toggle);
 
     tagList.addEventListener("click", (event) => {
         const tag = event.target.closest("button[data-genre]");
@@ -585,6 +799,7 @@ function createGenreTagField(selected = []) {
         tag.setAttribute("aria-pressed", String(!isSelected));
         tag.classList.toggle("is-selected", !isSelected);
         updateTagIcon(tag, !isSelected);
+        updateCollapsedTags();
         const selectedGenres = [...tagList.querySelectorAll("button[data-genre][aria-pressed='true']")]
             .map((item) => item.dataset.genre);
         input.value = selectedGenres.join(", ");
@@ -602,6 +817,7 @@ function createGenreTagField(selected = []) {
 }
 
 function renderWorkForm(work, targetRegion = editorRegion) {
+    currentEditingWorkId = work?.id || "";
     const isEditing = Boolean(work);
     const isRequest = !isAdmin && !isEditing;
     const panel = createEditorPanel(isEditing ? "Editar Obra" : isRequest ? "Solicitar nova obra" : "Adicionar Obra");
@@ -718,6 +934,21 @@ function createLanguageSelect(selected = "pt-BR") {
 }
 
 function renderChapterForm(work, chapter, targetRegion) {
+    selectedArchive = undefined;
+    selectedArchivePages = undefined;
+    selectedChapterImages = [];
+    selectedChapterExistingPages = (chapter?.pages || []).map((page) => {
+        if (typeof page === "string") {
+            return { name: "Página", url: page, fileId: "", format: "" };
+        }
+        return {
+            ...page,
+            name: page.name || page.originalName || "Página",
+            url: page.url || page.imageUrl || "",
+            fileId: page.fileId || page.imageFileId || ""
+        };
+    });
+
     const panel = createEditorPanel(chapter ? "Editar Capítulo" : `Novo Capítulo — ${work.title}`);
     const form = document.createElement("form");
     form.className = "editor-form";
@@ -752,101 +983,185 @@ function renderChapterForm(work, chapter, targetRegion) {
     form.append(chapterFields);
 
     const row = document.createElement("div");
-    row.className = "form-row";
+    row.className = "form-row chapter-language-row";
     row.append(createLanguageSelect(chapter?.language || "pt-BR"));
-    const formatField = document.createElement("div");
-    formatField.className = "field";
-    formatField.append(document.createTextNode("Formato do arquivo"));
-    const formatText = document.createElement("div");
-    formatText.className = "selected-files";
-    formatText.textContent = "Envie um arquivo .zip com as imagens PNG, JPG, JPEG, WEBP, GIF ou AVIF.";
-    formatField.append(formatText);
-    row.append(formatField);
     form.append(row);
 
+    const uploadArea = document.createElement("div");
+    uploadArea.className = "chapter-page-upload";
     const uploadLabel = document.createElement("label");
-    uploadLabel.className = "upload-label";
+    uploadLabel.className = "chapter-page-add";
     uploadLabel.htmlFor = "chapterPages";
     const uploadIcon = document.createElement("span");
-    uploadIcon.className = "upload-icon";
     uploadIcon.setAttribute("aria-hidden", "true");
     uploadIcon.textContent = "↑";
     uploadLabel.append(uploadIcon);
     const uploadStrong = document.createElement("strong");
-    uploadStrong.textContent = "Clique para selecionar um arquivo .zip";
+    uploadStrong.textContent = "Clique para adicionar";
     uploadLabel.append(uploadStrong);
-    const uploadHint = document.createElement("span");
-    uploadHint.textContent = "O ZIP deve conter apenas imagens e não pode ter senha.";
-    uploadLabel.append(uploadHint);
 
     const fileInput = document.createElement("input");
     fileInput.className = "file-input";
     fileInput.id = "chapterPages";
-    fileInput.name = "archive";
+    fileInput.name = "chapterPages";
     fileInput.type = "file";
-    fileInput.accept = ".zip,application/zip,application/x-zip-compressed";
-    form.append(uploadLabel, fileInput);
+    fileInput.accept = ".zip,application/zip,application/x-zip-compressed,image/avif,image/gif,image/jpeg,image/png,image/webp";
+    fileInput.multiple = true;
+    uploadLabel.append(fileInput);
 
+    const gallery = document.createElement("div");
+    gallery.className = "chapter-page-gallery";
+    const formatsHint = document.createElement("p");
+    formatsHint.className = "chapter-page-formats";
+    formatsHint.textContent = "Formatos aceitos: JPG, PNG, GIF, WEBP, AVIF e ZIP.";
+    const pageStrip = document.createElement("div");
+    pageStrip.className = "chapter-page-strip";
+    pageStrip.setAttribute("role", "list");
+    pageStrip.setAttribute("aria-label", "Imagens do capítulo");
     const selectedFilesLabel = document.createElement("p");
-    selectedFilesLabel.className = "selected-files";
-    selectedFilesLabel.id = "selectedFiles";
-    const existingNames = chapter?.pages?.map((page) => (
-        typeof page === "string" ? page : page.name
-    )) || [];
-    selectedFilesLabel.textContent = existingNames.length
-        ? `Arquivos registrados: ${existingNames.map((name) => name || "Página").join(", ")}`
-        : "Nenhum arquivo selecionado.";
-    form.append(selectedFilesLabel, createFormActions(chapter ? "Salvar" : "Adicionar capítulo"));
+    selectedFilesLabel.className = "selected-files chapter-page-status";
+    selectedFilesLabel.setAttribute("role", "status");
+    gallery.append(formatsHint, pageStrip, selectedFilesLabel);
+    uploadArea.append(uploadLabel, gallery);
+    form.append(uploadArea, createFormActions(chapter ? "Salvar" : "Adicionar capítulo"));
+
+    function renderChapterPages() {
+        pageStrip.replaceChildren();
+        const pages = selectedChapterExistingPages.map((page, index) => ({
+            ...page,
+            source: "existing",
+            index
+        })).concat(selectedChapterImages.map((image, index) => ({
+            name: image.file.name,
+            url: image.previewUrl,
+            source: "selected",
+            index
+        })));
+
+        for (const page of pages) {
+            const card = document.createElement("figure");
+            card.className = "page-preview";
+            card.setAttribute("role", "listitem");
+            const openButton = document.createElement("button");
+            openButton.className = "page-preview-open";
+            openButton.type = "button";
+            openButton.dataset.imagePreviewUrl = page.url;
+            openButton.setAttribute("aria-label", `Visualizar ${page.name}`);
+            const image = document.createElement("img");
+            image.src = page.url;
+            image.alt = page.name;
+            openButton.append(image);
+            card.append(openButton);
+
+            const removeButton = document.createElement("button");
+            removeButton.className = "page-preview-remove";
+            removeButton.type = "button";
+            removeButton.dataset.removePage = page.source;
+            removeButton.dataset.pageIndex = String(page.index);
+            removeButton.setAttribute("aria-label", `Remover ${page.name}`);
+            removeButton.textContent = "×";
+            card.append(removeButton);
+
+            const caption = document.createElement("figcaption");
+            caption.textContent = page.name;
+            card.append(caption);
+            pageStrip.append(card);
+        }
+
+        if (selectedArchive) {
+            const archiveCard = document.createElement("figure");
+            archiveCard.className = "page-preview page-preview-archive";
+            archiveCard.setAttribute("role", "listitem");
+            const archiveName = document.createElement("span");
+            archiveName.className = "page-preview-archive-icon";
+            archiveName.setAttribute("aria-hidden", "true");
+            archiveName.textContent = "ZIP";
+            archiveCard.append(archiveName);
+            const removeArchive = document.createElement("button");
+            removeArchive.className = "page-preview-remove";
+            removeArchive.type = "button";
+            removeArchive.dataset.removePage = "archive";
+            removeArchive.setAttribute("aria-label", `Remover arquivo ${selectedArchive.name}`);
+            removeArchive.textContent = "×";
+            archiveCard.append(removeArchive);
+            const caption = document.createElement("figcaption");
+            caption.textContent = selectedArchive.name;
+            archiveCard.append(caption);
+            pageStrip.append(archiveCard);
+        }
+
+        const pageCount = selectedChapterExistingPages.length + selectedChapterImages.length;
+        selectedFilesLabel.textContent = selectedArchive
+            ? `ZIP selecionado: ${selectedArchive.name}. As páginas serão adicionadas ao capítulo.`
+            : pageCount
+                ? `${pageCount} ${pageCount === 1 ? "imagem pronta" : "imagens prontas"} para o capítulo.`
+                : "Nenhuma imagem selecionada. Adicione imagens ou um arquivo ZIP.";
+    }
+
+    function addChapterFiles(files) {
+        if (files.length === 0) return;
+        const zipFiles = files.filter((file) => file.name.toLowerCase().endsWith(".zip"));
+        if (zipFiles.length > 0) {
+            if (files.length !== 1 || zipFiles.length !== 1 || selectedChapterImages.length > 0) {
+                showFeedback("Adicione um único ZIP por vez, sem misturá-lo com imagens.", true);
+                return;
+            }
+            selectedArchive = zipFiles[0];
+            selectedArchivePages = undefined;
+        } else {
+            if (selectedArchive) {
+                showFeedback("Remova o ZIP selecionado antes de adicionar imagens avulsas.", true);
+                return;
+            }
+            if (files.some((file) => !imageTypes.has(file.type) && !/\.(avif|gif|jpe?g|png|webp)$/i.test(file.name))) {
+                showFeedback("Selecione imagens JPG, PNG, GIF, WEBP ou AVIF.", true);
+                return;
+            }
+            selectedChapterImages.push(...files.map((file) => ({
+                file,
+                previewUrl: URL.createObjectURL(file),
+                uploadedPage: undefined
+            })));
+        }
+        showFeedback("");
+        renderChapterPages();
+    }
 
     fileInput.addEventListener("change", () => {
-        const [file] = fileInput.files;
-        if (!file) return;
-        if (!file.name.toLowerCase().endsWith(".zip")) {
-            fileInput.value = "";
-            selectedArchive = undefined;
-            selectedFilesLabel.textContent = existingNames.length
-                ? `Arquivos registrados: ${existingNames.join(", ")}`
-                : "Nenhum arquivo selecionado.";
-            showFeedback("Selecione somente um arquivo com extensão .zip.", true);
-            return;
-        }
-        selectedArchive = file;
-        selectedFilesLabel.textContent = `ZIP selecionado: ${file.name} (${(file.size / (1024 * 1024)).toFixed(1)} MB)`;
-        showFeedback("");
+        addChapterFiles([...fileInput.files]);
+        fileInput.value = "";
     });
 
-    uploadLabel.addEventListener("dragover", (event) => {
-        event.preventDefault();
-        uploadLabel.classList.add("is-dragging");
-    });
-    uploadLabel.addEventListener("dragleave", () => uploadLabel.classList.remove("is-dragging"));
-    uploadLabel.addEventListener("drop", (event) => {
-        event.preventDefault();
-        uploadLabel.classList.remove("is-dragging");
-        const files = [...(event.dataTransfer?.files || [])];
-        if (files.length > 1) {
+    pageStrip.addEventListener("click", (event) => {
+        const removeButton = event.target.closest("button[data-remove-page]");
+        if (!removeButton) return;
+        const { removePage, pageIndex } = removeButton.dataset;
+        if (removePage === "archive") {
             selectedArchive = undefined;
-            fileInput.value = "";
-            selectedFilesLabel.textContent = "Selecione somente um arquivo .zip.";
-            showFeedback("Arraste somente um arquivo .zip por capítulo.", true);
-            return;
+            selectedArchivePages = undefined;
+        } else if (removePage === "existing") {
+            selectedChapterExistingPages.splice(Number(pageIndex), 1);
+        } else if (removePage === "selected") {
+            const [removed] = selectedChapterImages.splice(Number(pageIndex), 1);
+            if (removed) URL.revokeObjectURL(removed.previewUrl);
         }
-        const [file] = files;
-        if (!file) return;
-        if (!file.name.toLowerCase().endsWith(".zip")) {
-            selectedArchive = undefined;
-            fileInput.value = "";
-            selectedFilesLabel.textContent = existingNames.length
-                ? `Arquivos registrados: ${existingNames.join(", ")}`
-                : "Nenhum arquivo selecionado.";
-            showFeedback("Arraste somente um arquivo com extensão .zip.", true);
-            return;
-        }
-        selectedArchive = file;
-        selectedFilesLabel.textContent = `ZIP selecionado: ${file.name} (${(file.size / (1024 * 1024)).toFixed(1)} MB)`;
-        showFeedback("");
+        renderChapterPages();
     });
 
+    uploadArea.addEventListener("dragover", (event) => {
+        event.preventDefault();
+        uploadArea.classList.add("is-dragging");
+    });
+    uploadArea.addEventListener("dragleave", (event) => {
+        if (!uploadArea.contains(event.relatedTarget)) uploadArea.classList.remove("is-dragging");
+    });
+    uploadArea.addEventListener("drop", (event) => {
+        event.preventDefault();
+        uploadArea.classList.remove("is-dragging");
+        addChapterFiles([...(event.dataTransfer?.files || [])]);
+    });
+
+    renderChapterPages();
     panel.append(form);
     targetRegion.replaceChildren(panel);
     document.querySelector("#chapterNumber").focus();
@@ -900,6 +1215,10 @@ function createFormActions(saveLabel = "Salvar", isWorkForm = false) {
 
 function closeEditor() {
     selectedArchive = undefined;
+    selectedArchivePages = undefined;
+    selectedChapterImages.forEach((image) => URL.revokeObjectURL(image.previewUrl));
+    selectedChapterImages = [];
+    selectedChapterExistingPages = [];
     selectedCoverFile = undefined;
     if (coverPreviewUrl) URL.revokeObjectURL(coverPreviewUrl);
     coverPreviewUrl = undefined;
@@ -1008,6 +1327,7 @@ async function handleWorkSubmit(form) {
             existing ? `/api/works/${encodeURIComponent(workId)}` : "/api/works",
             { method: existing ? "PUT" : "POST", body: updated, authenticated: true }
         );
+        invalidatePublicCatalogCache();
         works = existing
             ? works.map((work) => work.id === workId
                 ? { ...result.work, id: workId, chapters: work.chapters }
@@ -1024,6 +1344,7 @@ async function handleWorkSubmit(form) {
 }
 
 async function handleChapterSubmit(form) {
+    if (pendingChapterSubmissions.has(form)) return;
     const formData = new FormData(form);
     const work = works.find((item) => item.id === form.dataset.workId);
     if (!work) {
@@ -1038,22 +1359,47 @@ async function handleChapterSubmit(form) {
         showFeedback("Informe um número de capítulo inteiro maior que zero.", true);
         return;
     }
-    let pages = existing?.pages || [];
-    if (selectedArchive) {
-        try {
-            ({ pages } = await uploadChapterArchive(selectedArchive));
-        } catch (error) {
-            console.error("Não foi possível enviar o arquivo do capítulo:", error);
-            showFeedback(error.message || "Não foi possível enviar o arquivo do capítulo.", true);
-            return;
-        }
-    }
-    if (pages.length === 0) {
-        showFeedback("Selecione um arquivo .zip com as páginas do capítulo.", true);
+    let pages = [...selectedChapterExistingPages];
+    if (!selectedArchive && selectedChapterImages.length === 0 && pages.length === 0) {
+        showFeedback("Adicione ao menos uma imagem ou um arquivo ZIP com as páginas do capítulo.", true);
         return;
     }
 
+    const submitButton = form.querySelector(".submit-button");
+    const formButtons = [...form.querySelectorAll("button")];
+    const originalButtonLabel = submitButton?.textContent || "";
+    pendingChapterSubmissions.add(form);
+    form.setAttribute("aria-busy", "true");
+    formButtons.forEach((button) => {
+        button.disabled = true;
+    });
+
     try {
+        if (selectedArchive) {
+            if (!selectedArchivePages) {
+                if (submitButton) submitButton.textContent = "Enviando páginas…";
+                showOperationProgress("Enviando e processando as páginas do ZIP. Aguarde; isso pode levar alguns minutos conforme o tamanho do arquivo.");
+                ({ pages: selectedArchivePages } = await uploadChapterArchive(selectedArchive));
+            }
+            pages.push(...selectedArchivePages);
+        }
+        for (const [index, image] of selectedChapterImages.entries()) {
+            if (!image.uploadedPage) {
+                if (submitButton) submitButton.textContent = `Enviando imagem ${index + 1}/${selectedChapterImages.length}…`;
+                showOperationProgress(`Enviando imagem ${index + 1} de ${selectedChapterImages.length}. Aguarde.`);
+                image.uploadedPage = await uploadImage(image.file);
+            }
+            pages.push(image.uploadedPage);
+        }
+        if (pages.length === 0) {
+            showFeedback("Adicione ao menos uma imagem ao capítulo.", true);
+            return;
+        }
+
+        if (submitButton) submitButton.textContent = "Salvando capítulo…";
+        if (selectedArchive || selectedChapterImages.length) {
+            showOperationProgress("Páginas enviadas. Salvando o capítulo, aguarde.");
+        }
         const result = await apiRequest(
             existing
                 ? `/api/chapters/${encodeURIComponent(chapterId)}`
@@ -1069,6 +1415,7 @@ async function handleChapterSubmit(form) {
                 authenticated: true
             }
         );
+        invalidatePublicCatalogCache();
         work.chapters = existing
             ? work.chapters.map((chapter) => chapter.id === chapterId
                 ? { ...result.chapter, authorName: currentUserName }
@@ -1077,10 +1424,21 @@ async function handleChapterSubmit(form) {
                 .sort((left, right) => left.number - right.number);
         renderWorks();
         closeEditor();
-        showFeedback(existing ? "Capítulo atualizado no Appwrite." : "Capítulo adicionado ao Appwrite.");
+        showFeedback(
+            result.cleanupWarning || (existing ? "Capítulo atualizado no Appwrite." : "Capítulo adicionado ao Appwrite."),
+            Boolean(result.cleanupWarning)
+        );
     } catch (error) {
-        console.error("Não foi possível salvar o capítulo:", error);
-        showFeedback(error.message || "Não foi possível salvar o capítulo.", true);
+        console.error("Não foi possível enviar ou salvar o capítulo:", error);
+        showFeedback(error.message || "Não foi possível enviar ou salvar o capítulo.", true);
+    } finally {
+        closeOperationProgress();
+        pendingChapterSubmissions.delete(form);
+        form.removeAttribute("aria-busy");
+        formButtons.forEach((button) => {
+            button.disabled = false;
+        });
+        if (submitButton?.isConnected) submitButton.textContent = originalButtonLabel;
     }
 }
 
@@ -1130,12 +1488,15 @@ async function handleAction(action, card, chapterRow, actionButton) {
                 destructive: true
             })) {
                 actionButton.disabled = true;
+                showOperationProgress(`Apagando “${work.title}”, seus capítulos e imagens. Aguarde; esta operação pode levar alguns minutos.`);
                 try {
                     await apiRequest(`/api/works/${encodeURIComponent(workId)}`, {
                         method: "DELETE",
                         authenticated: true
                     });
+                    invalidatePublicCatalogCache();
                     works = works.filter((item) => item.id !== workId);
+                    catalogWorks = catalogWorks.filter((item) => item.id !== workId);
                     renderWorks();
                     closeEditor();
                     showFeedback("Obra, capítulos e imagens excluídos do Appwrite e do ImageKit.");
@@ -1143,6 +1504,7 @@ async function handleAction(action, card, chapterRow, actionButton) {
                     console.error("Não foi possível excluir a obra:", error);
                     showFeedback(getDeleteErrorMessage(error, "obra"), true);
                 } finally {
+                    closeOperationProgress();
                     if (actionButton.isConnected) actionButton.disabled = false;
                 }
             }
@@ -1154,17 +1516,24 @@ async function handleAction(action, card, chapterRow, actionButton) {
                 confirmLabel: "Excluir capítulo",
                 destructive: true
             })) {
+                actionButton.disabled = true;
+                const chapterTitle = chapterRow.querySelector(".chapter-row-title").textContent;
+                showOperationProgress(`Apagando “${chapterTitle}” e suas imagens. Aguarde.`);
                 try {
                     await apiRequest(`/api/chapters/${encodeURIComponent(chapterId)}`, {
                         method: "DELETE",
                         authenticated: true
                     });
+                    invalidatePublicCatalogCache();
                     work.chapters = work.chapters.filter((chapter) => chapter.id !== chapterId);
                     renderWorks();
                     showFeedback("Capítulo e imagens excluídos do Appwrite e do ImageKit.");
                 } catch (error) {
                     console.error("Não foi possível excluir o capítulo:", error);
                     showFeedback(error.message || "Não foi possível excluir o capítulo.", true);
+                } finally {
+                    closeOperationProgress();
+                    if (actionButton.isConnected) actionButton.disabled = false;
                 }
             }
             break;
@@ -1215,7 +1584,7 @@ workList.addEventListener("click", async (event) => {
         title: isRejected ? "Excluir pedido negado?" : "Cancelar análise?",
         message: isRejected
             ? `Excluir o registro do pedido negado “${request.title}”? Esta ação não pode ser desfeita.`
-            : `Cancelar a análise do pedido “${request.title}”?`,
+            : `Cancelar a análise do pedido “${request.title}”? A capa e as informações enviadas serão apagadas.`,
         confirmLabel: isRejected ? "Excluir pedido" : "Cancelar análise",
         destructive: true
     });
@@ -1232,7 +1601,7 @@ workList.addEventListener("click", async (event) => {
         if (!workRequests.some((item) => item.status?.toUpperCase() === "PENDENTE")) {
             stopWorkRequestPolling();
         }
-        showFeedback(isRejected ? "Pedido negado excluído." : "Análise do pedido cancelada.");
+        showFeedback(isRejected ? "Pedido negado excluído." : "Análise cancelada. A capa e as informações do pedido foram excluídas.");
     } catch (error) {
         console.error("Não foi possível excluir ou cancelar o pedido de obra:", error);
         showFeedback(getDeleteErrorMessage(error, "pedido de obra"), true);

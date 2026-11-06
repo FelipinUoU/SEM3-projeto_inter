@@ -1,3 +1,5 @@
+import { loadPublicCatalog } from "./catalogCache.js";
+
 const searchForm = document.querySelector(".work-search");
 const searchInput = searchForm?.querySelector('input[type="search"]');
 const searchResults = searchForm?.querySelector(".work-search__results");
@@ -68,16 +70,7 @@ function renderSearchResults() {
 }
 
 async function loadPublishedWorks() {
-    const response = await fetch("/api/works");
-    const contentType = response.headers.get("content-type") || "";
-    const data = contentType.includes("application/json") ? await response.json() : null;
-    if (!response.ok) {
-        throw new Error(data?.error || `Não foi possível carregar as obras (HTTP ${response.status}).`);
-    }
-    if (!Array.isArray(data?.works)
-        || data.works.some((work) => !work || typeof work.id !== "string" || typeof work.title !== "string")) {
-        throw new Error("A resposta do servidor contém uma lista de obras inválida.");
-    }
+    const data = await loadPublicCatalog();
     publishedWorks = data.works;
     if (searchInput?.value.trim()) renderSearchResults();
 }

@@ -1,4 +1,6 @@
 import { account } from "../JS/JAVA/authClient.js";
+import { loadPublicCatalog } from "../JS/catalogCache.js";
+import { normalizeWorkFormat } from "../JS/workFormat.js";
 import "./AuthHeader.js";
 
 const adminEmail = "hokupedia@gmail.com";
@@ -7,6 +9,17 @@ const dashboard = document.getElementById("dashboard");
 const overlay = document.getElementById("menuOverlay");
 const dashboardItems = document.querySelectorAll(".menu-lateral-item");
 const navigation = document.querySelector(".menu-lateral-items");
+
+if (dashboard && !dashboard.querySelector(".menu-lateral-about")) {
+    const aboutLink = document.createElement("a");
+    aboutLink.className = "menu-lateral-item menu-lateral-about";
+    aboutLink.href = "/HTML/SobreNos.html";
+    aboutLink.textContent = "Sobre Nós";
+    if (window.location.pathname === aboutLink.pathname) {
+        aboutLink.setAttribute("aria-current", "page");
+    }
+    dashboard.append(aboutLink);
+}
 
 async function updateNavigationForUser() {
     try {
@@ -94,8 +107,7 @@ const homeCatalogStatus = document.getElementById("homeCatalogStatus");
 const homeCarouselTracks = [
     document.querySelector('[aria-labelledby="titulo-novidades"] .obras-faixa'),
     document.querySelector('[aria-labelledby="titulo-obras-comunidade"] .obras-faixa'),
-    document.querySelector('[aria-labelledby="titulo-capnovos"] .obras-faixa'),
-    document.querySelector('[aria-labelledby="titulo-recomendados"] .obras-faixa')
+    document.querySelector('[aria-labelledby="titulo-capnovos"] .obras-faixa')
 ];
 
 const carouselStates = Array.from(document.querySelectorAll("[data-carousel]"), (carousel) => ({
@@ -111,6 +123,7 @@ let selectedCategory = "all";
 function updateCarousel(state, resetSelection = false) {
     const cards = Array.from(state.track.querySelectorAll(".obra-card"));
     const visibleCards = cards.filter((card) => !card.hidden);
+    const visibleIndexes = new Map(visibleCards.map((card, index) => [card, index]));
     const slots = window.matchMedia("(max-width: 520px)").matches
         ? 2
         : window.matchMedia("(max-width: 760px)").matches ? 3 : 5;
@@ -135,7 +148,7 @@ function updateCarousel(state, resetSelection = false) {
     }
 
     cards.forEach((card) => {
-        const index = visibleCards.indexOf(card);
+        const index = visibleIndexes.get(card) ?? -1;
         const isSelected = index === state.selectedIndex && index !== -1;
         card.setAttribute("aria-current", String(isSelected));
         card.tabIndex = isSelected ? 0 : -1;
@@ -151,20 +164,6 @@ function updateCarousel(state, resetSelection = false) {
 
     state.previous.disabled = visibleCards.length < 2 || state.startIndex === 0;
     state.next.disabled = visibleCards.length < 2;
-}
-
-function normalizeWorkFormat(value) {
-    const normalized = String(value || "")
-        .trim()
-        .toLocaleLowerCase("pt-BR")
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/[^a-z]/g, "");
-
-    if (["hq", "hqs", "quadrinho", "quadrinhos"].includes(normalized)) return "hq";
-    if (["manhwa", "manhwas"].includes(normalized)) return "manhwa";
-    if (["manga", "mangas"].includes(normalized)) return "manga";
-    return "";
 }
 
 function createWorkCard(work, subtitle) {
@@ -194,18 +193,24 @@ function createWorkCard(work, subtitle) {
 
 function getLatestPublishedChapter(work) {
     return (Array.isArray(work.chapters) ? work.chapters : [])
-        .filter((chapter) => chapter.status === "published")
-        .sort((left, right) => Date.parse(right.createdAt || "") - Date.parse(left.createdAt || ""))
-        .at(0);
+        .reduce((latest, chapter) => {
+            if (chapter.status !== "published") return latest;
+            if (!latest) return chapter;
+            const chapterDate = Date.parse(chapter.createdAt || "");
+            const latestDate = Date.parse(latest.createdAt || "");
+            return (Number.isFinite(chapterDate) ? chapterDate : 0)
+                > (Number.isFinite(latestDate) ? latestDate : 0) ? chapter : latest;
+        }, null);
 }
 
 function sortWorksByCreationDate(works) {
-    return [...works].sort((left, right) => {
-        const leftDate = Date.parse(left.createdAt || "");
-        const rightDate = Date.parse(right.createdAt || "");
-        return (Number.isFinite(rightDate) ? rightDate : 0)
-            - (Number.isFinite(leftDate) ? leftDate : 0);
-    });
+    return works
+        .map((work, index) => {
+            const date = Date.parse(work.createdAt || "");
+            return { work, index, date: Number.isFinite(date) ? date : 0 };
+        })
+        .sort((left, right) => right.date - left.date || left.index - right.index)
+        .map(({ work }) => work);
 }
 
 carouselStates.forEach((state) => {
@@ -278,32 +283,25 @@ async function loadHomeWorks() {
     homeCatalogStatus.hidden = false;
 
     try {
-        const response = await fetch("/api/works");
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error || "Não foi possível carregar as obras.");
-        if (!Array.isArray(data.works)) {
-            throw new Error("A resposta do servidor contém uma lista de obras inválida.");
-        }
-
-        const works = sortWorksByCreationDate(data.works);
+        const { works: catalogWorks } = await loadPublicCatalog();
+        const works = sortWorksByCreationDate(catalogWorks);
         const newestFirst = works.map((work) => createWorkCard(work, work.author));
-        const communityWorks = works.map((work) => createWorkCard(work, work.author));
-        const newestChaptersFirst = [...works].sort((left, right) => {
-            const leftDate = Date.parse(getLatestPublishedChapter(left)?.createdAt || "");
-            const rightDate = Date.parse(getLatestPublishedChapter(right)?.createdAt || "");
-            return (Number.isFinite(rightDate) ? rightDate : 0)
-                - (Number.isFinite(leftDate) ? leftDate : 0);
-        });
-        const newChapters = newestChaptersFirst.map((work) => {
-            const chapter = getLatestPublishedChapter(work);
-            const chapterDetails = chapter
-                ? `Capítulo ${chapter.number}${chapter.title ? ` — ${chapter.title}` : ""}`
-                : "Sem capítulos publicados";
-            return createWorkCard(work, chapterDetails);
-        });
-        const recommendations = works.map((work) => createWorkCard(work, work.author));
+        const communityWorks = [...catalogWorks]
+            .sort((left, right) => left.title.localeCompare(right.title, "pt-BR"))
+            .map((work) => createWorkCard(work, work.author));
+        const newestChaptersFirst = works
+            .map((work) => {
+                const chapter = getLatestPublishedChapter(work);
+                const date = Date.parse(chapter?.createdAt || "");
+                return { work, chapter, date: Number.isFinite(date) ? date : 0 };
+            })
+            .filter(({ chapter }) => chapter)
+            .sort((left, right) => right.date - left.date);
+        const newChapters = newestChaptersFirst.map(({ work, chapter }) => (
+            createWorkCard(work, `Capítulo ${chapter.number}${chapter.title ? ` — ${chapter.title}` : ""}`)
+        ));
 
-        [newestFirst, communityWorks, newChapters, recommendations].forEach((cards, index) => {
+        [newestFirst, communityWorks, newChapters].forEach((cards, index) => {
             homeCarouselTracks[index].replaceChildren(...cards);
         });
 
