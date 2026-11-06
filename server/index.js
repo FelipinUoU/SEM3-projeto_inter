@@ -5,8 +5,7 @@ import express from 'express';
 import fs from 'fs';
 import { createServer } from 'http';
 import path from 'path';
-import { fileURLToPath } from 'url';
-import { Account, Client, Users as AppwriteUsers } from 'node-appwrite';
+import { fileURLToPath, pathToFileURL } from 'url';
 import ImageKit from 'imagekit';
 import nodemailer from 'nodemailer';
 import { readChapterArchive } from './chapterArchive.js';
@@ -16,7 +15,6 @@ import {
   authenticateNeonSession,
   clearSessionCookie,
   completePasswordRecovery,
-  connectLegacyAccount,
   createCookie,
   createNeonUser,
   createRecoveryChallenge,
@@ -27,7 +25,6 @@ import {
   findUserByEmail,
   findUserById,
   generateRecoveryCode,
-  getAccountRole,
   hashPassword,
   updatePassword,
   updateUserDetails,
@@ -48,7 +45,8 @@ import {
 const app = express();
 const rootDirectory = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 dotenv.config({ path: path.join(rootDirectory, '.env') });
-const PORT = process.env.PORT || 3001;
+const DEFAULT_PORT = Number.parseInt(process.env.PORT ?? '3001', 10);
+let PORT = Number.isInteger(DEFAULT_PORT) && DEFAULT_PORT > 0 ? DEFAULT_PORT : 3001;
 const READER_DIRECTORY = path.join(rootDirectory, 'public', 'reader');
 const READER_IMAGE_EXTENSIONS = new Set(['.avif', '.gif', '.jpeg', '.jpg', '.png', '.webp']);
 const UPLOAD_IMAGE_TYPES = new Set(['image/avif', 'image/gif', 'image/jpeg', 'image/png', 'image/webp']);
@@ -58,18 +56,6 @@ const MAX_CHAPTER_PAGES = Number.parseInt(process.env.MAX_CHAPTER_PAGES || '500'
 const MAX_CHAPTER_ARCHIVE_BYTES = Number.parseInt(process.env.MAX_CHAPTER_ARCHIVE_BYTES || '104857600', 10);
 const MAX_CHAPTER_UNPACKED_BYTES = 209715200;
 const WORK_DATA_CACHE_TTL_MS = 5 * 60 * 1000;
-const appwriteEndpoint = process.env.APPWRITE_ENDPOINT;
-const appwriteProjectId = process.env.APPWRITE_PROJECT_ID;
-const appwriteApiKey = process.env.APPWRITE_API_KEY;
-const appwriteDatabaseId = 'neon';
-const worksCollectionId = 'obras';
-const chaptersCollectionId = 'capitulos';
-const pagesCollectionId = 'paginas';
-const moderationRequestsCollectionId = 'pedido_moderacao';
-const workRequestsCollectionId = 'pedido_obra';
-const appwriteClient = appwriteEndpoint && appwriteProjectId && appwriteApiKey
-  ? new Client().setEndpoint(appwriteEndpoint).setProject(appwriteProjectId).setKey(appwriteApiKey)
-  : undefined;
 const databases = new Databases();
 const users = new Users();
 const imageKit = process.env.IMAGEKIT_PUBLIC_KEY
@@ -81,6 +67,43 @@ const imageKit = process.env.IMAGEKIT_PUBLIC_KEY
     urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT
   })
   : undefined;
+export async function getAvailablePort(startPort = 3001, maxAttempts = 20) {
+  const basePort = Number.isInteger(startPort) && startPort > 0 ? startPort : 3001;
+
+  for (let port = basePort; port < basePort + maxAttempts; port += 1) {
+    const probe = createServer();
+    try {
+      await new Promise((resolve, reject) => {
+        const onError = (error) => {
+          probe.removeListener('listening', onListening);
+          reject(error);
+        };
+        const onListening = () => {
+          probe.removeListener('error', onError);
+          resolve();
+        };
+
+        probe.once('error', onError);
+        probe.once('listening', onListening);
+        probe.listen(port);
+      });
+
+      await new Promise((resolve, reject) => {
+        probe.close((error) => {
+          if (error) reject(error);
+          else resolve();
+        });
+      });
+
+      return port;
+    } catch (error) {
+      if (error && error.code !== 'EADDRINUSE') throw error;
+    }
+  }
+
+  throw new Error(`Nenhuma porta livre foi encontrada entre ${basePort} e ${basePort + maxAttempts - 1}.`);
+}
+
 function getConfiguredApiKeys(name) {
   const keyPattern = new RegExp(`^${name}(?:_(\\d+))?$`, 'i');
   const configuredKeys = Object.entries(process.env)
@@ -130,17 +153,17 @@ function requireNeonConfiguration() {
   configureNeonDatabase();
 }
 
-function getAppwriteStatus(error) {
+function getDatabaseErrorStatus(error) {
   return getDatabaseStatus(error);
 }
 
-function isAppwriteNotFound(error) {
+function isDatabaseLookupMissing(error) {
   return isDatabaseNotFound(error);
 }
 
-function sendAppwriteError(res, error, message) {
+function sendDatabaseError(res, error, message) {
   console.error(`${message}:`, error);
-  return res.status(getAppwriteStatus(error)).json({
+  return res.status(getDatabaseErrorStatus(error)).json({
     error: error?.message || message
   });
 }
@@ -152,7 +175,7 @@ function sendWorkSaveError(res, error, message) {
       error: 'O esquema Neon está incompleto. Execute Database/neon-schema.sql e tente novamente.'
     });
   }
-  return sendAppwriteError(res, error, message);
+  return sendDatabaseError(res, error, message);
 }
 
 async function listAllDocuments(collectionId, filters = []) {
@@ -359,55 +382,6 @@ function setSessionCookie(res, token) {
   res.setHeader('Set-Cookie', createCookie(token, process.env.NODE_ENV === 'production'));
 }
 
-async function authenticateLegacyAccount(email, password) {
-  if (!appwriteClient || !appwriteEndpoint || !appwriteProjectId) {
-    const error = new Error('A ponte de autenticação Appwrite não está configurada.');
-    error.status = 503;
-    throw error;
-  }
-  const sessionClient = new Client()
-    .setEndpoint(appwriteEndpoint)
-    .setProject(appwriteProjectId);
-  const account = new Account(sessionClient);
-  let session;
-  try {
-    session = await account.createEmailPasswordSession({ email, password });
-  } catch (error) {
-    if (error?.code === 401) return null;
-    throw error;
-  }
-
-  try {
-    if (!session.secret) throw new Error('O Appwrite não retornou o token da sessão temporária.');
-    return {
-      user: await new AppwriteUsers(appwriteClient).get(session.userId),
-      account,
-      client: sessionClient,
-      sessionId: session.$id,
-      secret: session.secret
-    };
-  } catch (error) {
-    try {
-      sessionClient.setSession(session.secret);
-      await account.deleteSession({ sessionId: session.$id });
-    } catch (cleanupError) {
-      console.error('Could not revoke a failed legacy sign-in session:', cleanupError);
-    }
-    throw error;
-  }
-}
-
-async function revokeLegacySession(legacySession) {
-  if (!legacySession) return;
-  try {
-    legacySession.client.setSession(legacySession.secret);
-    await legacySession.account.deleteSession({ sessionId: legacySession.sessionId });
-  } catch (error) {
-    console.error('Could not revoke the temporary legacy sign-in session:', error);
-    throw new Error('Não foi possível encerrar a sessão temporária da autenticação antiga.');
-  }
-}
-
 function isValidEmail(email) {
   return typeof email === 'string' && email.length <= 255
     && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -463,7 +437,7 @@ app.post('/api/auth/register', async (req, res) => {
     if (error?.code === '23505') {
       return res.status(409).json({ error: 'Já existe uma conta com este e-mail.' });
     }
-    return sendAppwriteError(res, error, 'Não foi possível criar a conta no Neon.');
+    return sendDatabaseError(res, error, 'Não foi possível criar a conta no Neon.');
   }
 });
 
@@ -473,40 +447,16 @@ app.post('/api/auth/login', async (req, res) => {
     return res.status(400).json({ error: 'Informe um e-mail e uma senha válidos.' });
   }
 
-  let user;
-  let legacySession;
   try {
-    user = await findUserByEmail(email.trim());
-    if (user?.password_hash) {
-      if (!await verifyPassword(password, user.password_hash)) {
-        return res.status(401).json({ error: 'E-mail ou senha incorretos.' });
-      }
-    } else {
-      try {
-        legacySession = await authenticateLegacyAccount(email.trim(), password);
-      } catch (error) {
-        if (error.status === 503) return res.status(503).json({ error: error.message });
-        console.error('Legacy Appwrite sign-in bridge failed:', error);
-        return res.status(503).json({ error: 'Não foi possível migrar a conta antiga. Tente novamente.' });
-      }
-      if (!legacySession) return res.status(401).json({ error: 'E-mail ou senha incorretos.' });
-
-      const legacyUser = legacySession.user;
-      const role = getAccountRole(legacyUser.email, legacyUser.labels?.includes('admin') ? 'admin'
-        : legacyUser.labels?.includes('moderator') ? 'moderator' : 'user');
-      user = await connectLegacyAccount({
-        user,
-        appwriteId: legacyUser.$id,
-        email: legacyUser.email,
-        name: legacyUser.name,
-        passwordHash: await hashPassword(password),
-        role,
-        prefs: legacyUser.prefs,
-        emailVerified: Boolean(legacyUser.emailVerification)
-      });
+    const user = await findUserByEmail(email.trim());
+    if (!user?.password_hash) {
+      return res.status(401).json({ error: 'E-mail ou senha incorretos.' });
     }
 
-    await revokeLegacySession(legacySession);
+    if (!await verifyPassword(password, user.password_hash)) {
+      return res.status(401).json({ error: 'E-mail ou senha incorretos.' });
+    }
+
     const token = await createSession(user.auth_id);
     setSessionCookie(res, token);
     return res.json({ user: getPublicUser(user) });
@@ -514,7 +464,7 @@ app.post('/api/auth/login', async (req, res) => {
     if (error?.code === '23505') {
       return res.status(409).json({ error: 'A conta já foi migrada. Tente entrar novamente.' });
     }
-    return sendAppwriteError(res, error, 'Não foi possível entrar na conta.');
+    return sendDatabaseError(res, error, 'Não foi possível entrar na conta.');
   }
 });
 
@@ -586,7 +536,7 @@ app.post('/api/auth/recovery/reset', async (req, res) => {
     }
     return res.json({ updated: true });
   } catch (error) {
-    return sendAppwriteError(res, error, 'Não foi possível redefinir a senha.');
+    return sendDatabaseError(res, error, 'Não foi possível redefinir a senha.');
   }
 });
 
@@ -629,7 +579,7 @@ app.patch('/api/account', requireAuthenticatedUser, async (req, res) => {
     return res.json(getPublicUser(updatedUser));
   } catch (error) {
     if (error?.code === '23505') return res.status(409).json({ error: 'Este e-mail já está sendo usado por outra conta.' });
-    return sendAppwriteError(res, error, 'Não foi possível atualizar a conta.');
+    return sendDatabaseError(res, error, 'Não foi possível atualizar a conta.');
   }
 });
 
@@ -662,7 +612,7 @@ app.delete('/api/account', requireAuthenticatedUser, async (req, res) => {
     res.setHeader('Set-Cookie', clearSessionCookie);
     return res.status(204).end();
   } catch (error) {
-    return sendAppwriteError(res, error, 'Não foi possível excluir a conta.');
+    return sendDatabaseError(res, error, 'Não foi possível excluir a conta.');
   }
 });
 
@@ -677,7 +627,7 @@ app.post('/api/account/verify-password', requireAuthenticatedUser, async (req, r
     }
     return res.json({ verified: true });
   } catch (error) {
-    return sendAppwriteError(res, error, 'Não foi possível verificar sua senha.');
+    return sendDatabaseError(res, error, 'Não foi possível verificar sua senha.');
   }
 });
 
@@ -914,7 +864,7 @@ app.get('/api/catalog/works', async (req, res) => {
     });
     return res.json(data);
   } catch (error) {
-    return sendAppwriteError(res, error, 'Não foi possível carregar o catálogo do Appwrite.');
+    return sendDatabaseError(res, error, 'Não foi possível carregar o catálogo do Appwrite.');
   }
 });
 
@@ -981,7 +931,7 @@ app.get('/api/works', async (req, res) => {
     });
     return res.json(data);
   } catch (error) {
-    return sendAppwriteError(res, error, 'Não foi possível carregar as obras do Neon.');
+    return sendDatabaseError(res, error, 'Não foi possível carregar as obras do Neon.');
   }
 });
 
@@ -1050,7 +1000,7 @@ app.get('/api/management/works', requireAuthenticatedUser, requireModeratorUser,
       }))
     });
   } catch (error) {
-    return sendAppwriteError(res, error, 'Não foi possível carregar as obras para gerenciamento.');
+    return sendDatabaseError(res, error, 'Não foi possível carregar as obras para gerenciamento.');
   }
 });
 
@@ -1149,8 +1099,8 @@ app.delete('/api/works/:id', requireAuthenticatedUser, requireModeratorUser, asy
   try {
     work = await databases.getDocument(appwriteDatabaseId, worksCollectionId, req.params.id);
   } catch (error) {
-    if (isAppwriteNotFound(error)) return res.json({ deleted: true, alreadyDeleted: true });
-    return sendAppwriteError(res, error, 'Não foi possível localizar a obra para exclusão.');
+    if (isDatabaseLookupMissing(error)) return res.json({ deleted: true, alreadyDeleted: true });
+    return sendDatabaseError(res, error, 'Não foi possível localizar a obra para exclusão.');
   }
   if (!ownsDocument(req.appwriteUser, work) && !isAdminUser(req.appwriteUser)) {
     return res.status(403).json({ error: 'Você só pode excluir obras criadas pela sua conta.' });
@@ -1214,7 +1164,7 @@ app.delete('/api/works/:id', requireAuthenticatedUser, requireModeratorUser, asy
         try {
           await databases.deleteDocument(appwriteDatabaseId, pagesCollectionId, page.$id);
         } catch (error) {
-          if (!isAppwriteNotFound(error)) throw error;
+          if (!isDatabaseLookupMissing(error)) throw error;
         }
       }
     }
@@ -1223,19 +1173,19 @@ app.delete('/api/works/:id', requireAuthenticatedUser, requireModeratorUser, asy
       try {
         await databases.deleteDocument(appwriteDatabaseId, chaptersCollectionId, chapter.$id);
       } catch (error) {
-        if (!isAppwriteNotFound(error)) throw error;
+        if (!isDatabaseLookupMissing(error)) throw error;
       }
     }
     deletionStep = 'excluir a obra';
     try {
       await databases.deleteDocument(appwriteDatabaseId, worksCollectionId, req.params.id);
     } catch (error) {
-      if (!isAppwriteNotFound(error)) throw error;
+      if (!isDatabaseLookupMissing(error)) throw error;
     }
     return res.json({ deleted: true, deletedImageCount: imageKitFiles.size });
   } catch (error) {
     console.error(`Não foi possível ${deletionStep}:`, error);
-    const status = deletionStep.includes('ImageKit') ? 502 : getAppwriteStatus(error);
+    const status = deletionStep.includes('ImageKit') ? 502 : getDatabaseErrorStatus(error);
     return res.status(status).json({
       error: `Falha ao ${deletionStep}: ${error?.message || 'erro inesperado no Neon.'}`
     });
@@ -1310,7 +1260,7 @@ app.post('/api/works/:workId/chapters', requireAuthenticatedUser, requireModerat
       }
     });
   } catch (error) {
-    return sendAppwriteError(res, error, 'Não foi possível salvar o capítulo no Neon.');
+    return sendDatabaseError(res, error, 'Não foi possível salvar o capítulo no Neon.');
   }
 });
 
@@ -1416,7 +1366,7 @@ app.put('/api/chapters/:id', requireAuthenticatedUser, requireModeratorUser, asy
       }
     });
   } catch (error) {
-    return sendAppwriteError(res, error, 'Não foi possível atualizar o capítulo no Neon.');
+    return sendDatabaseError(res, error, 'Não foi possível atualizar o capítulo no Neon.');
   }
 });
 
@@ -1476,7 +1426,7 @@ app.delete('/api/chapters/:id', requireAuthenticatedUser, requireModeratorUser, 
     return res.json({ deleted: true, deletedImageCount: imageKitFiles.size });
   } catch (error) {
     console.error(`Não foi possível ${deletionStep}:`, error);
-    const status = deletionStep.includes('ImageKit') ? 502 : getAppwriteStatus(error);
+    const status = deletionStep.includes('ImageKit') ? 502 : getDatabaseErrorStatus(error);
     return res.status(status).json({
       error: `Falha ao ${deletionStep}: ${error?.message || 'erro inesperado no Neon.'}`
     });
@@ -1501,7 +1451,7 @@ app.get('/api/pedido_moderacao/me', requireAuthenticatedUser, async (req, res) =
       } : null
     });
   } catch (error) {
-    return sendAppwriteError(res, error, 'Não foi possível carregar o pedido de moderação.');
+    return sendDatabaseError(res, error, 'Não foi possível carregar o pedido de moderação.');
   }
 });
 
@@ -1545,7 +1495,7 @@ app.post('/api/pedido_moderacao', requireAuthenticatedUser, async (req, res) => 
       }
     });
   } catch (error) {
-    return sendAppwriteError(res, error, 'Não foi possível criar o pedido de moderação no Neon.');
+    return sendDatabaseError(res, error, 'Não foi possível criar o pedido de moderação no Neon.');
   }
 });
 
@@ -1595,7 +1545,7 @@ app.post('/api/pedido_obra', requireAuthenticatedUser, requireModeratorUser, asy
     } catch (cleanupError) {
       console.error('Could not remove the unregistered work request cover:', cleanupError);
     }
-    return sendAppwriteError(res, error, 'Não foi possível criar o pedido de obra no Neon.');
+    return sendDatabaseError(res, error, 'Não foi possível criar o pedido de obra no Neon.');
   }
 });
 
@@ -1622,7 +1572,7 @@ app.get('/api/pedido_obra/me', requireAuthenticatedUser, requireModeratorUser, a
       }))
     });
   } catch (error) {
-    return sendAppwriteError(res, error, 'Não foi possível carregar o status do pedido de obra.');
+    return sendDatabaseError(res, error, 'Não foi possível carregar o status do pedido de obra.');
   }
 });
 
@@ -1633,7 +1583,7 @@ app.delete('/api/pedido_obra/:id', requireAuthenticatedUser, requireModeratorUse
     try {
       request = await databases.getDocument(appwriteDatabaseId, workRequestsCollectionId, req.params.id);
     } catch (error) {
-      if (isAppwriteNotFound(error)) return res.json({ deleted: true, alreadyDeleted: true });
+      if (isDatabaseLookupMissing(error)) return res.json({ deleted: true, alreadyDeleted: true });
       throw error;
     }
     if (request.moderadorId !== req.appwriteUser.$id && request.userId !== req.appwriteUser.$id) {
@@ -1667,7 +1617,7 @@ app.delete('/api/pedido_obra/:id', requireAuthenticatedUser, requireModeratorUse
     return res.json({ deleted: true });
   } catch (error) {
     console.error(`Não foi possível ${deletionStep}:`, error);
-    const errorStatus = deletionStep.includes('ImageKit') ? 502 : getAppwriteStatus(error);
+    const errorStatus = deletionStep.includes('ImageKit') ? 502 : getDatabaseErrorStatus(error);
     return res.status(errorStatus).json({
       error: `Falha ao ${deletionStep}: ${error?.message || 'erro inesperado no Neon.'}`
     });
@@ -1712,7 +1662,7 @@ app.get('/api/homologacao', requireAuthenticatedUser, requireAdminUser, async (r
       }))
     });
   } catch (error) {
-    return sendAppwriteError(res, error, 'Não foi possível carregar os pedidos para homologação.');
+    return sendDatabaseError(res, error, 'Não foi possível carregar os pedidos para homologação.');
   }
 });
 
@@ -1735,7 +1685,7 @@ app.post('/api/pedido_moderacao/:id/aprovar', requireAuthenticatedUser, requireA
     );
     return res.json({ pedido: { id: document.$id, status: document.status } });
   } catch (error) {
-    return sendAppwriteError(res, error, 'Não foi possível aprovar o pedido de moderação.');
+    return sendDatabaseError(res, error, 'Não foi possível aprovar o pedido de moderação.');
   }
 });
 
@@ -1753,7 +1703,7 @@ app.post('/api/pedido_moderacao/:id/reprovar', requireAuthenticatedUser, require
     );
     return res.json({ pedido: { id: document.$id, status: document.status } });
   } catch (error) {
-    return sendAppwriteError(res, error, 'Não foi possível reprovar o pedido de moderação.');
+    return sendDatabaseError(res, error, 'Não foi possível reprovar o pedido de moderação.');
   }
 });
 
@@ -1803,7 +1753,7 @@ app.post('/api/pedido_obra/:id/aprovar', requireAuthenticatedUser, requireAdminU
     );
     return res.json({ pedido: { id: document.$id, status: document.status }, workId: work.$id });
   } catch (error) {
-    return sendAppwriteError(res, error, 'Não foi possível aprovar o pedido de obra.');
+    return sendDatabaseError(res, error, 'Não foi possível aprovar o pedido de obra.');
   }
 });
 
@@ -1815,7 +1765,7 @@ app.post('/api/pedido_obra/:id/reprovar', requireAuthenticatedUser, requireAdmin
   try {
     request = await databases.getDocument(appwriteDatabaseId, workRequestsCollectionId, req.params.id);
   } catch (error) {
-    return sendAppwriteError(res, error, 'Não foi possível carregar o pedido de obra.');
+    return sendDatabaseError(res, error, 'Não foi possível carregar o pedido de obra.');
   }
 
   const status = String(request.status).toUpperCase();
@@ -1831,7 +1781,7 @@ app.post('/api/pedido_obra/:id/reprovar', requireAuthenticatedUser, requireAdmin
         { status: 'REPROVADO' }
       );
     } catch (error) {
-      return sendAppwriteError(res, error, 'Não foi possível reprovar o pedido de obra.');
+      return sendDatabaseError(res, error, 'Não foi possível reprovar o pedido de obra.');
     }
   }
 
@@ -1863,7 +1813,7 @@ app.post('/api/pedido_obra/:id/reprovar', requireAuthenticatedUser, requireAdmin
     );
     return res.json({ pedido: { id: document.$id, status: document.status } });
   } catch (error) {
-    return sendAppwriteError(res, error, 'A capa foi excluída, mas não foi possível atualizar o pedido de obra.');
+    return sendDatabaseError(res, error, 'A capa foi excluída, mas não foi possível atualizar o pedido de obra.');
   }
 });
 
@@ -2123,6 +2073,10 @@ async function startServer() {
   }
 
   try {
+    const resolvedPort = await getAvailablePort(PORT);
+    PORT = resolvedPort;
+    process.env.PORT = String(PORT);
+
     await new Promise((resolve, reject) => {
       server.once('error', reject);
       server.listen(PORT, () => {
@@ -2169,11 +2123,13 @@ async function startServer() {
   console.log('Connected to Neon PostgreSQL.');
 }
 
-startServer().catch((err) => {
-  if (err.code === 'EADDRINUSE') {
-    console.error(`Port ${PORT} is already in use. Stop the existing server or set PORT to a free port.`);
-  } else {
-    console.error('Could not start server:', err);
-  }
-  process.exitCode = 1;
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  startServer().catch((err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`Port ${PORT} is already in use. Stop the existing server or set PORT to a free port.`);
+    } else {
+      console.error('Could not start server:', err);
+    }
+    process.exitCode = 1;
+  });
+}

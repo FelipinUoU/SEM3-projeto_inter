@@ -149,7 +149,7 @@ async function prepareInsert(client, collectionId, documentId, data) {
 
   if (collection.table === 'work_requests' && data.moderadorId) {
     const moderator = await client.query(
-      'SELECT id FROM users WHERE auth_id = $1 OR appwrite_id = $1 LIMIT 1',
+      'SELECT id FROM users WHERE auth_id = $1 LIMIT 1',
       [data.moderadorId]
     );
     if (!moderator.rows[0]) {
@@ -163,7 +163,7 @@ async function prepareInsert(client, collectionId, documentId, data) {
 
   if (['moderation_requests', 'work_requests'].includes(collection.table) && data.userId) {
     const user = await client.query(
-      'SELECT id FROM users WHERE auth_id = $1 OR appwrite_id = $1 LIMIT 1',
+      'SELECT id FROM users WHERE auth_id = $1 LIMIT 1',
       [data.userId]
     );
     if (!user.rows[0]) {
@@ -300,7 +300,7 @@ export class Databases {
 export class Users {
   async get(userId) {
     const result = await pool.query(
-      'SELECT auth_id, appwrite_id, name, email, role, prefs FROM users WHERE auth_id = $1 OR appwrite_id = $1 LIMIT 1',
+      'SELECT auth_id, name, email, role, prefs FROM users WHERE auth_id = $1 LIMIT 1',
       [userId]
     );
     const user = result.rows[0];
@@ -310,7 +310,7 @@ export class Users {
       throw error;
     }
     return {
-      $id: user.appwrite_id || user.auth_id,
+      $id: user.auth_id,
       name: user.name,
       email: user.email,
       labels: user.role && user.role !== 'user' ? [user.role] : [],
@@ -321,7 +321,7 @@ export class Users {
   async updateLabels(userId, labels) {
     const role = ['admin', 'moderator'].find((label) => labels.includes(label)) || 'user';
     await pool.query(
-      'UPDATE users SET role = $1, updated_at = NOW() WHERE auth_id = $2 OR appwrite_id = $2',
+      'UPDATE users SET role = $1, updated_at = NOW() WHERE auth_id = $2',
       [role, userId]
     );
     return this.get(userId);
@@ -329,7 +329,7 @@ export class Users {
 
   async delete(userId) {
     const result = await pool.query(
-      'DELETE FROM users WHERE auth_id = $1 OR appwrite_id = $1',
+      'DELETE FROM users WHERE auth_id = $1',
       [userId]
     );
     if (result.rowCount === 0) {

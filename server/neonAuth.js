@@ -46,7 +46,7 @@ export async function verifyPassword(password, encodedHash) {
 
 export async function findUserByEmail(email) {
   const result = await pool.query(
-    `SELECT id, auth_id, appwrite_id, name, email, password_hash, role, prefs, email_verified
+    `SELECT id, auth_id, name, email, password_hash, role, prefs, email_verified
      FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
     [email]
   );
@@ -55,7 +55,7 @@ export async function findUserByEmail(email) {
 
 export async function findUserById(authId) {
   const result = await pool.query(
-    `SELECT id, auth_id, appwrite_id, name, email, password_hash, role, prefs, email_verified
+    `SELECT id, auth_id, name, email, password_hash, role, prefs, email_verified
      FROM users WHERE auth_id = $1 LIMIT 1`,
     [authId]
   );
@@ -67,7 +67,6 @@ export async function createNeonUser({
   name,
   passwordHash,
   authId = randomUUID(),
-  appwriteId = null,
   role = 'user',
   prefs = {},
   emailVerified = false
@@ -75,17 +74,16 @@ export async function createNeonUser({
   role = getAccountRole(email, role);
   const result = await pool.query(
     `INSERT INTO users
-      (auth_id, appwrite_id, name, email, password_hash, role, prefs, email_verified)
-     VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8)
-     RETURNING id, auth_id, appwrite_id, name, email, password_hash, role, prefs, email_verified`,
-    [authId, appwriteId, name, email, passwordHash, role, JSON.stringify(prefs), emailVerified]
+      (auth_id, name, email, password_hash, role, prefs, email_verified)
+     VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7)
+     RETURNING id, auth_id, name, email, password_hash, role, prefs, email_verified`,
+    [authId, name, email, passwordHash, role, JSON.stringify(prefs), emailVerified]
   );
   return result.rows[0];
 }
 
 export async function connectLegacyAccount({
   user,
-  appwriteId,
   email,
   name,
   passwordHash,
@@ -99,8 +97,6 @@ export async function connectLegacyAccount({
       email,
       name,
       passwordHash,
-      authId: appwriteId,
-      appwriteId,
       role,
       prefs,
       emailVerified
@@ -108,23 +104,20 @@ export async function connectLegacyAccount({
   }
   const result = await pool.query(
     `UPDATE users SET
-      appwrite_id = $1,
-      password_hash = $2,
-      role = $3,
-      prefs = $4::jsonb,
-      email_verified = $5,
+      password_hash = $1,
+      role = $2,
+      prefs = $3::jsonb,
+      email_verified = $4,
       updated_at = NOW()
-     WHERE id = $6
-     RETURNING id, auth_id, appwrite_id, name, email, password_hash, role, prefs, email_verified`,
-    [appwriteId, passwordHash, role, JSON.stringify(prefs || {}), emailVerified, user.id]
+     WHERE id = $5
+     RETURNING id, auth_id, name, email, password_hash, role, prefs, email_verified`,
+    [passwordHash, role, JSON.stringify(prefs || {}), emailVerified, user.id]
   );
   if (result.rows[0]) return result.rows[0];
   return createNeonUser({
     email: user.email || email,
     name: user.name || name,
     passwordHash,
-    authId: appwriteId,
-    appwriteId,
     role,
     prefs,
     emailVerified
@@ -145,7 +138,7 @@ export async function createSession(userId) {
 
 export async function authenticateNeonSession(token) {
   const result = await pool.query(
-    `SELECT u.auth_id, u.appwrite_id, u.name, u.email, u.role, u.prefs, u.email_verified
+    `SELECT u.auth_id, u.name, u.email, u.role, u.prefs, u.email_verified
      FROM auth_sessions s JOIN users u ON u.id = s.user_id
      WHERE s.token_hash = $1 AND s.expires_at > NOW()`,
     [hashToken(token)]
@@ -157,7 +150,7 @@ export async function authenticateNeonSession(token) {
     throw error;
   }
   return {
-    $id: user.appwrite_id || user.auth_id,
+    $id: user.auth_id,
     authId: user.auth_id,
     name: user.name,
     email: user.email,
@@ -250,7 +243,7 @@ export async function updateUserDetails(userId, { name, email, prefs }) {
   const result = await pool.query(
     `UPDATE users SET ${fields.join(', ')}, updated_at = NOW()
      WHERE auth_id = $${values.length}
-     RETURNING id, auth_id, appwrite_id, name, email, password_hash, role, prefs, email_verified`,
+     RETURNING id, auth_id, name, email, password_hash, role, prefs, email_verified`,
     values
   );
   return result.rows[0] || null;

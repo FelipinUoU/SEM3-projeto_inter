@@ -34,7 +34,6 @@ CREATE INDEX IF NOT EXISTS pages_chapter_id_index ON public.pages("chapterId");
 CREATE TABLE IF NOT EXISTS public.users (
   id BIGSERIAL PRIMARY KEY,
   auth_id VARCHAR(64) NOT NULL UNIQUE,
-  appwrite_id VARCHAR(64) UNIQUE,
   name VARCHAR(255) NOT NULL,
   email VARCHAR(255) NOT NULL,
   password_hash TEXT NOT NULL,
