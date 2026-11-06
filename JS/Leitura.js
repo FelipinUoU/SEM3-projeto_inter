@@ -6,6 +6,7 @@ import {
     savePageAnalysis,
     saveTranslatedPage
 } from "./chapterTranslations.js";
+import { getTranslationLoginMessage } from "./translationAccess.js";
 
 const viewModeButton = document.getElementById("view-mode-btn");
 const viewDropdown = document.getElementById("view-dropdown");
@@ -735,6 +736,13 @@ function handleTranslationError(error, controller) {
 }
 
 async function translateCurrentPage() {
+    const currentUser = await getCurrentLibraryUser();
+    const loginMessage = getTranslationLoginMessage(currentUser);
+    if (loginMessage) {
+        setStatus(loginMessage, "error");
+        window.location.href = "/HTML/CadLog.html?mode=login";
+        return;
+    }
     if (translateButton.disabled || wrappers.length === 0) return;
     const requestedIndex = currentPageIndex;
     const wrapper = wrappers[requestedIndex];
@@ -795,6 +803,13 @@ async function translateCurrentPage() {
 }
 
 async function translateAllPages() {
+    const currentUser = await getCurrentLibraryUser();
+    const loginMessage = getTranslationLoginMessage(currentUser);
+    if (loginMessage) {
+        setStatus(loginMessage, "error");
+        window.location.href = "/HTML/CadLog.html?mode=login";
+        return;
+    }
     if (translateButton.disabled || wrappers.length === 0) return;
     const pendingIndices = wrappers
         .map((wrapper, index) => ({ wrapper, index }))
@@ -940,10 +955,19 @@ window.addEventListener("resize", () => {
     nearestVisiblePage();
 });
 
-translateButton.addEventListener("click", () => {
+translateButton.addEventListener("click", async () => {
     if (translationController) {
         translationController.abort("user");
-    } else if (settings.scope === "all") {
+        return;
+    }
+    const currentUser = await getCurrentLibraryUser();
+    const loginMessage = getTranslationLoginMessage(currentUser);
+    if (loginMessage) {
+        setStatus(loginMessage, "error");
+        window.location.href = "/HTML/CadLog.html?mode=login";
+        return;
+    }
+    if (settings.scope === "all") {
         void translateAllPages();
     } else if (pageTranslationLayers.has(wrappers[currentPageIndex])) {
         setStatus("Esta página já tem tradução salva.");
