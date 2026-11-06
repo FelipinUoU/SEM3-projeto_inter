@@ -155,7 +155,7 @@ async function loadWork() {
     const response = await fetch("/api/works");
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || "Não foi possível carregar as obras.");
-    if (!Array.isArray(data.works)) throw new Error("A resposta do Appwrite contém uma lista de obras inválida.");
+    if (!Array.isArray(data.works)) throw new Error("A resposta do Neon PostgreSQL contém uma lista de obras inválida.");
 
     const requestedId = new URLSearchParams(window.location.search).get("obra");
     return requestedId
@@ -171,7 +171,7 @@ async function renderChapters() {
     } catch (error) {
         console.error("Não foi possível carregar os dados da obra:", error);
         workTitle.textContent = "Erro ao carregar obra";
-        setExpandableDescription(workDescription, error.message || "Não foi possível carregar os dados do Appwrite.");
+        setExpandableDescription(workDescription, error.message || "Não foi possível carregar os dados do Neon PostgreSQL.");
         workAuthor.textContent = "";
         favoriteButton.disabled = true;
         return;

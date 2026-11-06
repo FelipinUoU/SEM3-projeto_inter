@@ -67,6 +67,25 @@ const imageKit = process.env.IMAGEKIT_PUBLIC_KEY
     urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT
   })
   : undefined;
+
+const neonDatabaseId = 'neon';
+// Backward-compatibility alias for the legacy code path during the Neon migration.
+const appwriteDatabaseId = neonDatabaseId;
+
+export const NEON_COLLECTION_IDS = Object.freeze({
+  works: 'obras',
+  chapters: 'capitulos',
+  pages: 'paginas',
+  moderationRequests: 'pedido_moderacao',
+  workRequests: 'pedido_obra'
+});
+
+const worksCollectionId = NEON_COLLECTION_IDS.works;
+const chaptersCollectionId = NEON_COLLECTION_IDS.chapters;
+const pagesCollectionId = NEON_COLLECTION_IDS.pages;
+const moderationRequestsCollectionId = NEON_COLLECTION_IDS.moderationRequests;
+const workRequestsCollectionId = NEON_COLLECTION_IDS.workRequests;
+
 export async function getAvailablePort(startPort = 3001, maxAttempts = 20) {
   const basePort = Number.isInteger(startPort) && startPort > 0 ? startPort : 3001;
 
@@ -864,7 +883,7 @@ app.get('/api/catalog/works', async (req, res) => {
     });
     return res.json(data);
   } catch (error) {
-    return sendDatabaseError(res, error, 'Não foi possível carregar o catálogo do Appwrite.');
+    return sendDatabaseError(res, error, 'Não foi possível carregar o catálogo do Neon PostgreSQL.');
   }
 });
 

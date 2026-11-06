@@ -1,6 +1,6 @@
 import { createServer } from 'node:http';
 import { describe, expect, it } from 'vitest';
-import { getAvailablePort } from './index.js';
+import { NEON_COLLECTION_IDS, getAvailablePort } from './index.js';
 
 describe('server port selection', () => {
   it('skips occupied ports and returns a free port', async () => {
@@ -19,6 +19,18 @@ describe('server port selection', () => {
     });
     await new Promise((resolve, reject) => {
       occupiedServer.close((error) => (error ? reject(error) : resolve()));
+    });
+  });
+});
+
+describe('neon collection mapping', () => {
+  it('exposes the Neon collection ids used by the server', () => {
+    expect(NEON_COLLECTION_IDS).toMatchObject({
+      works: 'obras',
+      chapters: 'capitulos',
+      pages: 'paginas',
+      moderationRequests: 'pedido_moderacao',
+      workRequests: 'pedido_obra'
     });
   });
 });

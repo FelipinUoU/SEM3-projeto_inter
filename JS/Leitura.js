@@ -261,7 +261,7 @@ async function loadStoredChapter() {
             setStatus("O capítulo abriu, mas não foi possível salvar seu progresso nesta conta.", "error");
         }
     } catch (error) {
-        console.error("Não foi possível abrir o capítulo do Appwrite:", error);
+        console.error("Não foi possível abrir o capítulo no Neon PostgreSQL:", error);
         readerViewport.replaceChildren();
         readerViewport.setAttribute("aria-busy", "false");
         setStatus(error.message || "Não foi possível abrir este capítulo.", "error");

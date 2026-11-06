@@ -192,7 +192,7 @@ async function loadWorks() {
     void loadCatalogWorks();
     const data = await apiRequest("/api/management/works", { authenticated: true });
     if (!Array.isArray(data.works)) {
-        throw new Error("A resposta do Appwrite contém uma lista de obras inválida.");
+        throw new Error("A resposta do Neon PostgreSQL contém uma lista de obras inválida.");
     }
     works = data.works;
     for (const work of works) {
@@ -1335,7 +1335,7 @@ async function handleWorkSubmit(form) {
             : [result.work, ...works];
         renderWorks();
         closeEditor();
-        showFeedback(existing ? "Obra atualizada no Appwrite." : "Obra adicionada ao Appwrite.");
+        showFeedback(existing ? "Obra atualizada no Neon PostgreSQL." : "Obra adicionada no Neon PostgreSQL.");
         selectedCoverFile = undefined;
     } catch (error) {
         console.error("Não foi possível salvar a obra:", error);
@@ -1425,7 +1425,7 @@ async function handleChapterSubmit(form) {
         renderWorks();
         closeEditor();
         showFeedback(
-            result.cleanupWarning || (existing ? "Capítulo atualizado no Appwrite." : "Capítulo adicionado ao Appwrite."),
+            result.cleanupWarning || (existing ? "Capítulo atualizado no Neon PostgreSQL." : "Capítulo adicionado no Neon PostgreSQL."),
             Boolean(result.cleanupWarning)
         );
     } catch (error) {
@@ -1499,7 +1499,7 @@ async function handleAction(action, card, chapterRow, actionButton) {
                     catalogWorks = catalogWorks.filter((item) => item.id !== workId);
                     renderWorks();
                     closeEditor();
-                    showFeedback("Obra, capítulos e imagens excluídos do Appwrite e do ImageKit.");
+                    showFeedback("Obra, capítulos e imagens excluídos do Neon PostgreSQL e do ImageKit.");
                 } catch (error) {
                     console.error("Não foi possível excluir a obra:", error);
                     showFeedback(getDeleteErrorMessage(error, "obra"), true);
@@ -1527,7 +1527,7 @@ async function handleAction(action, card, chapterRow, actionButton) {
                     invalidatePublicCatalogCache();
                     work.chapters = work.chapters.filter((chapter) => chapter.id !== chapterId);
                     renderWorks();
-                    showFeedback("Capítulo e imagens excluídos do Appwrite e do ImageKit.");
+                    showFeedback("Capítulo e imagens excluídos do Neon PostgreSQL e do ImageKit.");
                 } catch (error) {
                     console.error("Não foi possível excluir o capítulo:", error);
                     showFeedback(error.message || "Não foi possível excluir o capítulo.", true);

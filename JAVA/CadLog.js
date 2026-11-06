@@ -131,7 +131,7 @@ recoveryRequestForm.addEventListener("submit", async (event) => {
             email,
             phrase: false
         });
-        if (!recovery.userId) throw new Error("O Appwrite não retornou a identificação da conta para recuperação.");
+        if (!recovery.userId) throw new Error("O Neon PostgreSQL não retornou a identificação da conta para recuperação.");
 
         recoveryUserId = recovery.userId;
         recoveryRequestForm.hidden = true;
