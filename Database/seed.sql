@@ -1,4 +1,4 @@
-﻿-- Legacy MySQL seed data; the Appwrite server does not load this file.
+-- Legacy MySQL seed data; the Neon server does not load this file automatically.
 
 INSERT INTO administradores (email, senha) VALUES ('admin@hokupedia.local', 'adminpass');
 

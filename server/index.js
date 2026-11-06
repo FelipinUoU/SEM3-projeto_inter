@@ -6,10 +6,43 @@ import fs from 'fs';
 import { createServer } from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { Account, Client, Databases, ID, Query, Users } from 'node-appwrite';
+import { Account, Client, Users as AppwriteUsers } from 'node-appwrite';
 import ImageKit from 'imagekit';
+import nodemailer from 'nodemailer';
 import { readChapterArchive } from './chapterArchive.js';
 import { optimizeImageForImageKit } from './imageOptimization.js';
+import {
+  authenticateNeonSession,
+  clearSessionCookie,
+  completePasswordRecovery,
+  connectLegacyAccount,
+  createCookie,
+  createNeonUser,
+  createRecoveryChallenge,
+  createSession,
+  deleteUserAccount,
+  destroySession,
+  ADMIN_EMAIL,
+  findUserByEmail,
+  findUserById,
+  generateRecoveryCode,
+  getAccountRole,
+  hashPassword,
+  updatePassword,
+  updateUserDetails,
+  verifyPassword,
+  verifyUserPassword
+} from './neonAuth.js';
+import {
+  Databases,
+  ID,
+  Query,
+  Users,
+  configureNeonDatabase,
+  getDatabaseStatus,
+  isDatabaseNotFound,
+  pool
+} from './neonDatabase.js';
 
 const app = express();
 const rootDirectory = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -23,22 +56,20 @@ const MAX_PROFILE_AVATAR_BYTES = 200 * 1024;
 const MAX_CHAPTER_PAGES = Number.parseInt(process.env.MAX_CHAPTER_PAGES || '500', 10);
 const MAX_CHAPTER_ARCHIVE_BYTES = Number.parseInt(process.env.MAX_CHAPTER_ARCHIVE_BYTES || '104857600', 10);
 const MAX_CHAPTER_UNPACKED_BYTES = 209715200;
-const ADMIN_EMAIL = 'hokupedia@gmail.com';
 const appwriteEndpoint = process.env.APPWRITE_ENDPOINT;
 const appwriteProjectId = process.env.APPWRITE_PROJECT_ID;
 const appwriteApiKey = process.env.APPWRITE_API_KEY;
-const appwriteDatabaseId = process.env.APPWRITE_DATABASE_ID;
-const worksCollectionId = process.env.APPWRITE_WORKS_COLLECTION_ID;
-const chaptersCollectionId = process.env.APPWRITE_CHAPTERS_COLLECTION_ID;
-const pagesCollectionId = process.env.APPWRITE_PAGES_COLLECTION_ID;
-const moderationRequestsCollectionId = process.env.APPWRITE_MODERATION_REQUESTS_COLLECTION_ID;
-const workRequestsCollectionId = process.env.APPWRITE_WORK_REQUESTS_COLLECTION_ID;
-const appwriteClient = new Client();
-if (appwriteEndpoint) appwriteClient.setEndpoint(appwriteEndpoint);
-if (appwriteProjectId) appwriteClient.setProject(appwriteProjectId);
-if (appwriteApiKey) appwriteClient.setKey(appwriteApiKey);
-const databases = new Databases(appwriteClient);
-const users = new Users(appwriteClient);
+const appwriteDatabaseId = 'neon';
+const worksCollectionId = 'obras';
+const chaptersCollectionId = 'capitulos';
+const pagesCollectionId = 'paginas';
+const moderationRequestsCollectionId = 'pedido_moderacao';
+const workRequestsCollectionId = 'pedido_obra';
+const appwriteClient = appwriteEndpoint && appwriteProjectId && appwriteApiKey
+  ? new Client().setEndpoint(appwriteEndpoint).setProject(appwriteProjectId).setKey(appwriteApiKey)
+  : undefined;
+const databases = new Databases();
+const users = new Users();
 const imageKit = process.env.IMAGEKIT_PUBLIC_KEY
   && process.env.IMAGEKIT_PRIVATE_KEY
   && process.env.IMAGEKIT_URL_ENDPOINT
@@ -68,30 +99,35 @@ const providerTimeoutMs = 180000;
 
 app.use(express.json({ limit: '15mb' }));
 app.use(cors({ origin: '*' }));
+app.use((req, res, next) => {
+  const cookies = req.get('Cookie') || '';
+  req.cookies = Object.fromEntries(cookies.split(';').map((part) => {
+    const separator = part.indexOf('=');
+    if (separator < 0) return ['', ''];
+    const name = part.slice(0, separator).trim();
+    const value = part.slice(separator + 1).trim();
+    try {
+      return [name, decodeURIComponent(value)];
+    } catch {
+      return [name, ''];
+    }
+  }).filter(([name]) => name));
+  next();
+});
 
-function requireAppwriteConfiguration() {
-  const missing = [
-    ['APPWRITE_ENDPOINT', appwriteEndpoint],
-    ['APPWRITE_PROJECT_ID', appwriteProjectId],
-    ['APPWRITE_API_KEY', appwriteApiKey],
-    ['APPWRITE_DATABASE_ID', appwriteDatabaseId],
-    ['APPWRITE_WORKS_COLLECTION_ID', worksCollectionId],
-    ['APPWRITE_CHAPTERS_COLLECTION_ID', chaptersCollectionId],
-    ['APPWRITE_PAGES_COLLECTION_ID', pagesCollectionId]
-  ].filter(([, value]) => !value).map(([name]) => name);
-  if (missing.length) {
-    throw new Error(`Configuração Appwrite ausente: ${missing.join(', ')}`);
+function requireNeonConfiguration() {
+  if (!process.env.DATABASE_URL) {
+    throw new Error('Configuração Neon ausente: DATABASE_URL.');
   }
+  configureNeonDatabase();
 }
 
 function getAppwriteStatus(error) {
-  return Number.isInteger(error?.code) && error.code >= 400 && error.code < 600
-    ? error.code
-    : 500;
+  return getDatabaseStatus(error);
 }
 
 function isAppwriteNotFound(error) {
-  return error?.code === 404 || error?.type === 'document_not_found';
+  return isDatabaseNotFound(error);
 }
 
 function sendAppwriteError(res, error, message) {
@@ -102,10 +138,10 @@ function sendAppwriteError(res, error, message) {
 }
 
 function sendWorkSaveError(res, error, message) {
-  if (typeof error?.message === 'string' && /Unknown attribute: ["']?gender/i.test(error.message)) {
+  if (error?.code === '42703' || error?.code === '42P01') {
     console.error(`${message}:`, error);
     return res.status(500).json({
-      error: 'A coleção de obras do Appwrite não possui o atributo opcional "gender" (String, até 2048 caracteres). Crie-o na coleção configurada em APPWRITE_WORKS_COLLECTION_ID e aguarde ficar disponível.'
+      error: 'O esquema Neon está incompleto. Execute Database/neon-schema.sql e tente novamente.'
     });
   }
   return sendAppwriteError(res, error, message);
@@ -156,20 +192,14 @@ function getChapterValidationError(number, title, language, pages) {
 }
 
 async function requireAuthenticatedUser(req, res, next) {
-  const jwt = req.get('X-Appwrite-JWT');
-  if (!jwt) return res.status(401).json({ error: 'Faça login para alterar obras e imagens.' });
+  const sessionToken = req.cookies?.hokupedia_session;
+  if (!sessionToken) return res.status(401).json({ error: 'Faça login para alterar obras e imagens.' });
   try {
-    const authenticatedClient = new Client()
-      .setEndpoint(appwriteEndpoint)
-      .setProject(appwriteProjectId)
-      .setJWT(jwt);
-    req.appwriteUser = await new Account(authenticatedClient).get();
+    req.appwriteUser = await authenticateNeonSession(sessionToken);
     return next();
   } catch (error) {
-    if (error?.code === 401) {
-      return res.status(401).json({ error: 'Sua sessão expirou. Faça login novamente.' });
-    }
-    console.error('Appwrite authentication failed:', error);
+    if (error?.code === 401) return res.status(401).json({ error: 'Sua sessão expirou. Faça login novamente.' });
+    console.error('Neon authentication failed:', error);
     return res.status(503).json({ error: 'Não foi possível validar sua sessão.' });
   }
 }
@@ -296,6 +326,85 @@ async function getChapterAuthorName(userId) {
   }
 }
 
+function getPublicUser(user) {
+  return {
+    $id: user.appwrite_id || user.auth_id || user.$id,
+    name: user.name,
+    email: user.email,
+    labels: user.role && user.role !== 'user'
+      ? [user.role]
+      : Array.isArray(user.labels) ? user.labels : [],
+    prefs: user.prefs || {},
+    emailVerification: Boolean(user.email_verified ?? user.emailVerification)
+  };
+}
+
+function getAuthUserId(user) {
+  return user.authId || user.auth_id || user.$id;
+}
+
+function getSessionToken(req) {
+  return req.cookies?.hokupedia_session;
+}
+
+function setSessionCookie(res, token) {
+  res.setHeader('Set-Cookie', createCookie(token, process.env.NODE_ENV === 'production'));
+}
+
+async function authenticateLegacyAccount(email, password) {
+  if (!appwriteClient || !appwriteEndpoint || !appwriteProjectId) {
+    const error = new Error('A ponte de autenticação Appwrite não está configurada.');
+    error.status = 503;
+    throw error;
+  }
+  const sessionClient = new Client()
+    .setEndpoint(appwriteEndpoint)
+    .setProject(appwriteProjectId);
+  const account = new Account(sessionClient);
+  let session;
+  try {
+    session = await account.createEmailPasswordSession({ email, password });
+  } catch (error) {
+    if (error?.code === 401) return null;
+    throw error;
+  }
+
+  try {
+    if (!session.secret) throw new Error('O Appwrite não retornou o token da sessão temporária.');
+    return {
+      user: await new AppwriteUsers(appwriteClient).get(session.userId),
+      account,
+      client: sessionClient,
+      sessionId: session.$id,
+      secret: session.secret
+    };
+  } catch (error) {
+    try {
+      sessionClient.setSession(session.secret);
+      await account.deleteSession({ sessionId: session.$id });
+    } catch (cleanupError) {
+      console.error('Could not revoke a failed legacy sign-in session:', cleanupError);
+    }
+    throw error;
+  }
+}
+
+async function revokeLegacySession(legacySession) {
+  if (!legacySession) return;
+  try {
+    legacySession.client.setSession(legacySession.secret);
+    await legacySession.account.deleteSession({ sessionId: legacySession.sessionId });
+  } catch (error) {
+    console.error('Could not revoke the temporary legacy sign-in session:', error);
+    throw new Error('Não foi possível encerrar a sessão temporária da autenticação antiga.');
+  }
+}
+
+function isValidEmail(email) {
+  return typeof email === 'string' && email.length <= 255
+    && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
 const screenRoutes = {
   '/CadLog': 'CadLog.html',
   '/Cadastro': 'CadLog.html',
@@ -328,12 +437,200 @@ app.get('/Leitura', (req, res) => {
   res.redirect(302, `${readerPath}${req.url.slice('/Leitura'.length)}`);
 });
 
+app.post('/api/auth/register', async (req, res) => {
+  const { name, email, password } = req.body || {};
+  if (typeof name !== 'string' || !name.trim() || name.trim().length > 255
+    || !isValidEmail(email) || typeof password !== 'string'
+    || password.length < 8 || password.length > 256) {
+    return res.status(400).json({ error: 'Informe nome, e-mail válido e senha entre 8 e 256 caracteres.' });
+  }
+  try {
+    const user = await createNeonUser({
+      name: name.trim(),
+      email: email.trim().toLowerCase(),
+      passwordHash: await hashPassword(password)
+    });
+    return res.status(201).json({ user: getPublicUser(user) });
+  } catch (error) {
+    if (error?.code === '23505') {
+      return res.status(409).json({ error: 'Já existe uma conta com este e-mail.' });
+    }
+    return sendAppwriteError(res, error, 'Não foi possível criar a conta no Neon.');
+  }
+});
+
+app.post('/api/auth/login', async (req, res) => {
+  const { email, password } = req.body || {};
+  if (!isValidEmail(email) || typeof password !== 'string' || !password || password.length > 256) {
+    return res.status(400).json({ error: 'Informe um e-mail e uma senha válidos.' });
+  }
+
+  let user;
+  let legacySession;
+  try {
+    user = await findUserByEmail(email.trim());
+    if (user?.password_hash) {
+      if (!await verifyPassword(password, user.password_hash)) {
+        return res.status(401).json({ error: 'E-mail ou senha incorretos.' });
+      }
+    } else {
+      try {
+        legacySession = await authenticateLegacyAccount(email.trim(), password);
+      } catch (error) {
+        if (error.status === 503) return res.status(503).json({ error: error.message });
+        console.error('Legacy Appwrite sign-in bridge failed:', error);
+        return res.status(503).json({ error: 'Não foi possível migrar a conta antiga. Tente novamente.' });
+      }
+      if (!legacySession) return res.status(401).json({ error: 'E-mail ou senha incorretos.' });
+
+      const legacyUser = legacySession.user;
+      const role = getAccountRole(legacyUser.email, legacyUser.labels?.includes('admin') ? 'admin'
+        : legacyUser.labels?.includes('moderator') ? 'moderator' : 'user');
+      user = await connectLegacyAccount({
+        user,
+        appwriteId: legacyUser.$id,
+        email: legacyUser.email,
+        name: legacyUser.name,
+        passwordHash: await hashPassword(password),
+        role,
+        prefs: legacyUser.prefs,
+        emailVerified: Boolean(legacyUser.emailVerification)
+      });
+    }
+
+    await revokeLegacySession(legacySession);
+    const token = await createSession(user.auth_id);
+    setSessionCookie(res, token);
+    return res.json({ user: getPublicUser(user) });
+  } catch (error) {
+    if (error?.code === '23505') {
+      return res.status(409).json({ error: 'A conta já foi migrada. Tente entrar novamente.' });
+    }
+    return sendAppwriteError(res, error, 'Não foi possível entrar na conta.');
+  }
+});
+
+app.get('/api/auth/me', requireAuthenticatedUser, (req, res) => {
+  return res.json(getPublicUser(req.appwriteUser));
+});
+
+app.post('/api/auth/logout', async (req, res) => {
+  const token = getSessionToken(req);
+  if (token) await destroySession(token);
+  res.setHeader('Set-Cookie', clearSessionCookie);
+  return res.json({ deleted: true });
+});
+
+app.post('/api/auth/recovery', async (req, res) => {
+  const email = req.body?.email?.trim();
+  if (!isValidEmail(email)) return res.status(400).json({ error: 'Informe um e-mail válido.' });
+
+  const smtpHost = process.env.SMTP_HOST;
+  const smtpPort = Number.parseInt(process.env.SMTP_PORT || '587', 10);
+  const smtpUser = process.env.SMTP_USER;
+  const smtpPassword = process.env.SMTP_PASSWORD;
+  const smtpFrom = process.env.SMTP_FROM;
+  if (!smtpHost || !Number.isInteger(smtpPort) || !smtpUser || !smtpPassword || !smtpFrom) {
+    return res.status(503).json({ error: 'Configure SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD e SMTP_FROM para recuperação de senha.' });
+  }
+
+  const code = generateRecoveryCode();
+  let challenge;
+  try {
+    challenge = await createRecoveryChallenge(email, code);
+    if (challenge) {
+      const transport = nodemailer.createTransport({
+        host: smtpHost,
+        port: smtpPort,
+        secure: process.env.SMTP_SECURE === 'true' || smtpPort === 465,
+        auth: { user: smtpUser, pass: smtpPassword }
+      });
+      try {
+        await transport.sendMail({
+          from: smtpFrom,
+          to: email,
+          subject: 'Código para redefinir sua senha - HokuPédia',
+          text: `Olá, ${challenge.name || 'leitor(a)'}.\n\nSeu código de recuperação é ${code}. Ele expira em 15 minutos. Se você não solicitou a redefinição, ignore este e-mail.`
+        });
+      } catch (error) {
+        await pool.query('DELETE FROM password_recovery_tokens WHERE challenge_id = $1', [challenge.challengeId]);
+        throw error;
+      } finally {
+        transport.close();
+      }
+    }
+    return res.json({ userId: challenge?.challengeId || ID.unique() });
+  } catch (error) {
+    console.error('Could not send password recovery email:', error);
+    return res.status(502).json({ error: 'Não foi possível enviar o código de recuperação. Tente novamente.' });
+  }
+});
+
+app.post('/api/auth/recovery/reset', async (req, res) => {
+  const { userId, secret, password } = req.body || {};
+  if (typeof userId !== 'string' || typeof secret !== 'string' || !/^\d{6}$/.test(secret)
+    || typeof password !== 'string' || password.length < 8 || password.length > 256) {
+    return res.status(400).json({ error: 'Código ou senha inválidos.' });
+  }
+  try {
+    if (!await completePasswordRecovery(userId, secret, password)) {
+      return res.status(400).json({ error: 'Código inválido ou expirado. Solicite um novo código.' });
+    }
+    return res.json({ updated: true });
+  } catch (error) {
+    return sendAppwriteError(res, error, 'Não foi possível redefinir a senha.');
+  }
+});
+
+app.patch('/api/account', requireAuthenticatedUser, async (req, res) => {
+  const { name, email, password, oldPassword, newPassword, prefs } = req.body || {};
+  try {
+    if (name !== undefined && (typeof name !== 'string' || !name.trim() || name.trim().length > 255)) {
+      return res.status(400).json({ error: 'Informe um nome válido de até 255 caracteres.' });
+    }
+    if (email !== undefined && !isValidEmail(email)) {
+      return res.status(400).json({ error: 'Informe um e-mail válido.' });
+    }
+    if (prefs !== undefined && (!prefs || typeof prefs !== 'object' || Array.isArray(prefs)
+      || Buffer.byteLength(JSON.stringify(prefs)) > 10000)) {
+      return res.status(400).json({ error: 'As preferências da conta são inválidas ou muito grandes.' });
+    }
+    if (email !== undefined || newPassword !== undefined) {
+      const confirmation = email !== undefined ? password : oldPassword;
+      if (typeof confirmation !== 'string' || !await verifyUserPassword(getAuthUserId(req.appwriteUser), confirmation)) {
+        return res.status(401).json({ error: 'A senha informada está incorreta.' });
+      }
+    }
+    if (newPassword !== undefined && (typeof newPassword !== 'string'
+      || newPassword.length < 8 || newPassword.length > 256)) {
+      return res.status(400).json({ error: 'A nova senha deve ter entre 8 e 256 caracteres.' });
+    }
+
+    let updatedUser;
+    if (newPassword !== undefined) await updatePassword(getAuthUserId(req.appwriteUser), newPassword);
+    if (name !== undefined || email !== undefined || prefs !== undefined) {
+      updatedUser = await updateUserDetails(getAuthUserId(req.appwriteUser), {
+        name: name?.trim(),
+        email: email?.trim().toLowerCase(),
+        prefs
+      });
+    } else {
+      updatedUser = await findUserById(getAuthUserId(req.appwriteUser));
+    }
+    if (!updatedUser) return res.status(404).json({ error: 'Conta não encontrada.' });
+    return res.json(getPublicUser(updatedUser));
+  } catch (error) {
+    if (error?.code === '23505') return res.status(409).json({ error: 'Este e-mail já está sendo usado por outra conta.' });
+    return sendAppwriteError(res, error, 'Não foi possível atualizar a conta.');
+  }
+});
+
 app.get('/api/health', async (req, res) => {
   try {
     await databases.get(appwriteDatabaseId);
     res.json({
       status: 'ok',
-      database: 'connected',
+      database: 'neon',
       imageStorage: imageKit ? 'configured' : 'missing_configuration'
     });
   } catch (err) {
@@ -347,34 +644,14 @@ app.delete('/api/account', requireAuthenticatedUser, async (req, res) => {
   if (typeof password !== 'string' || password.length === 0 || password.length > 256) {
     return res.status(400).json({ error: 'Informe sua senha para confirmar a exclusão.' });
   }
-  if (!appwriteApiKey) {
-    return res.status(503).json({ error: 'A exclusão de contas não está configurada no servidor.' });
+  if (!await verifyUserPassword(getAuthUserId(req.appwriteUser), password)) {
+    return res.status(401).json({ error: 'A senha informada está incorreta.' });
   }
-
-  const verificationClient = new Client()
-    .setEndpoint(appwriteEndpoint)
-    .setProject(appwriteProjectId);
-  const verificationAccount = new Account(verificationClient);
-  let verificationSession;
   try {
-    verificationSession = await verificationAccount.createEmailPasswordSession({
-      email: req.appwriteUser.email,
-      password
-    });
-  } catch (error) {
-    if (error?.code === 401) {
-      return res.status(401).json({ error: 'A senha informada está incorreta.' });
+    if (!await deleteUserAccount(getAuthUserId(req.appwriteUser))) {
+      return res.status(404).json({ error: 'Conta não encontrada.' });
     }
-    return sendAppwriteError(res, error, 'Não foi possível verificar sua senha.');
-  }
-
-  if (verificationSession.userId !== req.appwriteUser.$id) {
-    await verificationAccount.deleteSession({ sessionId: verificationSession.$id });
-    return res.status(403).json({ error: 'Não foi possível confirmar a identidade da conta.' });
-  }
-
-  try {
-    await users.delete(req.appwriteUser.$id);
+    res.setHeader('Set-Cookie', clearSessionCookie);
     return res.status(204).end();
   } catch (error) {
     return sendAppwriteError(res, error, 'Não foi possível excluir a conta.');
@@ -386,48 +663,14 @@ app.post('/api/account/verify-password', requireAuthenticatedUser, async (req, r
   if (typeof password !== 'string' || password.length === 0 || password.length > 256) {
     return res.status(400).json({ error: 'Informe sua senha para confirmar a edição.' });
   }
-  if (!appwriteApiKey) {
-    return res.status(503).json({ error: 'A confirmação de senha não está configurada no servidor.' });
-  }
-
-  const verificationClient = new Client()
-    .setEndpoint(appwriteEndpoint)
-    .setProject(appwriteProjectId);
-  const verificationAccount = new Account(verificationClient);
-  let verificationSession;
-  let verificationError;
   try {
-    verificationSession = await verificationAccount.createEmailPasswordSession({
-      email: req.appwriteUser.email,
-      password
-    });
-  } catch (error) {
-    verificationError = error;
-  }
-
-  if (verificationSession) {
-    try {
-      await users.deleteSession(verificationSession.userId, verificationSession.$id);
-    } catch (error) {
-      console.error('Could not revoke temporary password-verification session:', error);
-      return res.status(503).json({
-        error: 'A senha foi verificada, mas não foi possível encerrar a sessão temporária. Tente novamente.'
-      });
-    }
-  }
-
-  if (verificationError) {
-    if (verificationError?.code === 401) {
+    if (!await verifyUserPassword(getAuthUserId(req.appwriteUser), password)) {
       return res.status(401).json({ error: 'A senha informada está incorreta.' });
     }
-    return sendAppwriteError(res, verificationError, 'Não foi possível verificar sua senha.');
+    return res.json({ verified: true });
+  } catch (error) {
+    return sendAppwriteError(res, error, 'Não foi possível verificar sua senha.');
   }
-
-  if (verificationSession.userId !== req.appwriteUser.$id) {
-    return res.status(403).json({ error: 'Não foi possível confirmar a identidade da conta.' });
-  }
-
-  return res.json({ verified: true });
 });
 
 app.post('/api/uploads', requireAuthenticatedUser, requireModeratorUser, express.raw({
@@ -689,7 +932,7 @@ app.get('/api/works', async (req, res) => {
       }))
     });
   } catch (error) {
-    return sendAppwriteError(res, error, 'Não foi possível carregar as obras do Appwrite.');
+    return sendAppwriteError(res, error, 'Não foi possível carregar as obras do Neon.');
   }
 });
 
@@ -802,7 +1045,7 @@ app.post('/api/works', requireAuthenticatedUser, requireAdminUser, async (req, r
       }
     });
   } catch (error) {
-    return sendWorkSaveError(res, error, 'Não foi possível salvar a obra no Appwrite.');
+    return sendWorkSaveError(res, error, 'Não foi possível salvar a obra no Neon.');
   }
 });
 
@@ -848,7 +1091,7 @@ app.put('/api/works/:id', requireAuthenticatedUser, requireModeratorUser, async 
       }
     });
   } catch (error) {
-    return sendWorkSaveError(res, error, 'Não foi possível atualizar a obra no Appwrite.');
+    return sendWorkSaveError(res, error, 'Não foi possível atualizar a obra no Neon.');
   }
 });
 
@@ -945,7 +1188,7 @@ app.delete('/api/works/:id', requireAuthenticatedUser, requireModeratorUser, asy
     console.error(`Não foi possível ${deletionStep}:`, error);
     const status = deletionStep.includes('ImageKit') ? 502 : getAppwriteStatus(error);
     return res.status(status).json({
-      error: `Falha ao ${deletionStep}: ${error?.message || 'erro inesperado do Appwrite.'}`
+      error: `Falha ao ${deletionStep}: ${error?.message || 'erro inesperado no Neon.'}`
     });
   }
 });
@@ -1018,7 +1261,7 @@ app.post('/api/works/:workId/chapters', requireAuthenticatedUser, requireModerat
       }
     });
   } catch (error) {
-    return sendAppwriteError(res, error, 'Não foi possível salvar o capítulo no Appwrite.');
+    return sendAppwriteError(res, error, 'Não foi possível salvar o capítulo no Neon.');
   }
 });
 
@@ -1102,7 +1345,7 @@ app.put('/api/chapters/:id', requireAuthenticatedUser, requireModeratorUser, asy
       }
     });
   } catch (error) {
-    return sendAppwriteError(res, error, 'Não foi possível atualizar o capítulo no Appwrite.');
+    return sendAppwriteError(res, error, 'Não foi possível atualizar o capítulo no Neon.');
   }
 });
 
@@ -1164,15 +1407,12 @@ app.delete('/api/chapters/:id', requireAuthenticatedUser, requireModeratorUser, 
     console.error(`Não foi possível ${deletionStep}:`, error);
     const status = deletionStep.includes('ImageKit') ? 502 : getAppwriteStatus(error);
     return res.status(status).json({
-      error: `Falha ao ${deletionStep}: ${error?.message || 'erro inesperado do Appwrite.'}`
+      error: `Falha ao ${deletionStep}: ${error?.message || 'erro inesperado no Neon.'}`
     });
   }
 });
 
 app.get('/api/pedido_moderacao/me', requireAuthenticatedUser, async (req, res) => {
-  if (!moderationRequestsCollectionId) {
-    return res.status(503).json({ error: 'Configure APPWRITE_MODERATION_REQUESTS_COLLECTION_ID para habilitar pedidos de moderação.' });
-  }
   try {
     const requests = await listAllDocuments(moderationRequestsCollectionId, [
       Query.equal('userId', req.appwriteUser.$id)
@@ -1195,9 +1435,6 @@ app.get('/api/pedido_moderacao/me', requireAuthenticatedUser, async (req, res) =
 });
 
 app.post('/api/pedido_moderacao', requireAuthenticatedUser, async (req, res) => {
-  if (!moderationRequestsCollectionId) {
-    return res.status(503).json({ error: 'Configure APPWRITE_MODERATION_REQUESTS_COLLECTION_ID para habilitar pedidos de moderação.' });
-  }
   const { motivos, idiomas_preferencia: idiomasPreferencia } = req.body || {};
   if (typeof motivos !== 'string' || !motivos.trim() || motivos.length > 5000
     || typeof idiomasPreferencia !== 'string' || !idiomasPreferencia.trim() || idiomasPreferencia.length > 255) {
@@ -1237,14 +1474,11 @@ app.post('/api/pedido_moderacao', requireAuthenticatedUser, async (req, res) => 
       }
     });
   } catch (error) {
-    return sendAppwriteError(res, error, 'Não foi possível criar o pedido de moderação no Appwrite.');
+    return sendAppwriteError(res, error, 'Não foi possível criar o pedido de moderação no Neon.');
   }
 });
 
 app.post('/api/pedido_obra', requireAuthenticatedUser, requireModeratorUser, async (req, res) => {
-  if (!workRequestsCollectionId) {
-    return res.status(503).json({ error: 'Configure APPWRITE_WORK_REQUESTS_COLLECTION_ID para habilitar pedidos de obra.' });
-  }
   if (!imageKit) {
     return res.status(503).json({ error: 'Configure as chaves do ImageKit no servidor para enviar capas de pedidos.' });
   }
@@ -1283,7 +1517,6 @@ app.post('/api/pedido_obra', requireAuthenticatedUser, requireModeratorUser, asy
     );
     return res.status(201).json({ pedido: { id: document.$id, status: document.status } });
   } catch (error) {
-    const appwriteErrorDetails = `${error?.message || ''} ${JSON.stringify(error?.response || '')}`;
     try {
       await deleteImageKitFile(
         coverFileId,
@@ -1292,35 +1525,11 @@ app.post('/api/pedido_obra', requireAuthenticatedUser, requireModeratorUser, asy
     } catch (cleanupError) {
       console.error('Could not remove the unregistered work request cover:', cleanupError);
     }
-    if (error?.type === 'document_invalid_structure'
-      && /Unknown attribute:\s*["']gender["']/.test(appwriteErrorDetails)) {
-      console.error('The work requests collection is missing its gender attribute:', error);
-      return res.status(503).json({
-        error: 'A collection configurada em APPWRITE_WORK_REQUESTS_COLLECTION_ID não possui o atributo gender. Crie um atributo String chamado gender, com tamanho 255, e tente novamente.'
-      });
-    }
-    if (error?.type === 'document_invalid_structure'
-      && /Unknown attribute:\s*["']author["']/i.test(appwriteErrorDetails)) {
-      console.error('The work requests collection is missing its author attribute:', error);
-      return res.status(503).json({
-        error: 'A collection configurada em APPWRITE_WORK_REQUESTS_COLLECTION_ID não possui o atributo Author. Crie um atributo String chamado Author, com tamanho 255, e tente novamente.'
-      });
-    }
-    if (error?.type === 'document_invalid_structure'
-      && /Unknown attribute:\s*["']coverFileId["']/i.test(appwriteErrorDetails)) {
-      console.error('The work requests collection is missing its coverFileId attribute:', error);
-      return res.status(503).json({
-        error: 'A collection configurada em APPWRITE_WORK_REQUESTS_COLLECTION_ID não possui o atributo coverFileId. Crie um atributo String chamado coverFileId, com tamanho 255, e tente novamente.'
-      });
-    }
-    return sendAppwriteError(res, error, 'Não foi possível criar o pedido de obra no Appwrite.');
+    return sendAppwriteError(res, error, 'Não foi possível criar o pedido de obra no Neon.');
   }
 });
 
 app.get('/api/pedido_obra/me', requireAuthenticatedUser, requireModeratorUser, async (req, res) => {
-  if (!workRequestsCollectionId) {
-    return res.status(503).json({ error: 'Configure APPWRITE_WORK_REQUESTS_COLLECTION_ID para habilitar pedidos de obra.' });
-  }
   try {
     const [moderatorRequests, userRequests] = await Promise.all([
       listAllDocuments(workRequestsCollectionId, [Query.equal('moderadorId', req.appwriteUser.$id)]),
@@ -1347,9 +1556,6 @@ app.get('/api/pedido_obra/me', requireAuthenticatedUser, requireModeratorUser, a
 });
 
 app.delete('/api/pedido_obra/:id', requireAuthenticatedUser, requireModeratorUser, async (req, res) => {
-  if (!workRequestsCollectionId) {
-    return res.status(503).json({ error: 'Configure APPWRITE_WORK_REQUESTS_COLLECTION_ID para habilitar pedidos de obra.' });
-  }
   let deletionStep = 'carregar o pedido de obra';
   try {
     let request;
@@ -1372,15 +1578,12 @@ app.delete('/api/pedido_obra/:id', requireAuthenticatedUser, requireModeratorUse
   } catch (error) {
     console.error(`Não foi possível ${deletionStep}:`, error);
     return res.status(getAppwriteStatus(error)).json({
-      error: `Falha ao ${deletionStep}: ${error?.message || 'erro inesperado do Appwrite.'}`
+      error: `Falha ao ${deletionStep}: ${error?.message || 'erro inesperado no Neon.'}`
     });
   }
 });
 
 app.get('/api/homologacao', requireAuthenticatedUser, requireAdminUser, async (req, res) => {
-  if (!moderationRequestsCollectionId || !workRequestsCollectionId) {
-    return res.status(503).json({ error: 'Configure as collections de pedidos de moderação e de obra no servidor.' });
-  }
   try {
     const [moderationDocuments, workRequestDocuments] = await Promise.all([
       listAllDocuments(moderationRequestsCollectionId),
@@ -1423,9 +1626,6 @@ app.get('/api/homologacao', requireAuthenticatedUser, requireAdminUser, async (r
 });
 
 app.post('/api/pedido_moderacao/:id/aprovar', requireAuthenticatedUser, requireAdminUser, async (req, res) => {
-  if (!moderationRequestsCollectionId) {
-    return res.status(503).json({ error: 'Configure APPWRITE_MODERATION_REQUESTS_COLLECTION_ID para habilitar pedidos de moderação.' });
-  }
   try {
     const request = await databases.getDocument(appwriteDatabaseId, moderationRequestsCollectionId, req.params.id);
     if (String(request.status).toUpperCase() !== 'PENDENTE') {
@@ -1449,9 +1649,6 @@ app.post('/api/pedido_moderacao/:id/aprovar', requireAuthenticatedUser, requireA
 });
 
 app.post('/api/pedido_moderacao/:id/reprovar', requireAuthenticatedUser, requireAdminUser, async (req, res) => {
-  if (!moderationRequestsCollectionId) {
-    return res.status(503).json({ error: 'Configure APPWRITE_MODERATION_REQUESTS_COLLECTION_ID para habilitar pedidos de moderação.' });
-  }
   try {
     const request = await databases.getDocument(appwriteDatabaseId, moderationRequestsCollectionId, req.params.id);
     if (String(request.status).toUpperCase() !== 'PENDENTE') {
@@ -1470,9 +1667,6 @@ app.post('/api/pedido_moderacao/:id/reprovar', requireAuthenticatedUser, require
 });
 
 app.post('/api/pedido_obra/:id/aprovar', requireAuthenticatedUser, requireAdminUser, async (req, res) => {
-  if (!workRequestsCollectionId) {
-    return res.status(503).json({ error: 'Configure APPWRITE_WORK_REQUESTS_COLLECTION_ID para habilitar pedidos de obra.' });
-  }
   try {
     const request = await databases.getDocument(appwriteDatabaseId, workRequestsCollectionId, req.params.id);
     if (String(request.status).toUpperCase() === 'APROVADO') {
@@ -1523,9 +1717,6 @@ app.post('/api/pedido_obra/:id/aprovar', requireAuthenticatedUser, requireAdminU
 });
 
 app.post('/api/pedido_obra/:id/reprovar', requireAuthenticatedUser, requireAdminUser, async (req, res) => {
-  if (!workRequestsCollectionId) {
-    return res.status(503).json({ error: 'Configure APPWRITE_WORK_REQUESTS_COLLECTION_ID para habilitar pedidos de obra.' });
-  }
   if (!imageKit) {
     return res.status(503).json({ error: 'Configure as chaves do ImageKit no servidor para remover a capa do pedido.' });
   }
@@ -1791,7 +1982,30 @@ app.post('/api/gemini', async (req, res) => {
 });
 
 async function startServer() {
-  requireAppwriteConfiguration();
+  requireNeonConfiguration();
+  try {
+    await pool.query(`
+      SELECT id, auth_id, appwrite_id, name, email, password_hash, role, prefs, email_verified, updated_at FROM users LIMIT 0;
+      SELECT id, title, description, cover, author, gender, formato, cover_file_id, create_by, "createdAt", updated_at FROM works LIMIT 0;
+      SELECT id, "workId", number, title, language, page_count, status, create_by, "createdAt", updated_at FROM chapters LIMIT 0;
+      SELECT id, "chapterId", number, "imageUrl", original_name, image_file_id, format, created_at, updated_at FROM pages LIMIT 0;
+      SELECT id, user_id, user_auth_id, motivos, idiomas_preferencia, status FROM moderation_requests LIMIT 0;
+      SELECT id, user_id, user_auth_id, moderator_id, moderator_auth_id, nome_obra, author, sinopse, cover_url, cover_file_id, gender, formato, status FROM work_requests LIMIT 0;
+      SELECT token_hash FROM auth_sessions LIMIT 0;
+      SELECT challenge_id FROM password_recovery_tokens LIMIT 0
+    `);
+    await pool.query(
+      'UPDATE users SET role = $1, updated_at = NOW() WHERE LOWER(email) = $2 AND role <> $1',
+      ['admin', ADMIN_EMAIL]
+    );
+  } catch (error) {
+    if (error?.code === '42P01' || error?.code === '42703') {
+      throw new Error('O esquema Neon está incompleto. Execute Database/neon-schema.sql antes de iniciar o servidor.', {
+        cause: error
+      });
+    }
+    throw error;
+  }
   if (!Number.isSafeInteger(MAX_UPLOAD_BYTES) || MAX_UPLOAD_BYTES < 1
     || !Number.isSafeInteger(MAX_CHAPTER_PAGES) || MAX_CHAPTER_PAGES < 1
     || !Number.isSafeInteger(MAX_CHAPTER_ARCHIVE_BYTES) || MAX_CHAPTER_ARCHIVE_BYTES < 1) {
@@ -1862,7 +2076,7 @@ async function startServer() {
   }
 
   console.log(`Server listening on http://localhost:${PORT}`);
-  console.log('Connected to Appwrite.');
+  console.log('Connected to Neon PostgreSQL.');
 }
 
 startServer().catch((err) => {

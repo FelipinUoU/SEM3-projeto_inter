@@ -1,4 +1,5 @@
-﻿-- Legacy MySQL schema; the server now stores application data in Appwrite.
+-- Legacy MySQL schema. For Neon/PostgreSQL, run neon-schema.sql after creating
+-- equivalent legacy tables; the application uses the expanded PostgreSQL schema.
 
 CREATE TABLE IF NOT EXISTS usuarios (
   id INT AUTO_INCREMENT PRIMARY KEY,

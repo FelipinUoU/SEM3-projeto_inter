@@ -1,4 +1,4 @@
-import { account } from "../JS/JAVA/appwriteClient.js";
+import { account } from "../JS/JAVA/authClient.js";
 import "./AuthHeader.js";
 
 const adminEmail = "hokupedia@gmail.com";

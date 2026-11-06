@@ -1,4 +1,4 @@
-import { account } from "./JAVA/appwriteClient.js";
+import { account } from "./JAVA/authClient.js";
 import { confirmInPage } from "./confirmationDialog.js";
 
 const feedback = document.querySelector("#feedback");
@@ -16,9 +16,7 @@ async function apiRequest(url, options = {}) {
         headers.set("Content-Type", "application/json");
         options.body = JSON.stringify(options.body);
     }
-    const { jwt } = await account.createJWT();
-    headers.set("X-Appwrite-JWT", jwt);
-    const response = await fetch(url, { ...options, headers });
+    const response = await fetch(url, { ...options, headers, credentials: "same-origin" });
     const contentType = response.headers.get("content-type") || "";
     const data = contentType.includes("application/json") ? await response.json() : {};
     if (!response.ok) throw new Error(data.error || `A solicitação falhou (HTTP ${response.status}).`);

@@ -1,4 +1,4 @@
-import { account, ID } from "../JS/JAVA/appwriteClient.js";
+import { account } from "../JS/JAVA/authClient.js";
 
 const modeButtons = document.querySelectorAll("[data-auth-mode]");
 const tabs = document.querySelector(".auth-tabs");
@@ -249,7 +249,6 @@ registerForm.addEventListener("submit", async (event) => {
     showFeedback(registerFeedback, "Criando sua conta...");
     try {
         await account.create({
-            userId: ID.unique(),
             email,
             password,
             name

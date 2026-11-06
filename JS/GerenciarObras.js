@@ -1,7 +1,7 @@
 import { createAuthorIcon } from "./authorIcon.js";
 import { confirmInPage } from "./confirmationDialog.js";
 import { setExpandableDescription } from "./expandableDescription.js";
-import { account } from "./JAVA/appwriteClient.js";
+import { account } from "./JAVA/authClient.js";
 
 const adminEmail = "hokupedia@gmail.com";
 const imageTypes = new Set(["image/avif", "image/gif", "image/jpeg", "image/png", "image/webp"]);
@@ -94,17 +94,18 @@ let workRequestPolling;
 let isRefreshingWorkRequest = false;
 
 async function apiRequest(url, options = {}) {
-    const { authenticated = false, ...requestOptions } = options;
+    const requestOptions = { ...options };
+    delete requestOptions.authenticated;
     const headers = new Headers(requestOptions.headers);
     if (requestOptions.body && !(requestOptions.body instanceof Blob)) {
         headers.set("Content-Type", "application/json");
         requestOptions.body = JSON.stringify(requestOptions.body);
     }
-    if (authenticated) {
-        const { jwt } = await account.createJWT();
-        headers.set("X-Appwrite-JWT", jwt);
-    }
-    const response = await fetch(url, { ...requestOptions, headers });
+    const response = await fetch(url, {
+        ...requestOptions,
+        headers,
+        credentials: "same-origin"
+    });
     const contentType = response.headers.get("content-type") || "";
     const data = contentType.includes("application/json") ? await response.json() : {};
     if (!response.ok) {

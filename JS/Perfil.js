@@ -1,4 +1,4 @@
-import { account } from "./JAVA/appwriteClient.js";
+import { account } from "./JAVA/authClient.js";
 
 const defaultAvatar = "../Img/Perfil/PerfilExemplo.svg";
 const maxAvatarSize = 200 * 1024;
@@ -65,10 +65,7 @@ function isValidAvatarUrl(value) {
 }
 
 async function profileApiRequest(url, options = {}) {
-    const { jwt } = await account.createJWT();
-    const headers = new Headers(options.headers);
-    headers.set("X-Appwrite-JWT", jwt);
-    const response = await fetch(url, { ...options, headers });
+    const response = await fetch(url, { ...options, credentials: "same-origin" });
     const contentType = response.headers.get("content-type") || "";
     const result = contentType.includes("application/json") ? await response.json() : {};
     if (!response.ok) {
@@ -403,7 +400,7 @@ async function saveProfile() {
         setProfileFields(user);
         resetPendingChanges();
         const successMessage = changesEmail
-            ? "Perfil atualizado. O novo e-mail precisa ser confirmado novamente."
+            ? "Perfil atualizado. O novo e-mail já está ativo."
             : "Perfil atualizado com sucesso.";
         showFeedback(avatarCleanupWarning
             ? `${successMessage} ${avatarCleanupWarning}`
@@ -451,13 +448,12 @@ passwordConfirmForm.addEventListener("submit", async (event) => {
     passwordConfirmFeedback.classList.remove("is-success");
 
     try {
-        const jwt = await account.createJWT();
         const response = await fetch("/api/account/verify-password", {
             method: "POST",
             headers: {
-                "Content-Type": "application/json",
-                "X-Appwrite-JWT": jwt.jwt
+                "Content-Type": "application/json"
             },
+            credentials: "same-origin",
             body: JSON.stringify({ password })
         });
         const result = await response.json();
@@ -534,13 +530,12 @@ deleteAccountForm.addEventListener("submit", async (event) => {
     deleteAccountFeedback.textContent = "Verificando senha e excluindo a conta...";
 
     try {
-        const jwt = await account.createJWT();
         const response = await fetch("/api/account", {
             method: "DELETE",
             headers: {
-                "Content-Type": "application/json",
-                "X-Appwrite-JWT": jwt.jwt
+                "Content-Type": "application/json"
             },
+            credentials: "same-origin",
             body: JSON.stringify({ password: deleteAccountPassword.value })
         });
 

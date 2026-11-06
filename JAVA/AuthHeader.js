@@ -1,4 +1,4 @@
-import { account } from "../JS/JAVA/appwriteClient.js";
+import { account } from "../JS/JAVA/authClient.js";
 
 const defaultAvatar = "/Img/Perfil/PerfilExemplo.svg";
 

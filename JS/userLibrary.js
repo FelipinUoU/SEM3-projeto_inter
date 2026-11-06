@@ -1,4 +1,4 @@
-import { account } from "./JAVA/appwriteClient.js";
+import { account } from "./JAVA/authClient.js";
 
 const libraryStoragePrefix = "hokupedia.userLibrary.v1.";
 const anonymousReadChaptersKey = "hokupedia.readChapters.v1";
