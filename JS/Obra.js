@@ -1,5 +1,6 @@
 import { createAuthorIcon } from "./authorIcon.js";
 import { setExpandableDescription } from "./expandableDescription.js";
+import { apiRequest } from "./apiRequest.js";
 import {
     getCurrentLibraryUser,
     loadAnonymousReadChapters,
@@ -18,6 +19,7 @@ const workCoverPreview = document.querySelector("#workCoverPreview");
 const workCoverPreviewImage = document.querySelector("#workCoverPreviewImage");
 const favoriteButton = document.querySelector("#favoriteButton");
 const favoriteFeedback = document.querySelector("#favoriteFeedback");
+const workEditShortcut = document.querySelector("#workEditShortcut");
 let currentWork;
 let currentUser;
 
@@ -132,6 +134,27 @@ function updateFavoriteButton(isFavorite) {
     favoriteButton.classList.toggle("is-favorite", isFavorite);
 }
 
+async function updateWorkEditShortcut(work) {
+    workEditShortcut.hidden = true;
+    if (!currentUser) return;
+    const isAdmin = currentUser.email?.trim().toLowerCase() === "hokupedia@gmail.com"
+        || currentUser.labels?.includes("admin");
+    if (!isAdmin && !currentUser.labels?.includes("moderator")) return;
+
+    try {
+        const data = await apiRequest("/api/management/works", { authenticated: true });
+        if (!Array.isArray(data.works)) {
+            throw new Error("A resposta do gerenciamento não contém uma lista de obras válida.");
+        }
+        const editableWork = data.works.find((item) => item.id === work.id);
+        if (editableWork?.createBy !== currentUser.$id) return;
+        workEditShortcut.href = `/HTML/GerenciarObras.html?obra=${encodeURIComponent(work.id)}`;
+        workEditShortcut.hidden = false;
+    } catch (error) {
+        console.error("Não foi possível verificar o acesso para editar esta obra:", error);
+    }
+}
+
 favoriteButton.addEventListener("click", () => {
     if (!currentUser) {
         window.location.assign("/HTML/CadLog.html?mode=login");
@@ -190,6 +213,7 @@ async function renderChapters() {
     }
 
     currentWork = work;
+    void updateWorkEditShortcut(work);
     workTitle.textContent = work.title;
     setExpandableDescription(workDescription, work.description || "Sem descrição.");
     workAuthor.textContent = work.author || "Autor não informado";

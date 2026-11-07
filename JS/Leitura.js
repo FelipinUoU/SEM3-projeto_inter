@@ -1,9 +1,7 @@
 import { getCurrentLibraryUser, recordReadChapter } from "./userLibrary.js";
 import {
     getStoredChapterTranslations,
-    getStoredPageAnalysis,
     removeStoredPageAnalysis,
-    savePageAnalysis,
     saveTranslatedPage
 } from "./chapterTranslations.js";
 import { getTranslationLoginMessage } from "./translationAccess.js";
@@ -22,7 +20,6 @@ const settingsForm = document.getElementById("translation-settings-form");
 const cancelSettingsButton = document.getElementById("cancel-translation-settings");
 const clearTranslationsButton = document.getElementById("clear-translations-btn");
 const languageSelect = document.getElementById("translation-language");
-const scopeSelect = document.getElementById("translation-scope");
 const capitalizationSelect = document.getElementById("translation-capitalization");
 const fontSelect = document.getElementById("translation-font");
 const settingsKey = "hokupedia.translationSettings.v1";
@@ -41,7 +38,6 @@ const chapterTranslationsKey = chapterId
 const chapterAnalysisKey = chapterId
     ? `hokupedia.readerAnalysis.v1:${chapterId}`
     : "";
-const analysisCache = new Map();
 const translationCache = new Map();
 let settings = loadSettings();
 let settingsBeforeDialog;
@@ -55,46 +51,6 @@ let translationController;
 let statusTimeout;
 let translationsVisible = true;
 
-const analysisSchema = {
-    type: "OBJECT",
-    properties: {
-        detectedLanguage: { type: "STRING" },
-        bubbles: {
-            type: "ARRAY",
-            items: {
-                type: "OBJECT",
-                properties: {
-                    x: { type: "INTEGER" },
-                    y: { type: "INTEGER" },
-                    width: { type: "INTEGER" },
-                    height: { type: "INTEGER" },
-                    square: { type: "BOOLEAN" },
-                    originalText: { type: "STRING" }
-                },
-                required: ["x", "y", "width", "height", "square", "originalText"]
-            }
-        }
-    },
-    required: ["detectedLanguage", "bubbles"]
-};
-const translationSchema = {
-    type: "OBJECT",
-    properties: {
-        translations: {
-            type: "ARRAY",
-            items: {
-                type: "OBJECT",
-                properties: {
-                    id: { type: "INTEGER" },
-                    translation: { type: "STRING" }
-                },
-                required: ["id", "translation"]
-            }
-        }
-    },
-    required: ["translations"]
-};
-
 function loadSettings() {
     try {
         const stored = localStorage.getItem(settingsKey);
@@ -103,7 +59,7 @@ function loadSettings() {
         return {
             language: languageSelect.querySelector(`option[value="${CSS.escape(value.language)}"]`)
                 ? value.language : defaultSettings.language,
-            scope: ["current", "all"].includes(value.scope) ? value.scope : defaultSettings.scope,
+            scope: "current",
             capitalization: ["sentence", "uppercase"].includes(value.capitalization)
                 ? value.capitalization : defaultSettings.capitalization,
             font: ["arial", "trebuchet", "georgia", "comic"].includes(value.font)
@@ -117,7 +73,6 @@ function loadSettings() {
 
 function applySettingsToForm() {
     languageSelect.value = settings.language;
-    scopeSelect.value = settings.scope;
     capitalizationSelect.value = settings.capitalization;
     fontSelect.value = settings.font;
     setTranslationPending(Boolean(translationController));
@@ -319,13 +274,8 @@ function positionTranslationLayers() {
 
 function setTranslationPending(isPending) {
     translateButton.setAttribute("aria-busy", String(isPending));
-    const allPages = settings.scope === "all";
-    translateText.textContent = isPending
-        ? allPages ? "Parar tudo" : "Interromper"
-        : allPages ? "Traduzir tudo" : "Tradução";
-    translateButton.title = isPending
-        ? allPages ? "Interromper todas as traduções" : "Interromper tradução"
-        : allPages ? "Traduzir todas as páginas com IA" : "Traduzir página com IA";
+    translateText.textContent = isPending ? "Interromper" : "Tradução";
+    translateButton.title = isPending ? "Interromper tradução" : "Traduzir página com IA";
 }
 
 function showHorizontalPage(index) {
@@ -402,7 +352,7 @@ function toggleMode(mode) {
 async function imageToBase64(image) {
     if (!image.complete) await image.decode();
     if (!image.naturalWidth) throw new Error("A imagem desta página não pôde ser carregada.");
-    const maxDimension = 2560;
+    const maxDimension = 1200;
     const scale = Math.min(1, maxDimension / Math.max(image.naturalWidth, image.naturalHeight));
     const canvas = document.createElement("canvas");
     canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
@@ -411,7 +361,7 @@ async function imageToBase64(image) {
     if (!context) throw new Error("Não foi possível preparar a imagem para tradução.");
     context.drawImage(image, 0, 0, canvas.width, canvas.height);
     const blob = await new Promise((resolve, reject) => {
-        canvas.toBlob((value) => value ? resolve(value) : reject(new Error("Não foi possível codificar a imagem.")), "image/jpeg", 0.9);
+        canvas.toBlob((value) => value ? resolve(value) : reject(new Error("Não foi possível codificar a imagem.")), "image/jpeg", 0.8);
     });
     const bytes = new Uint8Array(await blob.arrayBuffer());
     let binary = "";
@@ -423,7 +373,7 @@ async function imageToBase64(image) {
     return { inlineData: { data: btoa(binary), mimeType: blob.type }, cacheKey };
 }
 
-async function requestAI(parts, responseSchema, controller, maxOutputTokens, context) {
+async function requestTranslationPage(image, targetLanguage, controller, context) {
     const startedAt = performance.now();
     logAIProgress("Solicitação enviada ao backend", {
         etapa: context.stage,
@@ -438,19 +388,13 @@ async function requestAI(parts, responseSchema, controller, maxOutputTokens, con
     }, 10000);
     let response;
     try {
-        response = await fetch("/api/gemini", {
+        response = await fetch("/api/translate-page", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             signal: controller.signal,
             body: JSON.stringify({
-                contents: [{ parts }],
-                generationConfig: {
-                    maxOutputTokens,
-                    responseMimeType: "application/json",
-                    responseSchema,
-                    thinkingConfig: { thinkingLevel: "LOW" }
-                },
-                responseSchema
+                image: image.inlineData,
+                targetLanguage
             })
         });
     } catch (error) {
@@ -486,19 +430,15 @@ async function requestAI(parts, responseSchema, controller, maxOutputTokens, con
         throw new Error(`Falha na tradução (HTTP ${response.status}): ${message}`);
     }
 
-    const text = result.candidates?.[0]?.content?.parts?.map((part) => part.text || "").join("").trim();
-    if (!text) throw new Error("O provedor de IA não retornou conteúdo.");
-    try {
-        const parsed = JSON.parse(text);
-        logAIProgress("Resposta da IA processada", {
-            etapa: context.stage,
-            pagina: context.pageNumber,
-            duracaoMs: Math.round(performance.now() - startedAt)
-        });
-        return parsed;
-    } catch {
-        throw new Error("O provedor de IA retornou dados em formato inesperado.");
+    if (!result || typeof result.detectedLanguage !== "string" || !Array.isArray(result.bubbles)) {
+        throw new Error("O backend retornou dados de tradução em formato inesperado.");
     }
+    logAIProgress("Resposta da IA processada", {
+        etapa: context.stage,
+        pagina: context.pageNumber,
+        duracaoMs: Math.round(performance.now() - startedAt)
+    });
+    return result;
 }
 
 function validateBubbles(bubbles) {
@@ -511,7 +451,10 @@ function validateBubbles(bubbles) {
             || typeof bubble.originalText !== "string" || !bubble.originalText.trim()) {
             throw new Error(`A IA retornou dados inválidos para o balão ${index + 1}.`);
         }
-        return { ...bubble, id: index + 1, originalText: bubble.originalText.trim() };
+        const shape = ["oval", "rect", "action"].includes(bubble.shape)
+            ? bubble.shape
+            : bubble.square ? "rect" : "oval";
+        return { ...bubble, id: index + 1, shape, originalText: bubble.originalText.trim() };
     });
 }
 
@@ -578,18 +521,20 @@ function displayTranslations(bubbles, wrapper) {
     layer.className = "translation-layer";
     layer.setAttribute("aria-label", "Tradução dos balões");
     layer.classList.toggle("is-hidden", !translationsVisible);
-    const elements = bubbles.map((bubble) => {
+    const textElements = [];
+    bubbles.forEach((bubble) => {
         const element = document.createElement("span");
-        element.className = bubble.square
-            ? "translated-bubble translated-bubble--square"
-            : "translated-bubble";
+        element.className = `translated-bubble translated-bubble--${bubble.shape}`;
         element.title = `Original: ${bubble.originalText}`;
         element.style.left = `${bubble.x / 10}%`;
         element.style.top = `${bubble.y / 10}%`;
         element.style.width = `${bubble.width / 10}%`;
         element.style.height = `${bubble.height / 10}%`;
+        const textElement = document.createElement("span");
+        textElement.className = "translated-bubble__text";
+        element.append(textElement);
+        textElements.push(textElement);
         layer.append(element);
-        return element;
     });
     wrapper.append(layer);
     const positionLayer = () => {
@@ -599,7 +544,7 @@ function displayTranslations(bubbles, wrapper) {
         layer.style.top = `${imageRect.top - wrapperRect.top}px`;
         layer.style.width = `${imageRect.width}px`;
         layer.style.height = `${imageRect.height}px`;
-        elements.forEach((element, index) => fitBubbleText(element, bubbles[index]));
+        textElements.forEach((element, index) => fitBubbleText(element, bubbles[index]));
     };
     positionLayer();
     const translation = { layer, bubbles, observer: undefined, position: positionLayer };
@@ -622,6 +567,9 @@ async function getTranslatedBubbles(pageIndex, controller) {
     const image = await imageToBase64(imageElement);
     logAIProgress("Imagem pronta para envio", {
         pagina: pageNumber,
+        larguraEnviada: Math.min(imageElement.naturalWidth, 1200),
+        alturaEnviada: Math.round(imageElement.naturalHeight
+            * Math.min(1, 1200 / Math.max(imageElement.naturalWidth, imageElement.naturalHeight))),
         largura: imageElement.naturalWidth,
         altura: imageElement.naturalHeight,
         tamanhoKB: Math.round(image.inlineData.data.length * 0.75 / 1024),
@@ -631,84 +579,25 @@ async function getTranslatedBubbles(pageIndex, controller) {
     const translationKey = `${image.cacheKey}:${settings.language}`;
     const cached = translationCache.get(translationKey);
     if (cached) {
-        logAIProgress("Página recuperada do cache de tradução", { pagina: pageNumber });
+        logAIProgress("Página recuperada do cache do navegador", {
+            pagina: pageNumber,
+            baloes: cached.length
+        });
         return cached;
     }
 
-    let analysis = analysisCache.get(image.cacheKey);
-    let analysisWasReused = Boolean(analysis);
-    if (!analysis) {
-        try {
-            analysis = getStoredPageAnalysis(
-                localStorage,
-                chapterAnalysisKey,
-                wrapper.dataset.pageId,
-                image.cacheKey
-            );
-            if (analysis) {
-                analysis = {
-                    ...analysis,
-                    bubbles: validateBubbles(analysis.bubbles)
-                };
-                analysisCache.set(image.cacheKey, analysis);
-                analysisWasReused = true;
-                logAIProgress("Análise concluída recuperada do armazenamento local", {
-                    pagina: pageNumber,
-                    baloesEncontrados: analysis.bubbles.length
-                });
-            }
-        } catch (error) {
-            console.error("Não foi possível restaurar a análise intermediária salva:", error);
-            logAIProgress("Cache da análise inválido; será refeita", { pagina: pageNumber });
-        }
-    }
-    if (!analysis) {
-        logAIProgress("Iniciando análise e identificação dos balões", { pagina: pageNumber });
-        setStatus("Etapa 1/2: analisando a página e localizando os balões…");
-        const analysisResult = await requestAI([{
-            text: "Analise a página inteira como um sistema de visão e OCR para quadrinhos. Faça uma varredura linha por linha, de cima para baixo, identificando todos os balões de fala e pensamento com texto legível. Transcreva cada fala exatamente e informe o idioma predominante em detectedLanguage. Para cada balão, estime uma caixa que cubra o interior sem a cauda: x, y, width e height são inteiros de 0 a 1000 normalizados pela imagem inteira. Defina square como true quando o balão tiver formato quadrado ou retangular, com laterais retas e cantos predominantemente retos; use false para balões ovais ou arredondados. Não classifique quadros, legendas ou caixas de narração como balões. Ignore textos fora de balões, desenhos e efeitos sonoros. Não invente texto."
-        }, { inlineData: image.inlineData }], analysisSchema, controller, 4096, {
-            stage: "análise dos balões",
-            pageNumber
-        });
-        analysis = {
-            ...analysisResult,
-            bubbles: validateBubbles(analysisResult.bubbles)
-        };
-        analysisCache.set(image.cacheKey, analysis);
-        const analysisSaved = savePageAnalysis(
-            localStorage,
-            chapterAnalysisKey,
-            wrapper.dataset.pageId,
-            image.cacheKey,
-            analysis
-        );
-        logAIProgress("Análise concluída", {
-            pagina: pageNumber,
-            baloesEncontrados: analysis.bubbles.length,
-            salvaParaRetomada: analysisSaved
-        });
-    }
     if (controller.signal.aborted) throw new DOMException("Tradução cancelada.", "AbortError");
-    if (analysis.bubbles.length === 0) {
-        translationCache.set(translationKey, []);
-        return [];
-    }
-
-    setStatus(`Etapa 2/2: traduzindo ${analysis.bubbles.length} balões para ${settings.language}${analysisWasReused ? " (análise reutilizada)" : ""}…`);
-    logAIProgress("Iniciando tradução dos balões", {
-        pagina: pageNumber,
-        baloes: analysis.bubbles.length,
-        idioma: settings.language
-    });
-    const result = await requestAI([{
-        text: `Traduza integralmente para ${settings.language} cada fala abaixo. O idioma original é ${analysis.detectedLanguage}. Retorne uma tradução natural e fiel, sem resumir nem adicionar falas. Preserve cada id e retorne uma tradução não vazia para todos os itens: ${JSON.stringify(analysis.bubbles.map(({ id, originalText }) => ({ id, originalText })))}`
-    }], translationSchema, controller, Math.min(4096, Math.max(512, analysis.bubbles.length * 100)), {
-        stage: "tradução do texto",
+    setStatus(`Detectando e traduzindo balões para ${settings.language}…`);
+    const result = await requestTranslationPage(image, settings.language, controller, {
+        stage: "detecção e tradução dos balões",
         pageNumber
     });
     if (controller.signal.aborted) throw new DOMException("Tradução cancelada.", "AbortError");
-    const translatedBubbles = validateTranslations(result.translations, analysis.bubbles);
+    const bubbles = validateBubbles(result.bubbles);
+    const translatedBubbles = validateTranslations(
+        result.bubbles.map(({ id, translation }) => ({ id, translation })),
+        bubbles
+    );
     translationCache.set(translationKey, translatedBubbles);
     logAIProgress("Tradução concluída", {
         pagina: pageNumber,
@@ -772,9 +661,13 @@ async function translateCurrentPage() {
             wrapper.dataset.pageId,
             translatedBubbles
         );
-        if (saved) {
-            removeStoredPageAnalysis(localStorage, chapterAnalysisKey, wrapper.dataset.pageId);
-        }
+        logAIProgress(saved
+            ? "Tradução persistida no navegador"
+            : "Falha ao persistir a tradução no navegador", {
+            pagina: requestedIndex + 1,
+            idioma: settings.language,
+            baloes: translatedBubbles.length
+        });
         setStatus(!saved
             ? "A tradução foi feita, mas não pôde ser salva neste navegador."
             : translatedBubbles.length
@@ -1014,7 +907,6 @@ clearTranslationsButton.addEventListener("click", () => {
         return;
     }
     clearTranslation();
-    analysisCache.clear();
     translationCache.clear();
     translationsVisible = true;
     syncCurrentTranslation();
@@ -1033,7 +925,7 @@ settingsForm.addEventListener("submit", (event) => {
     event.preventDefault();
     const nextSettings = {
         language: languageSelect.value,
-        scope: scopeSelect.value,
+        scope: "current",
         capitalization: capitalizationSelect.value,
         font: fontSelect.value
     };
@@ -1067,6 +959,5 @@ settingsForm.addEventListener("submit", (event) => {
 window.addEventListener("pagehide", () => {
     translationController?.abort("chapter-exit");
     clearTranslation();
-    analysisCache.clear();
     translationCache.clear();
 });

@@ -273,6 +273,28 @@ a {
     gap: 16px;
 }
 
+.management-work-search {
+    flex: 1 1 280px;
+    max-width: 420px;
+}
+
+.management-work-search input {
+    width: 100%;
+    min-height: 42px;
+    padding: 9px 12px;
+    border: 1px solid #ffffff24;
+    border-radius: 8px;
+    outline: none;
+    background: #1e1d20;
+    color: #f6f5f7;
+    font-size: 14px;
+}
+
+.management-work-search input:focus-visible {
+    border-color: #48aaff;
+    box-shadow: 0 0 0 2px #48aaff40;
+}
+
 .work-request-card {
     position: relative;
     display: grid;
@@ -1368,7 +1390,18 @@ a {
     flex: 0 0 102px;
     width: 102px;
     min-width: 102px;
+    cursor: grab;
     scroll-snap-align: start;
+}
+
+.chapter-page-strip .page-preview.is-dragging {
+    opacity: 0.45;
+    cursor: grabbing;
+}
+
+.chapter-page-strip .page-preview.is-drop-target {
+    outline: 2px solid #48aaff;
+    outline-offset: 3px;
 }
 
 .chapter-page-strip .page-preview img {

@@ -381,22 +381,44 @@ h1.titulo-manga { font-size: 26px; margin-bottom: 5px; }
 
 .translated-bubble {
     position: absolute;
+    overflow: hidden;
+    background: #fff;
+    clip-path: ellipse(49% 48% at 50% 50%);
+}
+
+.translated-bubble__text {
+    position: absolute;
+    inset: 10% 12%;
     display: flex;
     align-items: center;
     justify-content: center;
     overflow: hidden;
-    padding: 2px;
-    border-radius: 45%;
     color: #111;
-    background: rgba(255, 255, 255, 0.96);
     text-align: center;
     line-height: 1.05;
     overflow-wrap: anywhere;
     white-space: pre-wrap;
 }
 
-.translated-bubble--square {
-    border-radius: 2px;
+.translated-bubble--rect {
+    clip-path: inset(2% round 8%);
+}
+
+.translated-bubble--rect .translated-bubble__text {
+    inset: 7% 9%;
+}
+
+.translated-bubble--action {
+    clip-path: polygon(
+        50% 0%, 61% 13%, 77% 4%, 79% 21%, 98% 27%,
+        85% 43%, 100% 56%, 81% 65%, 84% 84%, 65% 80%,
+        50% 100%, 38% 82%, 20% 93%, 20% 73%, 1% 67%,
+        15% 51%, 0% 36%, 20% 28%, 19% 9%, 39% 16%
+    );
+}
+
+.translated-bubble--action .translated-bubble__text {
+    inset: 18%;
 }
 
 .translation-container select {

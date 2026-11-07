@@ -329,6 +329,37 @@ a {
     font-size: 12px;
 }
 
+.work-edit-shortcut {
+    display: inline-flex;
+    min-height: 36px;
+    align-items: center;
+    justify-content: center;
+    margin-top: 8px;
+    padding: 0 14px;
+    border: 1px solid #f0b84b80;
+    border-radius: 8px;
+    background: #f0b84b;
+    color: #29231a;
+    font-size: 13px;
+    font-weight: 700;
+    transition: background 150ms ease, transform 150ms ease;
+}
+
+.work-edit-shortcut:hover,
+.work-edit-shortcut:focus-visible {
+    transform: translateY(-1px);
+    background: #ffd071;
+}
+
+.work-edit-shortcut:focus-visible {
+    outline: 2px solid #f0b84b;
+    outline-offset: 3px;
+}
+
+.work-edit-shortcut[hidden] {
+    display: none;
+}
+
 .chapter-section {
     margin-top: 38px;
 }
