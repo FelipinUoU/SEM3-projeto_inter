@@ -3,6 +3,7 @@ import { GoogleGenAI } from '@google/genai';
 import cors from 'cors';
 import express from 'express';
 import fs from 'fs';
+import { randomUUID } from 'node:crypto';
 import { createServer } from 'http';
 import path from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
@@ -10,7 +11,9 @@ import ImageKit from 'imagekit';
 import nodemailer from 'nodemailer';
 import { readChapterArchive } from './chapterArchive.js';
 import { getCachedValue, invalidateCache } from './cache.js';
+import { generateWithProviderFallback } from './geminiFallback.js';
 import { optimizeImageForImageKit } from './imageOptimization.js';
+import { processMangaPage } from './mangaTranslation.js';
 import {
   authenticateNeonSession,
   clearSessionCookie,
@@ -139,7 +142,19 @@ function getConfiguredApiKeys(name) {
   return [...new Set(configuredKeys)];
 }
 const geminiApiKeys = getConfiguredApiKeys('GEMINI_API_KEY');
-const providerTimeoutMs = 180000;
+const geminiModel = process.env.GEMINI_MODEL?.trim() || 'gemini-3.8-flash';
+const providerTimeoutMs = 45000;
+const translationRequestTimeoutMs = 180000;
+const providerMaxAttempts = 2;
+const transientGeminiStatuses = new Set([408, 503, 504]);
+const transientGeminiCodes = new Set(['ECONNRESET', 'ETIMEDOUT', 'EAI_AGAIN']);
+const TRANSLATION_CHECKPOINT_TTL_DAYS = 30;
+const TRANSLATION_CHECKPOINT_CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000;
+let lastTranslationCheckpointCleanupAt = 0;
+const redactApiKeys = (value) => geminiApiKeys.reduce(
+  (message, apiKey) => message.replaceAll(apiKey, '[REDACTED]'),
+  String(value ?? '')
+);
 
 app.use(express.json({ limit: '15mb' }));
 app.use(cors({ origin: '*' }));
@@ -1921,14 +1936,60 @@ function parseProviderJson(text, responseSchema, providerName) {
   return parsed;
 }
 
-async function generateWithProvider(provider, contents, generationConfig, responseSchema, signal) {
+async function cleanupExpiredTranslationCheckpoints(force = false) {
+  if (!force && Date.now() - lastTranslationCheckpointCleanupAt
+    < TRANSLATION_CHECKPOINT_CLEANUP_INTERVAL_MS) return;
+  await pool.query('DELETE FROM public.translation_checkpoints WHERE expires_at <= NOW()');
+  lastTranslationCheckpointCleanupAt = Date.now();
+}
+
+const translationCheckpointStore = {
+  async get(key) {
+    const result = await pool.query(
+      'SELECT payload FROM public.translation_checkpoints WHERE cache_key = $1 AND expires_at > NOW()',
+      [key]
+    );
+    return result.rows[0]?.payload;
+  },
+  async getMany(keys) {
+    if (keys.length === 0) return new Map();
+    const result = await pool.query(
+      'SELECT cache_key, payload FROM public.translation_checkpoints WHERE cache_key = ANY($1::text[]) AND expires_at > NOW()',
+      [keys]
+    );
+    return new Map(result.rows.map(({ cache_key, payload }) => [cache_key, payload]));
+  },
+  async setMany(entries) {
+    if (entries.length === 0) return;
+    const placeholders = entries.map((_, index) => {
+      const keyParameter = index * 2 + 1;
+      return `($${keyParameter}, $${keyParameter + 1}::jsonb, NOW() + INTERVAL '${TRANSLATION_CHECKPOINT_TTL_DAYS} days')`;
+    });
+    const values = entries.flatMap(([key, payload]) => [key, JSON.stringify(payload)]);
+    await pool.query(`
+      INSERT INTO public.translation_checkpoints (cache_key, payload, expires_at)
+      VALUES ${placeholders.join(', ')}
+      ON CONFLICT (cache_key) DO UPDATE
+      SET payload = EXCLUDED.payload,
+          expires_at = EXCLUDED.expires_at,
+          updated_at = NOW()
+    `, values);
+    await cleanupExpiredTranslationCheckpoints().catch((error) => {
+      console.warn('[HokuPédia IA] Falha ao limpar checkpoints expirados', {
+        mensagem: redactApiKeys(error.message)
+      });
+    });
+  }
+};
+
+async function generateWithProvider(provider, contents, generationConfig, responseSchema, signal, timeoutMs) {
   const result = await provider.gemini.models.generateContent({
-    model: 'gemini-3.8-flash',
+    model: geminiModel,
     contents,
     config: {
       ...generationConfig,
       httpOptions: {
-        timeout: providerTimeoutMs,
+        timeout: timeoutMs,
         retryOptions: { attempts: 1 }
       },
       abortSignal: signal
@@ -1952,6 +2013,178 @@ async function generateWithProvider(provider, contents, generationConfig, respon
     promptFeedback: result.promptFeedback
   };
 }
+
+app.post('/api/translate-page', async (req, res) => {
+  const origin = req.get('origin');
+  const serverOrigin = `${req.protocol}://${req.get('host')}`;
+  if (origin && origin !== serverOrigin) {
+    return res.status(403).json({ error: { message: 'A solicitação deve vir do leitor local.' } });
+  }
+
+  const { image, targetLanguage, analysis } = req.body ?? {};
+  if (!image || typeof image.data !== 'string'
+    || !['image/jpeg', 'image/png', 'image/webp', 'image/avif'].includes(image.mimeType)
+    || image.data.length > 14 * 1024 * 1024
+    || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(image.data)) {
+    return res.status(400).json({ error: { message: 'A imagem enviada é inválida ou excede o limite.' } });
+  }
+  const imageBuffer = Buffer.from(image.data, 'base64');
+  if (!imageBuffer.length || imageBuffer.length > 10 * 1024 * 1024) {
+    return res.status(413).json({ error: { message: 'A imagem deve ter no máximo 10 MB.' } });
+  }
+  if (typeof targetLanguage !== 'string' || targetLanguage.trim().length > 80) {
+    return res.status(400).json({ error: { message: 'Informe um idioma de destino válido.' } });
+  }
+
+  const abortController = new AbortController();
+  const requestId = randomUUID().slice(0, 8);
+  const requestStartedAt = Date.now();
+  const requestDeadlineAt = requestStartedAt + translationRequestTimeoutMs;
+  const log = (event, details = {}) => {
+    console.info(`[HokuPédia IA][${requestId}] ${event}`, details);
+  };
+  res.on('close', () => {
+    if (!res.writableEnded) {
+      abortController.abort();
+      log('Conexão com o leitor encerrada antes da resposta', {
+        duracaoMs: Date.now() - requestStartedAt
+      });
+    }
+  });
+
+  log('Solicitação recebida', {
+    idiomaDestino: targetLanguage.trim(),
+    tamanhoImagemBytes: imageBuffer.length,
+    analiseFornecida: Boolean(analysis),
+    limiteTotalMs: translationRequestTimeoutMs,
+    modelo: geminiModel
+  });
+  try {
+    const result = await processMangaPage({
+      buffer: imageBuffer,
+      targetLanguage,
+      requestId,
+      suppliedAnalysis: analysis,
+      signal: abortController.signal,
+      checkpointStore: translationCheckpointStore,
+      generateJson: async ({ parts, responseSchema, maxOutputTokens, signal }) => {
+        if (geminiApiKeys.length === 0) {
+          const error = new Error('Configure ao menos uma chave GEMINI_API_KEY válida no arquivo .env.');
+          error.status = 503;
+          throw error;
+        }
+        const stage = responseSchema?.properties?.detectedLanguage
+          ? 'detecção de balões'
+          : 'transcrição/tradução dos balões';
+        const providers = geminiApiKeys.map((apiKey, index) => ({
+            name: `Gemini (chave ${index + 1})`,
+            gemini: new GoogleGenAI({ apiKey })
+          }));
+        const attempts = new Map();
+        const attemptStartedAt = new Map();
+        return generateWithProviderFallback({
+          providers,
+          requestDeadlineAt,
+          providerTimeoutMs,
+          maxAttempts: providerMaxAttempts,
+          signal,
+          generate: async (provider, timeoutMs) => {
+            const attempt = attempts.get(provider);
+            const startedAt = Date.now();
+            attemptStartedAt.set(provider, startedAt);
+            const waitingInterval = setInterval(() => {
+              log('Aguardando resposta do Gemini', {
+                etapa: stage,
+                provedor: provider.name,
+                tentativa: `${attempt}/${providerMaxAttempts}`,
+                segundos: Math.floor((Date.now() - startedAt) / 1000),
+                tempoRestanteMs: Math.max(0, requestDeadlineAt - Date.now())
+              });
+            }, 30000);
+            try {
+              const response = await generateWithProvider(
+                provider,
+                [{ parts }],
+                {
+                  maxOutputTokens,
+                  responseMimeType: 'application/json',
+                  responseSchema,
+                  thinkingConfig: { thinkingLevel: 'LOW' }
+                },
+                responseSchema,
+                signal,
+                timeoutMs
+              );
+              log('Resposta do Gemini recebida', {
+                etapa: stage,
+                provedor: provider.name,
+                tentativa: `${attempt}/${providerMaxAttempts}`,
+                duracaoMs: Date.now() - startedAt,
+                motivoFinalizacao: response.candidates[0].finishReason
+              });
+              return response.candidates[0].content.parts[0].text;
+            } catch (error) {
+              if (signal.aborted || error.name === 'AbortError') {
+                log('Chamada ao Gemini cancelada', {
+                  etapa: stage,
+                  provedor: provider.name,
+                  tentativa: `${attempt}/${providerMaxAttempts}`,
+                  duracaoMs: Date.now() - startedAt
+                });
+              }
+              throw error;
+            } finally {
+              clearInterval(waitingInterval);
+            }
+          },
+          shouldRetry: (error) => transientGeminiStatuses.has(error.status)
+            || transientGeminiCodes.has(error.code),
+          waitBeforeRetry: (retrySignal) => waitForRetry(1000, retrySignal),
+          onAttempt: ({ provider, attempt, timeoutMs, remainingMs }) => {
+            attempts.set(provider, attempt);
+            log('Chamada ao Gemini iniciada', {
+              etapa: stage,
+              provedor: provider.name,
+              tentativa: `${attempt}/${providerMaxAttempts}`,
+              timeoutMs,
+              tempoRestanteMs: remainingMs
+            });
+          },
+          onFailure: ({ provider, attempt, error, willRetry }) => {
+            log('Chamada ao Gemini falhou', {
+              etapa: stage,
+              provedor: provider.name,
+              tentativa: `${attempt}/${providerMaxAttempts}`,
+              duracaoMs: Date.now() - (attemptStartedAt.get(provider) || Date.now()),
+              httpStatus: error.status,
+              codigo: error.code,
+              mensagem: redactApiKeys(error.message),
+              novaTentativa: willRetry
+            });
+          }
+        });
+      }
+    });
+    if (abortController.signal.aborted || res.writableEnded) return;
+    log('Resposta enviada ao leitor', {
+      baloes: result.bubbles.length,
+      duracaoMs: Date.now() - requestStartedAt
+    });
+    return res.json(result);
+  } catch (error) {
+    if (abortController.signal.aborted || error.name === 'AbortError') return;
+    const status = Number.isInteger(error.status) && error.status >= 400 && error.status < 600
+      ? error.status
+      : 502;
+    log('Solicitação encerrada com erro', {
+      status,
+      duracaoMs: Date.now() - requestStartedAt,
+      mensagem: redactApiKeys(error.message)
+    });
+    console.error(`Manga translation failed (HTTP ${status}):`, redactApiKeys(error.stack || error.message));
+    return res.status(status).json({ error: { message: error.message || 'Não foi possível traduzir esta página.' } });
+  }
+});
 
 app.post('/api/gemini', async (req, res) => {
   const origin = req.get('origin');
@@ -2051,7 +2284,8 @@ async function startServer() {
       SELECT id, user_id, user_auth_id, motivos, idiomas_preferencia, status FROM moderation_requests LIMIT 0;
       SELECT id, user_id, user_auth_id, moderator_id, moderator_auth_id, nome_obra, author, sinopse, cover_url, cover_file_id, gender, formato, status FROM work_requests LIMIT 0;
       SELECT token_hash FROM auth_sessions LIMIT 0;
-      SELECT challenge_id FROM password_recovery_tokens LIMIT 0
+      SELECT challenge_id FROM password_recovery_tokens LIMIT 0;
+      SELECT cache_key, payload, expires_at, updated_at FROM public.translation_checkpoints LIMIT 0
     `);
     await pool.query(
       'UPDATE users SET role = $1, updated_at = NOW() WHERE LOWER(email) = $2 AND role <> $1',
@@ -2065,6 +2299,7 @@ async function startServer() {
     }
     throw error;
   }
+  await cleanupExpiredTranslationCheckpoints(true);
   if (!Number.isSafeInteger(MAX_UPLOAD_BYTES) || MAX_UPLOAD_BYTES < 1
     || !Number.isSafeInteger(MAX_CHAPTER_PAGES) || MAX_CHAPTER_PAGES < 1
     || !Number.isSafeInteger(MAX_CHAPTER_ARCHIVE_BYTES) || MAX_CHAPTER_ARCHIVE_BYTES < 1) {

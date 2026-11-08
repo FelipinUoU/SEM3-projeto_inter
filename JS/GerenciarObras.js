@@ -94,6 +94,8 @@ const imagePreviewImage = document.querySelector("#imagePreviewImage");
 const pageTitle = document.querySelector("#pageTitle");
 const workManagementRegion = document.querySelector("#workManagementRegion");
 const moderationRequestRegion = document.querySelector("#moderationRequestRegion");
+const managementWorkSearch = document.querySelector("#managementWorkSearch");
+const managementWorkSearchRegion = managementWorkSearch.closest(".management-work-search");
 const moderationForm = document.querySelector("#moderationForm");
 const requestStatus = document.querySelector("#requestStatus");
 const requestStatusTitle = document.querySelector("#requestStatusTitle");
@@ -108,6 +110,7 @@ let selectedArchive;
 let selectedArchivePages;
 let selectedChapterImages = [];
 let selectedChapterExistingPages = [];
+let selectedChapterPageOrder = [];
 let selectedCoverFile;
 const pendingChapterSubmissions = new WeakSet();
 let coverPreviewUrl;
@@ -290,6 +293,7 @@ function renderWorkCard(work) {
     const card = document.createElement("article");
     card.className = "work-card";
     card.dataset.workId = work.id;
+    card.dataset.searchTitle = normalizeWorkSearch(work.title);
 
     const cover = document.createElement("div");
     cover.className = "work-cover";
@@ -472,6 +476,40 @@ function renderWorks() {
         workList.append(renderWorkRequestCard(request));
     }
     for (const work of works) workList.append(renderWorkCard(work));
+    applyWorkSearch();
+}
+
+function normalizeWorkSearch(value) {
+    return String(value || "")
+        .trim()
+        .toLocaleLowerCase("pt-BR")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "");
+}
+
+function applyWorkSearch() {
+    const query = normalizeWorkSearch(managementWorkSearch.value);
+    const cards = [...workList.querySelectorAll(".work-card")];
+    let visibleCount = 0;
+    for (const card of cards) {
+        const matches = !query || card.dataset.searchTitle.includes(query);
+        card.hidden = !matches;
+        if (matches) visibleCount += 1;
+    }
+
+    let emptyMessage = workList.querySelector("[data-search-empty]");
+    if (query && works.length > 0 && visibleCount === 0) {
+        if (!emptyMessage) {
+            emptyMessage = document.createElement("p");
+            emptyMessage.className = "empty-works";
+            emptyMessage.dataset.searchEmpty = "true";
+            emptyMessage.setAttribute("role", "status");
+            workList.append(emptyMessage);
+        }
+        emptyMessage.textContent = "Nenhuma obra gerenciável corresponde à pesquisa.";
+    } else {
+        emptyMessage?.remove();
+    }
 }
 
 function getKnownWorksForAuthorSuggestions() {
@@ -939,15 +977,17 @@ function renderChapterForm(work, chapter, targetRegion) {
     selectedChapterImages = [];
     selectedChapterExistingPages = (chapter?.pages || []).map((page) => {
         if (typeof page === "string") {
-            return { name: "Página", url: page, fileId: "", format: "" };
+            return { source: "existing", name: "Página", url: page, fileId: "", format: "" };
         }
         return {
             ...page,
+            source: "existing",
             name: page.name || page.originalName || "Página",
             url: page.url || page.imageUrl || "",
             fileId: page.fileId || page.imageFileId || ""
         };
     });
+    selectedChapterPageOrder = [...selectedChapterExistingPages];
 
     const panel = createEditorPanel(chapter ? "Editar Capítulo" : `Novo Capítulo — ${work.title}`);
     const form = document.createElement("form");
@@ -1013,11 +1053,12 @@ function renderChapterForm(work, chapter, targetRegion) {
     gallery.className = "chapter-page-gallery";
     const formatsHint = document.createElement("p");
     formatsHint.className = "chapter-page-formats";
-    formatsHint.textContent = "Formatos aceitos: JPG, PNG, GIF, WEBP, AVIF e ZIP.";
+    formatsHint.textContent = "Formatos aceitos: JPG, PNG, GIF, WEBP, AVIF e ZIP. Arraste as imagens para reordenar.";
     const pageStrip = document.createElement("div");
     pageStrip.className = "chapter-page-strip";
     pageStrip.setAttribute("role", "list");
     pageStrip.setAttribute("aria-label", "Imagens do capítulo");
+    let draggedPageIndex = -1;
     const selectedFilesLabel = document.createElement("p");
     selectedFilesLabel.className = "selected-files chapter-page-status";
     selectedFilesLabel.setAttribute("role", "status");
@@ -1027,29 +1068,23 @@ function renderChapterForm(work, chapter, targetRegion) {
 
     function renderChapterPages() {
         pageStrip.replaceChildren();
-        const pages = selectedChapterExistingPages.map((page, index) => ({
-            ...page,
-            source: "existing",
-            index
-        })).concat(selectedChapterImages.map((image, index) => ({
-            name: image.file.name,
-            url: image.previewUrl,
-            source: "selected",
-            index
-        })));
-
-        for (const page of pages) {
+        for (const [index, page] of selectedChapterPageOrder.entries()) {
             const card = document.createElement("figure");
             card.className = "page-preview";
             card.setAttribute("role", "listitem");
+            card.draggable = true;
+            card.dataset.pageIndex = String(index);
+            card.title = "Arraste para reorganizar";
             const openButton = document.createElement("button");
             openButton.className = "page-preview-open";
             openButton.type = "button";
-            openButton.dataset.imagePreviewUrl = page.url;
-            openButton.setAttribute("aria-label", `Visualizar ${page.name}`);
             const image = document.createElement("img");
-            image.src = page.url;
-            image.alt = page.name;
+            const pageName = page.source === "selected" ? page.file.name : page.name;
+            const pageUrl = page.source === "selected" ? page.previewUrl : page.url;
+            openButton.dataset.imagePreviewUrl = pageUrl;
+            openButton.setAttribute("aria-label", `Visualizar ${pageName}`);
+            image.src = pageUrl;
+            image.alt = pageName;
             openButton.append(image);
             card.append(openButton);
 
@@ -1057,13 +1092,13 @@ function renderChapterForm(work, chapter, targetRegion) {
             removeButton.className = "page-preview-remove";
             removeButton.type = "button";
             removeButton.dataset.removePage = page.source;
-            removeButton.dataset.pageIndex = String(page.index);
-            removeButton.setAttribute("aria-label", `Remover ${page.name}`);
+            removeButton.dataset.pageIndex = String(index);
+            removeButton.setAttribute("aria-label", `Remover ${pageName}`);
             removeButton.textContent = "×";
             card.append(removeButton);
 
             const caption = document.createElement("figcaption");
-            caption.textContent = page.name;
+            caption.textContent = pageName;
             card.append(caption);
             pageStrip.append(card);
         }
@@ -1090,7 +1125,7 @@ function renderChapterForm(work, chapter, targetRegion) {
             pageStrip.append(archiveCard);
         }
 
-        const pageCount = selectedChapterExistingPages.length + selectedChapterImages.length;
+        const pageCount = selectedChapterPageOrder.length;
         selectedFilesLabel.textContent = selectedArchive
             ? `ZIP selecionado: ${selectedArchive.name}. As páginas serão adicionadas ao capítulo.`
             : pageCount
@@ -1117,11 +1152,14 @@ function renderChapterForm(work, chapter, targetRegion) {
                 showFeedback("Selecione imagens JPG, PNG, GIF, WEBP ou AVIF.", true);
                 return;
             }
-            selectedChapterImages.push(...files.map((file) => ({
+            const images = files.map((file) => ({
+                source: "selected",
                 file,
                 previewUrl: URL.createObjectURL(file),
                 uploadedPage: undefined
-            })));
+            }));
+            selectedChapterImages.push(...images);
+            selectedChapterPageOrder.push(...images);
         }
         showFeedback("");
         renderChapterPages();
@@ -1139,13 +1177,51 @@ function renderChapterForm(work, chapter, targetRegion) {
         if (removePage === "archive") {
             selectedArchive = undefined;
             selectedArchivePages = undefined;
-        } else if (removePage === "existing") {
-            selectedChapterExistingPages.splice(Number(pageIndex), 1);
-        } else if (removePage === "selected") {
-            const [removed] = selectedChapterImages.splice(Number(pageIndex), 1);
-            if (removed) URL.revokeObjectURL(removed.previewUrl);
+        } else {
+            const [removed] = selectedChapterPageOrder.splice(Number(pageIndex), 1);
+            if (removed?.source === "existing") {
+                selectedChapterExistingPages = selectedChapterExistingPages.filter((page) => page !== removed);
+            } else if (removed?.source === "selected") {
+                selectedChapterImages = selectedChapterImages.filter((image) => image !== removed);
+                URL.revokeObjectURL(removed.previewUrl);
+            }
         }
         renderChapterPages();
+    });
+
+    pageStrip.addEventListener("dragstart", (event) => {
+        const card = event.target.closest(".page-preview[data-page-index]");
+        if (!card || !event.dataTransfer) return;
+        draggedPageIndex = Number(card.dataset.pageIndex);
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData("text/plain", String(draggedPageIndex));
+        card.classList.add("is-dragging");
+    });
+    pageStrip.addEventListener("dragover", (event) => {
+        const card = event.target.closest(".page-preview[data-page-index]");
+        if (!card || draggedPageIndex < 0) return;
+        event.preventDefault();
+        event.stopPropagation();
+        pageStrip.querySelectorAll(".page-preview.is-drop-target")
+            .forEach((item) => item.classList.remove("is-drop-target"));
+        card.classList.add("is-drop-target");
+    });
+    pageStrip.addEventListener("drop", (event) => {
+        const card = event.target.closest(".page-preview[data-page-index]");
+        if (!card || draggedPageIndex < 0) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const targetIndex = Number(card.dataset.pageIndex);
+        const [movedPage] = selectedChapterPageOrder.splice(draggedPageIndex, 1);
+        if (!movedPage) return;
+        selectedChapterPageOrder.splice(targetIndex, 0, movedPage);
+        draggedPageIndex = -1;
+        renderChapterPages();
+    });
+    pageStrip.addEventListener("dragend", () => {
+        draggedPageIndex = -1;
+        pageStrip.querySelectorAll(".page-preview.is-dragging, .page-preview.is-drop-target")
+            .forEach((card) => card.classList.remove("is-dragging", "is-drop-target"));
     });
 
     uploadArea.addEventListener("dragover", (event) => {
@@ -1158,7 +1234,8 @@ function renderChapterForm(work, chapter, targetRegion) {
     uploadArea.addEventListener("drop", (event) => {
         event.preventDefault();
         uploadArea.classList.remove("is-dragging");
-        addChapterFiles([...(event.dataTransfer?.files || [])]);
+        const files = [...(event.dataTransfer?.files || [])];
+        if (files.length > 0) addChapterFiles(files);
     });
 
     renderChapterPages();
@@ -1219,6 +1296,7 @@ function closeEditor() {
     selectedChapterImages.forEach((image) => URL.revokeObjectURL(image.previewUrl));
     selectedChapterImages = [];
     selectedChapterExistingPages = [];
+    selectedChapterPageOrder = [];
     selectedCoverFile = undefined;
     if (coverPreviewUrl) URL.revokeObjectURL(coverPreviewUrl);
     coverPreviewUrl = undefined;
@@ -1359,7 +1437,7 @@ async function handleChapterSubmit(form) {
         showFeedback("Informe um número de capítulo inteiro maior que zero.", true);
         return;
     }
-    let pages = [...selectedChapterExistingPages];
+    let pages = [...selectedChapterPageOrder];
     if (!selectedArchive && selectedChapterImages.length === 0 && pages.length === 0) {
         showFeedback("Adicione ao menos uma imagem ou um arquivo ZIP com as páginas do capítulo.", true);
         return;
@@ -1381,7 +1459,6 @@ async function handleChapterSubmit(form) {
                 showOperationProgress("Enviando e processando as páginas do ZIP. Aguarde; isso pode levar alguns minutos conforme o tamanho do arquivo.");
                 ({ pages: selectedArchivePages } = await uploadChapterArchive(selectedArchive));
             }
-            pages.push(...selectedArchivePages);
         }
         for (const [index, image] of selectedChapterImages.entries()) {
             if (!image.uploadedPage) {
@@ -1389,8 +1466,19 @@ async function handleChapterSubmit(form) {
                 showOperationProgress(`Enviando imagem ${index + 1} de ${selectedChapterImages.length}. Aguarde.`);
                 image.uploadedPage = await uploadImage(image.file);
             }
-            pages.push(image.uploadedPage);
         }
+        pages = selectedChapterPageOrder.concat(
+            (selectedArchivePages || []).map((page) => ({ ...page, source: "archive" }))
+        );
+        pages = pages.map((page) => {
+            const uploadedPage = page.source === "selected" ? page.uploadedPage : page;
+            return {
+                name: uploadedPage.name,
+                url: uploadedPage.url,
+                fileId: uploadedPage.fileId,
+                format: uploadedPage.format
+            };
+        });
         if (pages.length === 0) {
             showFeedback("Adicione ao menos uma imagem ao capítulo.", true);
             return;
@@ -1556,6 +1644,7 @@ async function handleAction(action, card, chapterRow, actionButton) {
 }
 
 addWorkButton.addEventListener("click", () => handleAction("add-work"));
+managementWorkSearch.addEventListener("input", applyWorkSearch);
 managementPage.addEventListener("click", (event) => {
     const button = event.target.closest("button[data-action]");
     if (!button) return;
@@ -1637,12 +1726,23 @@ async function initializeManagementPage() {
             return;
         }
 
+        managementWorkSearchRegion.hidden = false;
         workManagementRegion.hidden = false;
         moderationRequestRegion.hidden = true;
         addWorkButton.innerHTML = isAdmin
             ? '<span aria-hidden="true">＋</span> Adicionar Obra'
             : '<span aria-hidden="true">＋</span> Solicitar Obra';
         await loadWorks();
+        const requestedWorkId = new URLSearchParams(window.location.search).get("obra");
+        const requestedWork = works.find((work) => (
+            work.id === requestedWorkId && work.createBy === currentUserId
+        ));
+        if (requestedWork) {
+            setEditor("work", requestedWork.id);
+            workList.querySelector(
+                `.work-editor-region[data-work-id="${CSS.escape(requestedWork.id)}"]`
+            )?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
         if (!isAdmin) await loadWorkRequest();
     } catch (error) {
         if (error.code === 401) {

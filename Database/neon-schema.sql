@@ -96,3 +96,13 @@ CREATE TABLE IF NOT EXISTS public.password_recovery_tokens (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS password_recovery_expiry_index ON public.password_recovery_tokens(expires_at);
+
+CREATE TABLE IF NOT EXISTS public.translation_checkpoints (
+  cache_key TEXT PRIMARY KEY,
+  payload JSONB NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS translation_checkpoints_expiry_index
+  ON public.translation_checkpoints(expires_at);
