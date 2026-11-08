@@ -143,8 +143,8 @@ function getConfiguredApiKeys(name) {
 }
 const geminiApiKeys = getConfiguredApiKeys('GEMINI_API_KEY');
 const geminiModel = process.env.GEMINI_MODEL?.trim() || 'gemini-3.8-flash';
-const providerTimeoutMs = 45000;
-const translationRequestTimeoutMs = 180000;
+const providerTimeoutMs = 7 * 60 * 1000;
+const translationRequestTimeoutMs = 7 * 60 * 1000;
 const providerMaxAttempts = 2;
 const transientGeminiStatuses = new Set([408, 503, 504]);
 const transientGeminiCodes = new Set(['ECONNRESET', 'ETIMEDOUT', 'EAI_AGAIN']);
@@ -943,6 +943,7 @@ app.get('/api/works', async (req, res) => {
           status: chapter.status,
           createdAt: chapter.$createdAt,
           author: chapterAuthors.get(chapter.createBy) || 'Usuário desconhecido',
+          createBy: chapter.createBy,
           pages
         });
         chaptersByWork.set(chapter.workId, workChapters);
@@ -957,7 +958,7 @@ app.get('/api/works', async (req, res) => {
           description: getWorkAttribute(work.Description),
           cover: getWorkAttribute(work.coverUrl),
           createdAt: work.$createdAt,
-          coverFileId: '',
+          coverFileId: work.coverFileId || '',
           chapters: (chaptersByWork.get(work.$id) || [])
             .sort((left, right) => left.number - right.number)
         }))
@@ -971,11 +972,9 @@ app.get('/api/works', async (req, res) => {
 
 app.get('/api/management/works', requireAuthenticatedUser, requireModeratorUser, async (req, res) => {
   try {
-    const userId = req.appwriteUser.$id;
-    const isAdmin = isAdminUser(req.appwriteUser);
     const [workDocuments, chapterDocuments] = await Promise.all([
-      listAllDocuments(worksCollectionId, isAdmin ? [] : [Query.equal('createBy', userId)]),
-      listAllDocuments(chaptersCollectionId, [Query.equal('createBy', userId)])
+      listAllDocuments(worksCollectionId),
+      listAllDocuments(chaptersCollectionId)
     ]);
     const workIds = new Set(workDocuments.map((work) => work.$id));
     const managedChapters = chapterDocuments.filter((chapter) => (
@@ -1027,7 +1026,7 @@ app.get('/api/management/works', requireAuthenticatedUser, requireModeratorUser,
         formato: work.formato ?? '',
         description: getWorkAttribute(work.Description),
         cover: getWorkAttribute(work.coverUrl),
-        coverFileId: '',
+        coverFileId: work.coverFileId || '',
         createBy: work.createBy,
         chapters: (chaptersByWork.get(work.$id) || [])
           .sort((left, right) => left.number - right.number)
@@ -1060,7 +1059,8 @@ app.post('/api/works', requireAuthenticatedUser, requireAdminUser, async (req, r
         gender: gender.trim(),
         formato,
         Description: [description],
-        coverUrl: [cover]
+        coverUrl: [cover],
+        coverFileId
       }
     );
     return res.status(201).json({
@@ -1072,7 +1072,7 @@ app.post('/api/works', requireAuthenticatedUser, requireAdminUser, async (req, r
         formato: document.formato ?? '',
         description: getWorkAttribute(document.Description),
         cover: getWorkAttribute(document.coverUrl),
-        coverFileId: '',
+        coverFileId: document.coverFileId || '',
         createBy: document.createBy,
         chapters: []
       }
@@ -1094,7 +1094,7 @@ app.put('/api/works/:id', requireAuthenticatedUser, requireModeratorUser, async 
   }
   try {
     const currentWork = await databases.getDocument(appwriteDatabaseId, worksCollectionId, req.params.id);
-    if (!ownsDocument(req.appwriteUser, currentWork)) {
+    if (!ownsDocument(req.appwriteUser, currentWork) && !isAdminUser(req.appwriteUser)) {
       return res.status(403).json({ error: 'Você só pode editar obras criadas pela sua conta.' });
     }
     const document = await databases.updateDocument(
@@ -1107,7 +1107,8 @@ app.put('/api/works/:id', requireAuthenticatedUser, requireModeratorUser, async 
         gender: gender.trim(),
         formato,
         Description: [description],
-        coverUrl: [cover]
+        coverUrl: [cover],
+        coverFileId
       }
     );
     return res.json({
@@ -1119,7 +1120,7 @@ app.put('/api/works/:id', requireAuthenticatedUser, requireModeratorUser, async 
         formato: document.formato ?? '',
         description: getWorkAttribute(document.Description),
         cover: getWorkAttribute(document.coverUrl),
-        coverFileId: '',
+        coverFileId: document.coverFileId || '',
         createBy: document.createBy
       }
     });
@@ -1231,10 +1232,7 @@ app.post('/api/works/:workId/chapters', requireAuthenticatedUser, requireModerat
   const validationError = getChapterValidationError(number, title, language, pages);
   if (validationError) return res.status(400).json({ error: validationError });
   try {
-    const work = await databases.getDocument(appwriteDatabaseId, worksCollectionId, req.params.workId);
-    if (!ownsDocument(req.appwriteUser, work)) {
-      return res.status(403).json({ error: 'Você só pode adicionar capítulos às suas próprias obras.' });
-    }
+    await databases.getDocument(appwriteDatabaseId, worksCollectionId, req.params.workId);
     const chapter = await databases.createDocument(
       appwriteDatabaseId,
       chaptersCollectionId,
@@ -1308,63 +1306,28 @@ app.put('/api/chapters/:id', requireAuthenticatedUser, requireModeratorUser, asy
       chaptersCollectionId,
       req.params.id
     );
-    if (!ownsDocument(req.appwriteUser, existingChapter)) {
+    if (!ownsDocument(req.appwriteUser, existingChapter) && !isAdminUser(req.appwriteUser)) {
       return res.status(403).json({ error: 'Você só pode editar capítulos criados pela sua conta.' });
     }
     const author = await getChapterAuthorName(existingChapter.createBy);
-    const existingPages = await listAllDocuments(pagesCollectionId, [
-      Query.equal('chapterId', req.params.id)
-    ]);
-    const createdPages = [];
-    let chapter;
-    try {
-      for (const [position, page] of pages.entries()) {
-        const document = await databases.createDocument(
-          appwriteDatabaseId,
-          pagesCollectionId,
-          ID.unique(),
-          {
-            chapterId: req.params.id,
-            number: position + 1,
-            originalName: page.name,
-            imageUrl: page.url,
-            imageFileId: page.fileId,
-            format: page.format
-          }
-        );
-        createdPages.push(document);
+    const { existingPages, createdPages, chapter } = await databases.replaceChapterPages(
+      req.params.id,
+      pages.map((page) => ({
+        originalName: page.name,
+        imageUrl: page.url,
+        imageFileId: page.fileId,
+        format: page.format
+      })),
+      {
+        number,
+        title: [title],
+        language,
+        pageCount: pages.length,
+        status: 'published'
       }
-      chapter = await databases.updateDocument(
-        appwriteDatabaseId,
-        chaptersCollectionId,
-        req.params.id,
-        {
-          number,
-          title: [title],
-          language,
-          pageCount: pages.length,
-          status: 'published'
-        }
-      );
-    } catch (error) {
-      await Promise.allSettled(createdPages.map((page) => (
-        databases.deleteDocument(appwriteDatabaseId, pagesCollectionId, page.$id)
-      )));
-      throw error;
-    }
-    const cleanupResults = await Promise.allSettled(existingPages.map((page) => (
-      databases.deleteDocument(appwriteDatabaseId, pagesCollectionId, page.$id)
-    )));
-    const successfullyDeletedPages = [];
-    cleanupResults.forEach((result, index) => {
-      if (result.status === 'rejected') {
-        console.error('Could not delete a replaced chapter page:', result.reason);
-        return;
-      }
-      successfullyDeletedPages.push(existingPages[index]);
-    });
+    );
     const retainedFileIds = new Set(pages.map((page) => page.fileId).filter(Boolean));
-    const removedImagePages = successfullyDeletedPages.filter((page) => (
+    const removedImagePages = existingPages.filter((page) => (
       page.imageFileId && !retainedFileIds.has(page.imageFileId)
     ));
     const imageCleanupResults = await Promise.allSettled(removedImagePages.map((page) => (
@@ -1375,8 +1338,7 @@ app.put('/api/chapters/:id', requireAuthenticatedUser, requireModeratorUser, asy
         console.error('Could not delete a removed chapter image from ImageKit:', result.reason);
       }
     });
-    const cleanupWarning = cleanupResults.some((result) => result.status === 'rejected')
-      || imageCleanupResults.some((result) => result.status === 'rejected')
+    const cleanupWarning = imageCleanupResults.some((result) => result.status === 'rejected')
       ? 'Capítulo salvo, mas algumas imagens removidas não puderam ser excluídas do armazenamento.'
       : undefined;
     return res.json({
@@ -1408,7 +1370,7 @@ app.delete('/api/chapters/:id', requireAuthenticatedUser, requireModeratorUser, 
   let deletionStep = 'carregar capítulo';
   try {
     const chapter = await databases.getDocument(appwriteDatabaseId, chaptersCollectionId, req.params.id);
-    if (!ownsDocument(req.appwriteUser, chapter)) {
+    if (!ownsDocument(req.appwriteUser, chapter) && !isAdminUser(req.appwriteUser)) {
       return res.status(403).json({ error: 'Você só pode excluir capítulos criados pela sua conta.' });
     }
     deletionStep = 'carregar páginas do capítulo';

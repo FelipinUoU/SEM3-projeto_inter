@@ -76,7 +76,7 @@ body > header.menu-lateral-header {
 }
 
 .about-hero h2 {
-    max-width: 760px;
+    max-width: 62%;
     margin: 0;
     font-size: clamp(34px, 5vw, 58px);
     line-height: 1.08;
@@ -88,10 +88,22 @@ body > header.menu-lateral-header {
 }
 
 .about-intro {
-    max-width: 650px;
+    max-width: 58%;
     margin: 22px 0 0;
     color: #e0dce5;
     font: 17px/1.75 Arial, sans-serif;
+}
+
+.about-hero__logo {
+    position: absolute;
+    top: 50%;
+    right: clamp(28px, 6vw, 68px);
+    z-index: 1;
+    width: clamp(150px, 25%, 250px);
+    aspect-ratio: 1;
+    object-fit: contain;
+    transform: translateY(-50%);
+    mix-blend-mode: screen;
 }
 
 .about-project,
@@ -286,6 +298,21 @@ body > header.menu-lateral-header {
     .about-hero {
         padding: 32px 24px;
         border-radius: 20px;
+    }
+
+    .about-hero h2,
+    .about-intro {
+        max-width: none;
+    }
+
+    .about-hero__logo {
+        position: relative;
+        top: auto;
+        right: auto;
+        display: block;
+        width: clamp(130px, 50%, 190px);
+        margin: 24px auto 0;
+        transform: none;
     }
 
     .about-intro {

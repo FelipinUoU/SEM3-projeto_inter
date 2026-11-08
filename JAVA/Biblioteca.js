@@ -1,4 +1,4 @@
-import fallbackCover from "../Img/Capa.jpg";
+import fallbackCover from "../Img/LogoCnome.png";
 import { getCurrentLibraryUser, loadUserLibrary } from "../JS/userLibrary.js";
 
 const latestReadGrid = document.getElementById("latestReadGrid");

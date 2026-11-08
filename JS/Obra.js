@@ -1,10 +1,12 @@
 import { createAuthorIcon } from "./authorIcon.js";
 import { setExpandableDescription } from "./expandableDescription.js";
 import { apiRequest } from "./apiRequest.js";
+import { groupChaptersByNumber } from "./chapterGroups.js";
 import {
     getCurrentLibraryUser,
     loadAnonymousReadChapters,
     loadUserLibrary,
+    queueFavoriteAfterLogin,
     toggleFavorite
 } from "./userLibrary.js";
 
@@ -157,7 +159,14 @@ async function updateWorkEditShortcut(work) {
 
 favoriteButton.addEventListener("click", () => {
     if (!currentUser) {
-        window.location.assign("/HTML/CadLog.html?mode=login");
+        if (!currentWork) return;
+        try {
+            queueFavoriteAfterLogin(currentWork.id);
+            window.location.assign("/HTML/CadLog.html?mode=login");
+        } catch (error) {
+            console.error("Não foi possível guardar o pedido de favorito:", error);
+            favoriteFeedback.textContent = "Não foi possível guardar seu pedido. Tente novamente.";
+        }
         return;
     }
     if (!currentWork) return;
@@ -271,15 +280,7 @@ async function renderChapters() {
     }
 
     const openedChapters = loadOpenedChapters();
-    const chapterGroups = new Map();
-    for (const [index, chapter] of work.chapters.entries()) {
-        const number = Number.isInteger(chapter.number) && chapter.number > 0
-            ? chapter.number
-            : index + 1;
-        const group = chapterGroups.get(number) || [];
-        group.push({ chapter, index });
-        chapterGroups.set(number, group);
-    }
+    const chapterGroups = groupChaptersByNumber(work.chapters);
 
     for (const [number, versions] of chapterGroups) {
         const card = document.createElement("section");

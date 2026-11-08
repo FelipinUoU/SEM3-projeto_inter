@@ -2,6 +2,7 @@ import { account } from "./JAVA/authClient.js";
 
 const libraryStoragePrefix = "hokupedia.userLibrary.v1.";
 const anonymousReadChaptersKey = "hokupedia.readChapters.v1";
+const pendingFavoriteKey = "hokupedia.pendingFavorite.v1";
 
 function isReadEntry(entry) {
     return entry && typeof entry.workId === "string"
@@ -92,4 +93,33 @@ export function toggleFavorite(userId, workId) {
         : [...library.favorites, workId];
     saveUserLibrary(userId, library);
     return !isFavorite;
+}
+
+export function addFavorite(userId, workId) {
+    if (typeof workId !== "string" || !workId) {
+        throw new Error("Não foi possível identificar a obra favorita.");
+    }
+
+    const library = loadUserLibrary(userId);
+    if (library.favorites.includes(workId)) return false;
+
+    library.favorites.push(workId);
+    saveUserLibrary(userId, library);
+    return true;
+}
+
+export function queueFavoriteAfterLogin(workId) {
+    if (typeof workId !== "string" || !workId) {
+        throw new Error("Não foi possível identificar a obra favorita.");
+    }
+    sessionStorage.setItem(pendingFavoriteKey, workId);
+}
+
+export function completePendingFavorite(userId) {
+    const workId = sessionStorage.getItem(pendingFavoriteKey);
+    if (workId === null) return null;
+
+    addFavorite(userId, workId);
+    sessionStorage.removeItem(pendingFavoriteKey);
+    return workId;
 }

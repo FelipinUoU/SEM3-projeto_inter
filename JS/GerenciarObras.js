@@ -1,4 +1,5 @@
 import { createAuthorIcon } from "./authorIcon.js";
+import { groupChaptersByNumber } from "./chapterGroups.js";
 import { findSimilarAuthorSuggestions } from "./authorSuggestions.js";
 import { apiRequest } from "./apiRequest.js";
 import { confirmInPage } from "./confirmationDialog.js";
@@ -328,12 +329,8 @@ function renderWorkCard(work) {
     hubLink.href = `/HTML/Obra.html?obra=${encodeURIComponent(work.id)}`;
     hubLink.textContent = "Ver Obra";
     actions.append(hubLink);
-    if (canManageWork) {
-        actions.append(
-            createButton("✎ Editar", "edit-work", "text-action edit-action"),
-            createButton("⊕ Novo Capítulo", "add-chapter", "text-action chapter-action")
-        );
-    }
+    if (canManageWork) actions.append(createButton("✎ Editar", "edit-work", "text-action edit-action"));
+    actions.append(createButton("⊕ Novo Capítulo", "add-chapter", "text-action chapter-action"));
     details.append(actions);
     card.append(details);
 
@@ -343,56 +340,98 @@ function renderWorkCard(work) {
 
     const chapterList = document.createElement("div");
     chapterList.className = "work-chapters";
-    if (!canManageWork) {
-        chapterList.hidden = true;
-    } else if (work.chapters.length === 0) {
+    if (work.chapters.length === 0) {
         const empty = document.createElement("p");
         empty.className = "no-chapters";
         empty.textContent = "Sem Capítulos";
         chapterList.append(empty);
     } else {
-        const hasCollapsedChapters = work.chapters.length > 1;
-        for (const [index, chapter] of work.chapters.entries()) {
-            const row = document.createElement("div");
-            row.className = "chapter-row";
-            if (hasCollapsedChapters && index > 0) {
-                row.dataset.extraChapter = "true";
-                row.hidden = true;
+        const chapterGroups = groupChaptersByNumber(work.chapters);
+        const hasCollapsedChapters = chapterGroups.size > 1;
+        for (const [groupIndex, [number, versions]] of [...chapterGroups.entries()].entries()) {
+            const group = document.createElement("section");
+            group.className = "chapter-group";
+            if (hasCollapsedChapters && groupIndex > 0) {
+                group.dataset.extraChapter = "true";
+                group.hidden = true;
             }
 
-            const flag = document.createElement("span");
-            flag.textContent = languageFlags[chapter.language] || "🌐";
-            flag.setAttribute("aria-label", languageNames[chapter.language] || "Idioma");
-            row.append(flag);
-
-            const chapterTitle = document.createElement("span");
-            chapterTitle.className = "chapter-row-title";
-            chapterTitle.textContent = getChapterDisplayName(chapter, index);
-            row.append(chapterTitle);
-
-            const chapterAuthor = document.createElement("span");
-            chapterAuthor.className = "chapter-row-author";
-            chapterAuthor.append(createAuthorIcon());
-            const authorName = document.createElement("span");
-            authorName.textContent = chapter.authorName || chapter.author || "Usuário desconhecido";
-            chapterAuthor.append(authorName);
-            row.append(chapterAuthor);
-
-            if (chapter.createBy === currentUserId) {
-                row.append(
-                    createButton("Editar", "edit-chapter", "chapter-row-action edit-chapter-action", `Editar ${getChapterDisplayName(chapter, index)}`),
-                    createButton("Excluir", "delete-chapter", "chapter-row-action delete-chapter-action", `Excluir ${getChapterDisplayName(chapter, index)}`)
+            const heading = document.createElement("div");
+            heading.className = "chapter-group-heading";
+            const groupTitle = document.createElement("span");
+            groupTitle.className = "chapter-group-title";
+            groupTitle.textContent = `Capítulo ${number}`;
+            heading.append(groupTitle);
+            if (versions.length > 1) {
+                const toggleVersions = createButton(
+                    `Mostrar versões (${versions.length})`,
+                    "toggle-chapter-versions",
+                    "chapter-versions-toggle",
+                    `Mostrar todas as ${versions.length} versões do Capítulo ${number}`
                 );
+                toggleVersions.setAttribute("aria-expanded", "false");
+                const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+                icon.setAttribute("viewBox", "0 0 24 24");
+                icon.setAttribute("aria-hidden", "true");
+                const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                path.setAttribute("d", "m6 9 6 6 6-6");
+                icon.append(path);
+                toggleVersions.append(icon);
+                heading.append(toggleVersions);
             }
-            row.dataset.chapterId = chapter.id;
-            chapterList.append(row);
+            group.append(heading);
+
+            const versionList = document.createElement("div");
+            versionList.className = "chapter-group-versions";
+            versionList.id = `chapter-versions-${work.id}-${number}`;
+            const versionsToggle = heading.querySelector(".chapter-versions-toggle");
+            if (versionsToggle) versionsToggle.setAttribute("aria-controls", versionList.id);
+            for (const [versionIndex, { chapter, index }] of versions.entries()) {
+                const row = document.createElement("div");
+                row.className = "chapter-row";
+                if (versionIndex > 0) {
+                    row.dataset.extraVersion = "true";
+                    row.hidden = true;
+                }
+
+                const flag = document.createElement("span");
+                flag.textContent = languageFlags[chapter.language] || "🌐";
+                flag.setAttribute("aria-label", languageNames[chapter.language] || "Idioma");
+                row.append(flag);
+
+                const chapterTitle = document.createElement("span");
+                chapterTitle.className = "chapter-row-title";
+                chapterTitle.textContent = typeof chapter.title === "string" && chapter.title.trim()
+                    ? chapter.title.trim()
+                    : "Sem título";
+                row.append(chapterTitle);
+
+                const chapterAuthor = document.createElement("span");
+                chapterAuthor.className = "chapter-row-author";
+                chapterAuthor.append(createAuthorIcon());
+                const authorName = document.createElement("span");
+                authorName.textContent = chapter.authorName || chapter.author || "Usuário desconhecido";
+                chapterAuthor.append(authorName);
+                row.append(chapterAuthor);
+
+                if (chapter.createBy === currentUserId) {
+                    row.append(
+                        createButton("Editar", "edit-chapter", "chapter-row-action edit-chapter-action", `Editar ${getChapterDisplayName(chapter, index)}`),
+                        createButton("Excluir", "delete-chapter", "chapter-row-action delete-chapter-action", `Excluir ${getChapterDisplayName(chapter, index)}`)
+                    );
+                }
+                row.dataset.chapterId = chapter.id;
+                versionList.append(row);
+            }
+            group.append(versionList);
+            chapterList.append(group);
         }
         if (hasCollapsedChapters) {
             const toggle = createButton(
                 "",
                 "toggle-chapters",
                 "chapter-list-toggle",
-                `Mostrar todos os ${work.chapters.length} capítulos de ${work.title}`
+                `Mostrar todos os ${chapterGroups.size} capítulos de ${work.title}`
             );
             toggle.setAttribute("aria-expanded", "false");
             const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -971,7 +1010,7 @@ function createLanguageSelect(selected = "pt-BR") {
     return wrapper;
 }
 
-function renderChapterForm(work, chapter, targetRegion) {
+function renderChapterForm(work, chapter, targetRegion, chapterNumber = null) {
     selectedArchive = undefined;
     selectedArchivePages = undefined;
     selectedChapterImages = [];
@@ -997,9 +1036,9 @@ function renderChapterForm(work, chapter, targetRegion) {
     form.dataset.chapterId = chapter?.id || "";
 
     const chapterIndex = chapter ? work.chapters.findIndex((item) => item.id === chapter.id) : -1;
-    const suggestedNumber = chapter
+    const suggestedNumber = chapterNumber || (chapter
         ? getChapterNumber(chapter, chapterIndex)
-        : work.chapters.reduce((highest, item, index) => Math.max(highest, getChapterNumber(item, index)), 0) + 1;
+        : work.chapters.reduce((highest, item, index) => Math.max(highest, getChapterNumber(item, index)), 0) + 1);
     const chapterFields = document.createElement("div");
     chapterFields.className = "form-row chapter-fields-row";
     const numberField = createField({
@@ -1306,7 +1345,7 @@ function closeEditor() {
         .forEach((region) => region.replaceChildren());
 }
 
-function setEditor(type, workId, chapterId = null) {
+function setEditor(type, workId, chapterId = null, chapterNumber = null) {
     const work = works.find((item) => item.id === workId);
     if (type === "chapter" && !work) {
         showFeedback("Selecione uma obra válida antes de adicionar um capítulo.", true);
@@ -1340,7 +1379,7 @@ function setEditor(type, workId, chapterId = null) {
         showFeedback("Não foi possível abrir o editor do capítulo desta obra.", true);
         return;
     }
-    renderChapterForm(work, chapter, chapterEditorRegion);
+    renderChapterForm(work, chapter, chapterEditorRegion, chapterNumber);
 }
 
 async function handleWorkSubmit(form) {
@@ -1555,16 +1594,41 @@ async function handleAction(action, card, chapterRow, actionButton) {
             workList.querySelector(`.chapter-editor-region[data-work-id="${CSS.escape(workId)}"]`)
                 ?.scrollIntoView({ behavior: "smooth", block: "start" });
             break;
+        case "toggle-chapter-versions": {
+            const isExpanded = actionButton.getAttribute("aria-expanded") === "true";
+            const expanded = !isExpanded;
+            const group = actionButton.closest(".chapter-group");
+            const versionCount = group.querySelectorAll(".chapter-row").length;
+            group.querySelectorAll(".chapter-row[data-extra-version]").forEach((row) => {
+                row.hidden = !expanded;
+            });
+            actionButton.setAttribute("aria-expanded", String(expanded));
+            actionButton.textContent = expanded
+                ? "Ocultar versões"
+                : `Mostrar versões (${versionCount})`;
+            actionButton.title = expanded
+                ? "Ocultar versões adicionais deste capítulo"
+                : `Mostrar todas as ${versionCount} versões deste capítulo`;
+            actionButton.setAttribute("aria-label", actionButton.title);
+            const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+            icon.setAttribute("viewBox", "0 0 24 24");
+            icon.setAttribute("aria-hidden", "true");
+            const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            path.setAttribute("d", "m6 9 6 6 6-6");
+            icon.append(path);
+            actionButton.append(icon);
+            break;
+        }
         case "toggle-chapters": {
             const isExpanded = actionButton.getAttribute("aria-expanded") === "true";
             const expanded = !isExpanded;
-            card.querySelectorAll(".chapter-row[data-extra-chapter]").forEach((row) => {
-                row.hidden = !expanded;
+            card.querySelectorAll(".chapter-group[data-extra-chapter]").forEach((group) => {
+                group.hidden = !expanded;
             });
             actionButton.setAttribute("aria-expanded", String(expanded));
             actionButton.title = expanded
                 ? `Recolher capítulos de ${work.title}`
-                : `Mostrar todos os ${work.chapters.length} capítulos de ${work.title}`;
+                : `Mostrar todos os ${groupChaptersByNumber(work.chapters).size} capítulos de ${work.title}`;
             actionButton.setAttribute("aria-label", actionButton.title);
             break;
         }

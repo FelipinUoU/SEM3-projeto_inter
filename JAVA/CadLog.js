@@ -1,4 +1,6 @@
 import { account } from "../JS/JAVA/authClient.js";
+import { getPostLoginDestination } from "../JS/authRedirect.js";
+import { completePendingFavorite } from "../JS/userLibrary.js";
 
 const modeButtons = document.querySelectorAll("[data-auth-mode]");
 const tabs = document.querySelector(".auth-tabs");
@@ -312,17 +314,14 @@ loginForm.addEventListener("submit", async (event) => {
         await account.createEmailPasswordSession({ email, password });
         const user = await account.get();
         const requestedDestination = new URLSearchParams(window.location.search).get("redirect");
-        const safeDestination = requestedDestination?.startsWith("/")
-            && !requestedDestination.startsWith("//")
-            && !requestedDestination.includes("\\")
-            ? requestedDestination
-            : null;
-        const hasManagementAccess = user.email?.toLowerCase() === "hokupedia@gmail.com"
-            || user.labels?.includes("admin")
-            || user.labels?.includes("moderator");
-        const destination = safeDestination || (hasManagementAccess
-            ? "/HTML/GerenciarObras.html"
-            : "/HTML/Biblioteca.html");
+        completePendingFavorite(user.$id);
+        const destination = getPostLoginDestination(
+            user,
+            requestedDestination,
+            document.referrer,
+            window.location.pathname,
+            window.location.origin
+        );
         window.location.assign(destination);
     } catch (error) {
         console.error("Erro no login:", error);

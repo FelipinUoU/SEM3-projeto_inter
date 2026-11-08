@@ -244,8 +244,8 @@ body {
 .obra-card img {
   display: block;
   width: 100%;
-  height: auto;
-  object-fit: contain;
+  aspect-ratio: 0.65;
+  object-fit: cover;
   border-radius: 3px;
   background: #d7d7d7;
 }

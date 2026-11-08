@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>HokuPédia</title>
+    <link rel="icon" type="image/png" href="/Img/LogoSnome.png" />
     <link rel="stylesheet" href="/CSS/stylesheet.css" />
     <link rel="stylesheet" href="/CSS/MenuLat.css" />
   </head>
@@ -14,7 +15,7 @@
         <span></span>
         <span></span>
       </button>
-      <h1 class="menu-lateral-logo"><a href="/" aria-label="Ir para a página inicial">HokuPédia</a></h1>
+      <h1 class="menu-lateral-logo"><a href="/" aria-label="Ir para a página inicial"><img src="/Img/LogoSnome.png" alt="" />HokuPédia</a></h1>
       <form class="work-search" role="search" autocomplete="off">
         <label class="work-search__label" for="work-search-input">Buscar obra por nome</label>
         <input id="work-search-input" type="search" name="q" placeholder="Buscar obra..." aria-autocomplete="list" aria-controls="work-search-results" aria-expanded="false" />
@@ -45,6 +46,20 @@
 
       <div class="catalogo" id="catalogo" aria-live="polite">
         <p id="homeCatalogStatus" role="status" aria-live="polite" hidden></p>
+        <section class="novidades" id="recommendationsSection" aria-labelledby="titulo-recomendacoes" hidden>
+          <h2 id="titulo-recomendacoes">Recomendações</h2>
+          <p class="catalog-section-empty" id="recommendationsEmpty" role="status" aria-live="polite" hidden>
+            Ainda não encontramos obras com categorias em comum com seu histórico e favoritos.
+          </p>
+          <div class="carrossel-controles" data-carousel>
+            <button class="carrossel-botao" type="button" data-carousel-previous aria-label="Recomendações anteriores">‹</button>
+            <div class="carrossel-janela">
+              <div class="obras-faixa" data-recommendations></div>
+            </div>
+            <button class="carrossel-botao" type="button" data-carousel-next aria-label="Próximas recomendações">›</button>
+          </div>
+        </section>
+
         <section class="novidades" aria-labelledby="titulo-novidades">
           <h2 id="titulo-novidades">Novidades</h2>
           <div class="carrossel-controles" data-carousel>
