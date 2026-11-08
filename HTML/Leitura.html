@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HokuPédia - Leitura</title>
+    <link rel="icon" type="image/png" href="/Img/LogoSnome.png">
     <link rel="stylesheet" href="../CSS/Leitura.css">
     <link rel="stylesheet" href="../CSS/MenuLat.css">
 </head>
@@ -15,7 +16,7 @@
             <span></span>
             <span></span>
         </button>
-        <div class="logo"><a href="/" aria-label="Ir para a página inicial">HokuPédia</a></div>
+        <div class="logo"><a href="/" aria-label="Ir para a página inicial"><img src="/Img/LogoSnome.png" alt="">HokuPédia</a></div>
         <a class="header-login" href="/HTML/CadLog.html?mode=login">Login</a>
     </header>
     <button class="menu-lateral-overlay" id="menuOverlay" type="button" aria-label="Fechar dashboard" hidden></button>
@@ -31,11 +32,15 @@
     <!-- Conteúdo da Página / Leitura -->
     <div class="main-container">
         <h1 class="titulo-manga" id="reader-work-title"></h1>
-        <div class="breadcrumb"><a href="/">Home</a> / <a id="reader-work-link" href="/HTML/Obra.html">Obra</a> / <span id="current-chapter-breadcrumb">Capítulo 1</span></div>
 
         <!-- Controles de Leitura e Modo de Exibição -->
         <div class="controls-row">
-            <button class="btn-select" id="chapter-label" type="button">Capítulo 1</button>
+            <div class="dropdown-container" id="chapter-selector">
+                <button class="btn-select" id="chapter-label" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="chapter-dropdown">
+                    Capítulo 1 <span aria-hidden="true">▼</span>
+                </button>
+                <div class="dropdown-menu" id="chapter-dropdown" role="menu"></div>
+            </div>
             
             <!-- Menu seletor de Modo de Leitura -->
             <div class="dropdown-container">
@@ -54,42 +59,25 @@
         <div class="end-chapter-card">
             <h3 id="end-chapter-title">Fim do capítulo 1</h3>
             <div class="end-actions">
-                <button class="btn-chapter-nav" id="previous-chapter-btn" type="button" disabled>❮ Capítulo anterior</button>
-                <a class="btn-chapter-nav main-indice" id="chapter-index-link" href="/HTML/Obra.html">Índice</a>
-                <button class="btn-chapter-nav" id="next-chapter-btn" type="button" disabled>Próximo capítulo ❯</button>
+                <button class="btn-chapter-nav" id="previous-chapter-btn" type="button" hidden>❮ Capítulo anterior</button>
+                <a class="btn-chapter-nav main-indice" id="chapter-index-link" href="/HTML/Obra.html">Ver tudo</a>
+                <button class="btn-chapter-nav" id="next-chapter-btn" type="button" hidden>Próximo capítulo ❯</button>
             </div>
             
             <div class="recommendations">
                 <h4>Leia também</h4>
-                <div class="rec-grid">
-                    <div class="rec-item">
-                        <div class="rec-thumb">Capa</div>
-                        <div class="rec-title">Título genérico..</div>
-                    </div>
-                    <div class="rec-item">
-                        <div class="rec-thumb">Capa</div>
-                        <div class="rec-title">Título genérico</div>
-                    </div>
-                    <div class="rec-item">
-                        <div class="rec-thumb">Capa</div>
-                        <div class="rec-title">Título genérico</div>
-                    </div>
-                    <div class="rec-item">
-                        <div class="rec-thumb">Capa</div>
-                        <div class="rec-title">Título genérico</div>
-                    </div>
-                    <div class="rec-item">
-                        <div class="rec-thumb">Capa</div>
-                        <div class="rec-title">Título genérico</div>
-                    </div>
-                    <div class="rec-item">
-                        <div class="rec-thumb">Capa</div>
-                        <div class="rec-title">Título genérico</div>
-                    </div>
-                </div>
+                <p id="related-works-empty" hidden>Não encontramos outras obras com categorias em comum.</p>
+                <div class="rec-grid" id="related-works-grid"></div>
             </div>
         </div>
     </div>
+
+    <dialog class="language-change-dialog" id="language-change-dialog" aria-labelledby="language-change-title">
+        <h2 id="language-change-title">Continuar em outro idioma?</h2>
+        <p id="language-change-message"></p>
+        <div class="language-change-options" id="language-change-options"></div>
+        <button class="btn-chapter-nav" id="cancel-language-change" type="button">Não, ficar neste capítulo</button>
+    </dialog>
 
     <!-- Barra Inferior Flutuante com o Botão de Tradução -->
     <div class="floating-nav-bar">
@@ -131,7 +119,6 @@
     <dialog class="translation-dialog" id="translation-dialog" aria-labelledby="translation-dialog-title">
         <form id="translation-settings-form">
             <h2 id="translation-dialog-title">Configurações de tradução</h2>
-            <p>As configurações ficam salvas neste navegador. A chave da IA permanece no servidor.</p>
             <label for="translation-language">Traduzir para
                 <select id="translation-language" name="language">
                     <option value="Português brasileiro">Português (Brasil)</option>

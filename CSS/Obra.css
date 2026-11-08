@@ -403,7 +403,7 @@ a {
 
 .chapter-language-list {
     display: grid;
-    gap: 6px;
+    gap: 0;
 }
 
 .chapter-language-link {
@@ -417,6 +417,10 @@ a {
     color: inherit;
     text-decoration: none;
     transition: background 150ms ease, border-color 150ms ease;
+}
+
+.chapter-language-link + .chapter-language-link {
+    border-top-color: #ffffff14;
 }
 
 .chapter-language-link:hover,

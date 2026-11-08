@@ -1,11 +1,11 @@
 # Guia: atualizar o schema do Neon
 
-Use este guia quando uma atualização do projeto adicionar tabelas ou colunas ao banco. Para os checkpoints de tradução, a atualização cria a tabela `public.translation_checkpoints`.
+Use este guia quando uma atualização do projeto alterar o schema do banco. O script atualiza as colunas, permite versões do mesmo número de capítulo e cria a tabela `public.translation_checkpoints`.
 
 ## Antes de executar
 
 - Confirme que você está no projeto, branch e banco corretos no Neon.
-- O script [`neon-schema.sql`](./neon-schema.sql) é aditivo e idempotente: pode ser executado novamente; ele cria estruturas ausentes e não apaga as tabelas nem os dados existentes.
+- O script [`neon-schema.sql`](./neon-schema.sql) é idempotente: pode ser executado novamente; ele cria/ajusta estruturas sem apagar tabelas nem dados existentes.
 - Não cole nem compartilhe o arquivo `.env`, a URL de conexão ou chaves de API no SQL Editor.
 - Se o banco for importante, faça ou confirme um backup antes de qualquer alteração de schema.
 
@@ -16,7 +16,7 @@ Use este guia quando uma atualização do projeto adicionar tabelas ou colunas a
 3. Abra **SQL Editor**.
 4. No repositório, abra [`neon-schema.sql`](./neon-schema.sql), copie o arquivo inteiro e cole no SQL Editor. Reexecutar o arquivo completo aplica as atualizações aditivas pendentes.
 5. Execute o script. Confira se a execução terminou sem erros.
-6. Rode a verificação abaixo no SQL Editor:
+6. Rode as verificações abaixo no SQL Editor:
 
 ```sql
 SELECT
@@ -24,7 +24,22 @@ SELECT
   to_regclass('public.translation_checkpoints_expiry_index') AS indice_expiracao;
 ```
 
-O resultado esperado é `translation_checkpoints` e `translation_checkpoints_expiry_index`. Se algum valor vier `NULL`, confirme projeto, branch e banco selecionados e execute o script novamente.
+```sql
+SELECT EXISTS (
+  SELECT 1
+  FROM pg_constraint
+  WHERE conname = 'unique_chapter_number'
+    AND conrelid = 'public.chapters'::regclass
+  UNION ALL
+  SELECT 1
+  FROM pg_indexes
+  WHERE schemaname = 'public'
+    AND tablename = 'chapters'
+    AND indexname = 'unique_chapter_number'
+) AS restricao_antiga_ativa;
+```
+
+O resultado esperado é `translation_checkpoints`, `translation_checkpoints_expiry_index` e `false` para `restricao_antiga_ativa`. A restrição antiga impedia mais de uma versão para o mesmo número da obra; sem ela, diferentes contas moderadoras podem publicar versões que aparecem agrupadas no mesmo capítulo. Se a tabela ou o índice vier `NULL`, confirme projeto, branch e banco selecionados e execute o script novamente.
 
 7. Reinicie a aplicação com `npm run server`. Se o servidor já estiver aberto, pare-o e inicie-o novamente. O log `Connected to Neon PostgreSQL.` confirma a conexão e a validação do schema.
 

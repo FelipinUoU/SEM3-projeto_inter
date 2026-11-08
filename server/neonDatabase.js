@@ -260,6 +260,77 @@ export class Databases {
     return toDocument(prepared.collection, result.rows[0]);
   }
 
+  async replaceChapterPages(chapterId, pages, chapterData) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const chapterResult = await client.query(
+        'SELECT id FROM chapters WHERE id = $1 FOR UPDATE',
+        [chapterId]
+      );
+      if (!chapterResult.rows[0]) {
+        const error = new Error('Registro não encontrado.');
+        error.code = 404;
+        throw error;
+      }
+
+      const pageCollection = getCollection('paginas');
+      const existingPagesResult = await client.query(
+        'SELECT * FROM pages WHERE "chapterId" = $1 ORDER BY number, id FOR UPDATE',
+        [chapterId]
+      );
+      await client.query('DELETE FROM pages WHERE "chapterId" = $1', [chapterId]);
+
+      const createdPages = [];
+      for (const [position, page] of pages.entries()) {
+        const prepared = await prepareInsert(client, 'paginas', ID.unique(), {
+          ...page,
+          chapterId,
+          number: position + 1
+        });
+        const result = await client.query(
+          `INSERT INTO ${prepared.collection.table} (${prepared.columns.join(', ')}) VALUES (${prepared.placeholders.join(', ')}) RETURNING *`,
+          prepared.values
+        );
+        createdPages.push(toDocument(pageCollection, result.rows[0]));
+      }
+
+      const chapterCollection = getCollection('capitulos');
+      const chapterEntries = Object.entries(chapterData)
+        .filter(([attribute]) => chapterCollection.fields[attribute]);
+      const chapterValues = chapterEntries.map(([, value]) => toDatabaseValue(value));
+      const assignments = chapterEntries.map(([attribute], index) => (
+        `${chapterCollection.fields[attribute]} = $${index + 1}`
+      ));
+      chapterValues.push(chapterId);
+      const updatedChapter = await client.query(
+        `UPDATE chapters SET ${assignments.join(', ')}, updated_at = NOW() WHERE id = $${chapterValues.length} RETURNING *`,
+        chapterValues
+      );
+      if (!updatedChapter.rows[0]) {
+        const error = new Error('Registro não encontrado.');
+        error.code = 404;
+        throw error;
+      }
+
+      await client.query('COMMIT');
+      return {
+        existingPages: existingPagesResult.rows.map((row) => toDocument(pageCollection, row)),
+        createdPages,
+        chapter: toDocument(chapterCollection, updatedChapter.rows[0])
+      };
+    } catch (error) {
+      try {
+        await client.query('ROLLBACK');
+      } catch (rollbackError) {
+        console.error('Could not roll back chapter page replacement:', rollbackError);
+      }
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   async updateDocument(_databaseId, collectionId, documentId, data) {
     const collection = getCollection(collectionId);
     const entries = Object.entries(data)

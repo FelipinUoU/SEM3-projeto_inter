@@ -5,9 +5,23 @@ import {
     saveTranslatedPage
 } from "./chapterTranslations.js";
 import { getTranslationLoginMessage } from "./translationAccess.js";
+import {
+    buildRelatedWorks,
+    getAdjacentChapters,
+    getChapterLanguageName,
+    getNextLanguageAlternatives
+} from "./readerRecommendations.js";
 
 const viewModeButton = document.getElementById("view-mode-btn");
 const viewDropdown = document.getElementById("view-dropdown");
+const chapterLabel = document.getElementById("chapter-label");
+const chapterDropdown = document.getElementById("chapter-dropdown");
+const relatedWorksGrid = document.getElementById("related-works-grid");
+const relatedWorksEmpty = document.getElementById("related-works-empty");
+const languageChangeDialog = document.getElementById("language-change-dialog");
+const languageChangeMessage = document.getElementById("language-change-message");
+const languageChangeOptions = document.getElementById("language-change-options");
+const cancelLanguageChange = document.getElementById("cancel-language-change");
 const readerViewport = document.getElementById("reader-viewport");
 const pageCounter = document.getElementById("page-counter");
 const translateButton = document.getElementById("translate-btn");
@@ -46,6 +60,7 @@ let currentPageIndex = 0;
 let currentMode = "vertical";
 let currentWork;
 let currentChapter;
+let allWorks = [];
 const pageTranslationLayers = new Map();
 let translationController;
 let statusTimeout;
@@ -128,34 +143,118 @@ function getChapterName(chapter, index) {
     return `Capítulo ${number}${chapter?.title ? ` — ${chapter.title}` : ""}`;
 }
 
+function renderRelatedWorks(works, currentWork) {
+    const recommendations = buildRelatedWorks(works, currentWork);
+    relatedWorksEmpty.hidden = recommendations.length > 0;
+    relatedWorksGrid.replaceChildren(...recommendations.map(({ work }) => {
+        const link = document.createElement("a");
+        link.className = "rec-item";
+        link.href = `/HTML/Obra.html?obra=${encodeURIComponent(work.id)}`;
+        link.setAttribute("aria-label", `Ver obra ${work.title}`);
+
+        const cover = document.createElement("img");
+        cover.className = "rec-thumb";
+        cover.alt = `Capa de ${work.title}`;
+        if (typeof work.cover === "string" && work.cover.trim()) {
+            cover.src = work.cover;
+            cover.addEventListener("error", () => {
+                const fallback = document.createElement("div");
+                fallback.className = "rec-thumb";
+                fallback.textContent = "Sem capa";
+                fallback.setAttribute("aria-hidden", "true");
+                cover.replaceWith(fallback);
+            }, { once: true });
+        } else {
+            cover.removeAttribute("src");
+            cover.alt = "";
+            cover.replaceWith(Object.assign(document.createElement("div"), {
+                className: "rec-thumb",
+                textContent: "Sem capa"
+            }));
+        }
+
+        const title = document.createElement("span");
+        title.className = "rec-title";
+        title.textContent = work.title;
+        link.append(cover, title);
+        return link;
+    }));
+}
+
 function setChapterNavigation(work, chapter) {
     const chapters = work?.chapters || [];
     const index = chapters.findIndex((item) => item.id === chapter?.id);
     const chapterUrl = (target) => `/HTML/Leitura.html?obra=${encodeURIComponent(work.id)}&capitulo=${encodeURIComponent(target.id)}`;
     const previousButton = document.getElementById("previous-chapter-btn");
     const nextButton = document.getElementById("next-chapter-btn");
+    const { previous, next } = getAdjacentChapters(work, chapter);
+    const languageAlternatives = next ? [] : getNextLanguageAlternatives(work, chapter);
     const indexUrl = `/HTML/Obra.html?obra=${encodeURIComponent(work.id)}`;
 
     document.getElementById("reader-work-title").textContent = work.title;
-    document.getElementById("reader-work-link").textContent = work.title;
-    document.getElementById("reader-work-link").href = indexUrl;
     document.getElementById("chapter-index-link").href = indexUrl;
-    document.getElementById("current-chapter-breadcrumb").textContent = getChapterName(chapter, index);
-    document.getElementById("chapter-label").textContent = getChapterName(chapter, index);
+    const dropdownIndicator = document.createElement("span");
+    dropdownIndicator.textContent = "▼";
+    dropdownIndicator.setAttribute("aria-hidden", "true");
+    chapterLabel.replaceChildren(
+        document.createTextNode(getChapterName(chapter, index)),
+        dropdownIndicator
+    );
+    chapterLabel.disabled = chapters.length < 2;
+    chapterDropdown.hidden = chapters.length < 2;
+    chapterDropdown.classList.remove("show");
+    chapterLabel.setAttribute("aria-expanded", "false");
+    chapterDropdown.replaceChildren(...chapters
+        .map((item, chapterIndex) => ({ item, chapterIndex }))
+        .filter(({ item }) => item.id !== chapter.id)
+        .map(({ item, chapterIndex }) => {
+            const option = document.createElement("button");
+            option.type = "button";
+            option.setAttribute("role", "menuitem");
+            option.textContent = getChapterName(item, chapterIndex);
+            option.addEventListener("click", () => {
+                chapterDropdown.classList.remove("show");
+                chapterLabel.setAttribute("aria-expanded", "false");
+                window.location.assign(chapterUrl(item));
+            });
+            return option;
+        }));
     document.getElementById("end-chapter-title").textContent = `Fim do ${getChapterName(chapter, index).toLocaleLowerCase("pt-BR")}`;
     document.title = `${getChapterName(chapter, index)} — ${work.title} | HokuPédia`;
 
-    const previous = chapters[index - 1];
-    const next = chapters[index + 1];
+    previousButton.hidden = !previous;
+    nextButton.hidden = !next && languageAlternatives.length === 0;
     previousButton.disabled = !previous;
-    nextButton.disabled = !next;
-    previousButton.textContent = previous ? `❮ ${getChapterName(previous, index - 1)}` : "❮ Capítulo anterior";
-    nextButton.textContent = next ? `${getChapterName(next, index + 1)} ❯` : "Próximo capítulo ❯";
+    nextButton.disabled = !next && languageAlternatives.length === 0;
+    previousButton.textContent = previous ? `❮ ${getChapterName(previous, chapters.indexOf(previous))}` : "❮ Capítulo anterior";
+    nextButton.textContent = next ? `${getChapterName(next, chapters.indexOf(next))} ❯` : "Próximo capítulo ❯";
     previousButton.onclick = previous ? () => window.location.assign(chapterUrl(previous)) : null;
-    nextButton.onclick = next ? () => window.location.assign(chapterUrl(next)) : null;
+    nextButton.onclick = next
+        ? () => window.location.assign(chapterUrl(next))
+        : languageAlternatives.length
+            ? () => {
+                const currentLanguage = getChapterLanguageName(chapter.language || "pt-BR");
+                languageChangeMessage.textContent = `Não há mais capítulos em ${currentLanguage}. Deseja continuar em outro idioma?`;
+                languageChangeOptions.replaceChildren(...languageAlternatives.map((alternative) => {
+                    const option = document.createElement("button");
+                    option.type = "button";
+                    option.className = "btn-chapter-nav";
+                    option.textContent = `${getChapterLanguageName(alternative.language || "pt-BR")} — ${getChapterName(alternative, chapters.indexOf(alternative))}`;
+                    option.addEventListener("click", () => {
+                        languageChangeDialog.close();
+                        window.location.assign(chapterUrl(alternative));
+                    });
+                    return option;
+                }));
+                languageChangeDialog.showModal();
+            }
+            : null;
     previousButton.classList.toggle("is-disabled", !previous);
     nextButton.classList.toggle("is-disabled", !next);
+    renderRelatedWorks(allWorks, work);
 }
+
+cancelLanguageChange.addEventListener("click", () => languageChangeDialog.close());
 
 async function loadStoredChapter() {
     readerViewport.replaceChildren();
@@ -178,6 +277,7 @@ async function loadStoredChapter() {
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || "Não foi possível carregar as obras.");
         const works = data.works;
+        allWorks = works;
         currentWork = works.find((work) => work.id === workId);
         currentChapter = currentWork?.chapters?.find((chapter) => chapter.id === chapterId);
         if (!currentWork || !currentChapter) {
@@ -814,6 +914,12 @@ viewModeButton.addEventListener("click", (event) => {
     viewDropdown.classList.toggle("show");
 });
 
+chapterLabel.addEventListener("click", (event) => {
+    event.stopPropagation();
+    const isOpen = chapterDropdown.classList.toggle("show");
+    chapterLabel.setAttribute("aria-expanded", String(isOpen));
+});
+
 viewDropdown.querySelectorAll("[data-mode]").forEach((button) => {
     button.addEventListener("click", () => {
         toggleMode(button.dataset.mode);
@@ -821,8 +927,21 @@ viewDropdown.querySelectorAll("[data-mode]").forEach((button) => {
     });
 });
 
-window.addEventListener("click", () => viewDropdown.classList.remove("show"));
+window.addEventListener("click", () => {
+    viewDropdown.classList.remove("show");
+    chapterDropdown.classList.remove("show");
+    chapterLabel.setAttribute("aria-expanded", "false");
+});
 window.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+        const chapterWasOpen = chapterDropdown.classList.contains("show");
+        const viewModeWasOpen = viewDropdown.classList.contains("show");
+        viewDropdown.classList.remove("show");
+        chapterDropdown.classList.remove("show");
+        chapterLabel.setAttribute("aria-expanded", "false");
+        if (chapterWasOpen) chapterLabel.focus();
+        else if (viewModeWasOpen) viewModeButton.focus();
+    }
     if (currentMode !== "horizontal" || !["ArrowLeft", "ArrowRight"].includes(event.key)) return;
     if (event.target instanceof Element
         && event.target.closest("input, textarea, select, [contenteditable='true']")) return;

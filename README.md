@@ -22,6 +22,7 @@ O `.env.example` lista as variáveis. A connection string Neon, credenciais SMTP
 - A autenticação usa cookie de sessão `HttpOnly` e as contas são criadas diretamente no Neon.
 - Recuperação de senha usa código de 6 dígitos, válido por 15 minutos, enviado pelo SMTP configurado.
 - Categorias e formatos (`hq`, `manhwa` ou `manga`) alimentam os filtros do catálogo. Pedidos e papéis de moderação ficam no Neon.
+- Moderadores podem publicar várias versões do mesmo capítulo, em idiomas iguais ou diferentes; elas ficam agrupadas pelo número e separadas por idioma e autor.
 - Uploads e exclusões continuam no ImageKit; as operações de gerenciamento invalidam o cache do catálogo.
 - Favoritos, histórico, preferências e traduções ficam no armazenamento local do navegador.
 - O limite padrão é 20 MB por imagem, 100 MB por ZIP, 200 MB descompactados e 500 páginas por capítulo. Ajuste `MAX_IMAGE_BYTES`, `MAX_CHAPTER_ARCHIVE_BYTES` e `MAX_CHAPTER_PAGES`.

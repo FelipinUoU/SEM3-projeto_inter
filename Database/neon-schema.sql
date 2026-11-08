@@ -1,4 +1,4 @@
--- Additive PostgreSQL migration for the existing public works/chapters/pages/favorites tables.
+-- Idempotent PostgreSQL migration for the existing public works/chapters/pages/favorites tables.
 -- Run against an empty or existing database; this script does not delete rows or tables.
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
@@ -19,6 +19,8 @@ ALTER TABLE public.chapters
   ADD COLUMN IF NOT EXISTS status VARCHAR(50) NOT NULL DEFAULT 'published',
   ADD COLUMN IF NOT EXISTS create_by VARCHAR(64) NOT NULL DEFAULT '',
   ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+ALTER TABLE public.chapters DROP CONSTRAINT IF EXISTS unique_chapter_number;
+DROP INDEX IF EXISTS public.unique_chapter_number;
 ALTER TABLE public.chapters ALTER COLUMN "createdAt" SET DEFAULT NOW();
 CREATE INDEX IF NOT EXISTS chapters_work_id_index ON public.chapters("workId");
 CREATE INDEX IF NOT EXISTS chapters_create_by_index ON public.chapters(create_by);

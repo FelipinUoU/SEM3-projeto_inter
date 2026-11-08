@@ -1,5 +1,7 @@
 import { account } from "../JS/JAVA/authClient.js";
 import { loadPublicCatalog } from "../JS/catalogCache.js";
+import { getCurrentLibraryUser, loadUserLibrary } from "../JS/userLibrary.js";
+import { buildRecommendations } from "../JS/recommendations.js";
 import { normalizeWorkFormat } from "../JS/workFormat.js";
 import "./AuthHeader.js";
 
@@ -107,8 +109,11 @@ const homeCatalogStatus = document.getElementById("homeCatalogStatus");
 const homeCarouselTracks = [
     document.querySelector('[aria-labelledby="titulo-novidades"] .obras-faixa'),
     document.querySelector('[aria-labelledby="titulo-obras-comunidade"] .obras-faixa'),
+    document.querySelector('[aria-labelledby="titulo-recomendacoes"] .obras-faixa'),
     document.querySelector('[aria-labelledby="titulo-capnovos"] .obras-faixa')
 ];
+const recommendationsSection = document.getElementById("recommendationsSection");
+const recommendationsEmpty = document.getElementById("recommendationsEmpty");
 
 const carouselStates = Array.from(document.querySelectorAll("[data-carousel]"), (carousel) => ({
     carousel,
@@ -191,6 +196,34 @@ function createWorkCard(work, subtitle) {
     return card;
 }
 
+async function loadRecommendations(works) {
+    if (!recommendationsSection || !recommendationsEmpty) return;
+    recommendationsSection.hidden = true;
+    recommendationsEmpty.hidden = true;
+
+    try {
+        const user = await getCurrentLibraryUser();
+        if (!user) return;
+
+        const library = loadUserLibrary(user.$id);
+        if (library.readingHistory.length === 0) return;
+
+        const recommendations = buildRecommendations(works, library);
+        if (recommendations.length === 0) {
+            recommendationsEmpty.hidden = false;
+        } else {
+            const track = recommendationsSection.querySelector("[data-recommendations]");
+            track.replaceChildren(...recommendations.map(({ work, matchedTags }) => (
+                createWorkCard(work, `Categorias: ${matchedTags.join(", ")}`)
+            )));
+        }
+        recommendationsSection.hidden = false;
+        filterCatalog();
+    } catch (error) {
+        console.error("Não foi possível carregar as recomendações:", error);
+    }
+}
+
 function getLatestPublishedChapter(work) {
     return (Array.isArray(work.chapters) ? work.chapters : [])
         .reduce((latest, chapter) => {
@@ -258,7 +291,9 @@ function filterCatalog() {
     });
 
     catalogSections.forEach((section) => {
-        section.hidden = !section.querySelector(".obra-card:not([hidden])");
+        const hasVisibleCard = section.querySelector(".obra-card:not([hidden])");
+        const hasVisibleEmptyState = section.querySelector(".catalog-section-empty:not([hidden])");
+        section.hidden = !hasVisibleCard && !hasVisibleEmptyState;
     });
 
     carouselStates.forEach((state) => updateCarousel(state, true));
@@ -301,13 +336,14 @@ async function loadHomeWorks() {
             createWorkCard(work, `Capítulo ${chapter.number}${chapter.title ? ` — ${chapter.title}` : ""}`)
         ));
 
-        [newestFirst, communityWorks, newChapters].forEach((cards, index) => {
+        [[0, newestFirst], [1, communityWorks], [3, newChapters]].forEach(([index, cards]) => {
             homeCarouselTracks[index].replaceChildren(...cards);
         });
 
         homeCatalogStatus.textContent = works.length ? "" : "Nenhuma obra publicada foi encontrada.";
         homeCatalogStatus.hidden = works.length > 0;
         filterCatalog();
+        void loadRecommendations(catalogWorks);
     } catch (error) {
         console.error("Não foi possível carregar as obras da página inicial:", error);
         homeCatalogStatus.textContent = error.message || "Não foi possível carregar as obras.";
