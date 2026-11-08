@@ -4,8 +4,11 @@ const modeButtons = document.querySelectorAll("[data-auth-mode]");
 const tabs = document.querySelector(".auth-tabs");
 const registerPanel = document.getElementById("registerPanel");
 const loginPanel = document.getElementById("loginPanel");
+const loginTab = document.getElementById("loginTab");
+const loginTitle = loginPanel.querySelector("h1");
 const registerForm = document.getElementById("formCadastro");
 const loginForm = document.getElementById("formLogin");
+const showRecoveryButton = document.getElementById("showRecoveryButton");
 const recoveryRequestForm = document.getElementById("formRecoveryRequest");
 const passwordResetForm = document.getElementById("formPasswordReset");
 const registerFeedback = document.getElementById("registerFeedback");
@@ -13,6 +16,7 @@ const loginFeedback = document.getElementById("loginFeedback");
 const recoveryRequestFeedback = document.getElementById("recoveryRequestFeedback");
 const passwordResetFeedback = document.getElementById("passwordResetFeedback");
 let recoveryUserId = "";
+let isRecoveryView = false;
 
 function showFeedback(element, message, type = "") {
     element.textContent = message;
@@ -44,15 +48,56 @@ function setAuthMode(mode, updateUrl = true) {
     }
 }
 
+function setRecoveryView(isRecovery) {
+    isRecoveryView = isRecovery;
+    loginTab.textContent = isRecovery ? "Voltar ao Login" : "Login";
+    loginTitle.textContent = isRecovery ? "Esqueceu Sua Senha?" : "Entrar";
+    showRecoveryButton.hidden = isRecovery;
+    document.title = `HokuPédia - ${isRecovery ? "Recuperar senha" : "Login"}`;
+}
+
+function openRecoveryView() {
+    setRecoveryView(true);
+    loginForm.hidden = true;
+    loginForm.inert = true;
+    recoveryRequestForm.hidden = false;
+    recoveryRequestForm.inert = false;
+    passwordResetForm.hidden = true;
+    passwordResetForm.inert = true;
+    document.getElementById("recoveryEmail").value = document.getElementById("loginEmail").value.trim();
+    document.getElementById("recoveryEmail").focus();
+}
+
+function closeRecoveryView() {
+    recoveryRequestForm.reset();
+    recoveryRequestForm.hidden = true;
+    recoveryRequestForm.inert = true;
+    passwordResetForm.reset();
+    passwordResetForm.hidden = true;
+    passwordResetForm.inert = true;
+    loginForm.hidden = false;
+    loginForm.inert = false;
+    recoveryUserId = "";
+    showFeedback(recoveryRequestFeedback, "");
+    showFeedback(passwordResetFeedback, "");
+    setRecoveryView(false);
+}
+
+function selectAuthMode(mode) {
+    if (isRecoveryView) closeRecoveryView();
+    setAuthMode(mode);
+    if (mode === "login") document.getElementById("loginEmail").focus();
+}
+
 modeButtons.forEach((button, index) => {
-    button.addEventListener("click", () => setAuthMode(button.dataset.authMode));
+    button.addEventListener("click", () => selectAuthMode(button.dataset.authMode));
     button.addEventListener("keydown", (event) => {
         if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
         event.preventDefault();
         const direction = event.key === "ArrowRight" ? 1 : -1;
         const nextButton = modeButtons[(index + direction + modeButtons.length) % modeButtons.length];
         nextButton.focus();
-        setAuthMode(nextButton.dataset.authMode);
+        selectAuthMode(nextButton.dataset.authMode);
     });
 });
 
@@ -64,46 +109,20 @@ const initialMode = new URLSearchParams(window.location.search).get("mode") === 
     : routeMode || "register";
 setAuthMode(initialMode);
 
-document.getElementById("showRecoveryButton").addEventListener("click", () => {
-    loginForm.hidden = true;
-    loginForm.inert = true;
-    document.getElementById("showRecoveryButton").hidden = true;
-    recoveryRequestForm.hidden = false;
-    recoveryRequestForm.inert = false;
-    passwordResetForm.hidden = true;
-    passwordResetForm.inert = true;
-    document.getElementById("recoveryEmail").value = document.getElementById("loginEmail").value.trim();
-    document.getElementById("recoveryEmail").focus();
-});
-
 if (new URLSearchParams(window.location.search).get("recovery") === "1") {
-    document.getElementById("showRecoveryButton").click();
+    openRecoveryView();
 }
 
-document.getElementById("cancelRecoveryButton").addEventListener("click", () => {
-    recoveryRequestForm.reset();
-    recoveryRequestForm.hidden = true;
-    recoveryRequestForm.inert = true;
-    loginForm.hidden = false;
-    loginForm.inert = false;
-    document.getElementById("showRecoveryButton").hidden = false;
-    showFeedback(recoveryRequestFeedback, "");
-    setAuthMode("login");
-    document.getElementById("showRecoveryButton").focus();
-});
+showRecoveryButton.addEventListener("click", openRecoveryView);
 
-document.getElementById("backToLoginButton").addEventListener("click", () => {
-    passwordResetForm.reset();
-    passwordResetForm.hidden = true;
-    passwordResetForm.inert = true;
-    recoveryRequestForm.reset();
-    recoveryUserId = "";
-    loginForm.hidden = false;
-    loginForm.inert = false;
-    document.getElementById("showRecoveryButton").hidden = false;
-    showFeedback(passwordResetFeedback, "");
-    setAuthMode("login");
-    document.getElementById("loginEmail").focus();
+document.querySelectorAll(".auth-password-toggle").forEach((toggle) => {
+    const input = document.getElementById(toggle.getAttribute("aria-controls"));
+    toggle.addEventListener("click", () => {
+        const isVisible = input.type === "text";
+        input.type = isVisible ? "password" : "text";
+        toggle.setAttribute("aria-pressed", String(!isVisible));
+        toggle.setAttribute("aria-label", isVisible ? "Mostrar senha" : "Ocultar senha");
+    });
 });
 
 document.getElementById("resendRecoveryButton").addEventListener("click", () => {
@@ -197,7 +216,7 @@ passwordResetForm.addEventListener("submit", async (event) => {
         passwordResetForm.inert = true;
         loginForm.hidden = false;
         loginForm.inert = false;
-        document.getElementById("showRecoveryButton").hidden = false;
+        setRecoveryView(false);
         setAuthMode("login");
         showFeedback(loginFeedback, "Senha redefinida. Entre com sua nova senha.", "success");
         document.getElementById("loginEmail").focus();

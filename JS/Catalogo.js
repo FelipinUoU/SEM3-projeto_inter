@@ -98,15 +98,6 @@ function createWorkCard(work, index) {
     author.textContent = work.author || "Autor não informado";
     details.append(author);
 
-    const chapters = Array.isArray(work.chapters) ? work.chapters : [];
-    const publishedChapterCount = chapters.filter((chapter) => chapter.status === "published").length;
-    const chapterCount = document.createElement("p");
-    chapterCount.className = "work-chapters";
-    chapterCount.textContent = publishedChapterCount === 1
-        ? "1 capítulo publicado"
-        : `${publishedChapterCount} capítulos publicados`;
-    details.append(chapterCount);
-
     link.append(details);
     card.append(link);
     return card;

@@ -1,3 +1,10 @@
+@import url("https://fonts.googleapis.com/css2?family=Alatsi&display=swap");
+
+body,
+body * {
+    font-family: "Alatsi", sans-serif !important;
+}
+
 body > header {
     position: sticky;
     top: 0;

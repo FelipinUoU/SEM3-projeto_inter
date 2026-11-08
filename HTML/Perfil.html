@@ -7,6 +7,7 @@
     <title>Meu perfil | HokuPédia</title>
     <link rel="stylesheet" href="../CSS/Perfil.css">
     <link rel="stylesheet" href="../CSS/MenuLat.css">
+    <link rel="stylesheet" href="../CSS/BackButton.css">
 </head>
 <body>
     <header>
@@ -41,7 +42,12 @@
     </aside>
 
     <main class="profile-page">
+        <div class="profile-back-row">
+            <button class="back-button" type="button">Voltar</button>
+        </div>
         <section class="profile-card" aria-label="Configurações do perfil">
+            <p class="profile-admin-notice">Você está como Moderador!</p>
+            <p class="profile-common-notice">Tipo da Conta: Comum</p>
             <div class="profile-details">
                 <div class="profile-view-fields" aria-label="Dados do perfil">
                     <input type="text" placeholder="Nome" aria-label="Nome" readonly>
@@ -55,26 +61,26 @@
                     <input type="password" placeholder="Confirmar nova senha" aria-label="Confirmar nova senha" autocomplete="new-password" minlength="8" maxlength="256">
                 </div>
                 <p class="profile-feedback" id="profileFeedback" role="status" aria-live="polite">Carregando dados do perfil...</p>
-                <a class="profile-login-link" id="profileLoginLink" href="/HTML/CadLog.html?mode=login" hidden>Fazer login</a>
+                <a class="profile-login-link" id="profileLoginLink" href="/HTML/CadLog.html?mode=login" hidden>Fazer Login</a>
             </div>
 
             <aside class="profile-photo" aria-label="Foto do perfil">
                 <img class="profile-avatar profile-avatar--large" src="../Img/Perfil/PerfilExemplo.svg" alt="Foto atual do perfil">
                 <div class="photo-actions">
                     <input class="photo-input" id="profilePhotoInput" type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif" aria-label="Selecionar nova foto de perfil">
-                    <label class="photo-add" for="profilePhotoInput">Adicionar foto</label>
-                    <button class="photo-remove" type="button">Remover foto</button>
+                    <label class="photo-add profile-photo-action" for="profilePhotoInput">Adicionar Foto</label>
+                    <button class="photo-remove profile-photo-action" type="button">Remover Foto</button>
                 </div>
             </aside>
 
             <div class="profile-actions">
                 <button class="profile-button profile-edit-button" id="profileEditButton" type="button" disabled hidden>
                     <span class="edit-label">Editar</span>
-                    <span class="cancel-label">Cancelar edição</span>
+                    <span class="cancel-label">Cancelar Edição</span>
                 </button>
-                <button class="profile-button profile-save-button" type="button" disabled>Salvar alterações</button>
+                <button class="profile-button profile-save-button" type="button" disabled>Salvar Alterações</button>
                 <button class="profile-button profile-delete-button" type="button" disabled hidden>Excluir Conta</button>
-                <button class="profile-button profile-logout-button" id="profileLogoutButton" type="button" disabled hidden>Sair da conta</button>
+                <button class="profile-button profile-logout-button" id="profileLogoutButton" type="button" disabled hidden>Sair da Conta</button>
             </div>
         </section>
     </main>
@@ -83,8 +89,23 @@
         <form class="account-delete-form" id="passwordConfirmForm">
             <h2 id="passwordConfirmTitle">Confirme sua senha</h2>
             <p>Digite sua senha para liberar a edição dos dados do perfil.</p>
-            <label for="profileConfirmPassword">Senha da conta</label>
-            <input id="profileConfirmPassword" name="password" type="password" autocomplete="current-password" maxlength="256" required>
+            <label for="profileConfirmPassword">Senha da Conta</label>
+            <div class="profile-password-field">
+                <input id="profileConfirmPassword" name="password" type="password" autocomplete="current-password" maxlength="256" required>
+                <button
+                    class="profile-password-toggle"
+                    id="toggleProfileConfirmPassword"
+                    type="button"
+                    aria-label="Mostrar senha"
+                    aria-pressed="false"
+                    aria-controls="profileConfirmPassword">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                        <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path class="profile-password-eye-slash" d="m4 4 16 16"></path>
+                    </svg>
+                </button>
+            </div>
             <a class="password-confirm-recovery" href="/HTML/CadLog.html?mode=login&amp;recovery=1">Esqueci minha senha</a>
             <p class="account-delete-feedback" id="passwordConfirmFeedback" role="status" aria-live="polite"></p>
             <div class="account-delete-actions">
@@ -96,8 +117,8 @@
 
     <dialog class="account-delete-dialog" id="accountDeleteDialog" aria-labelledby="accountDeleteTitle">
         <form class="account-delete-form" id="accountDeleteForm">
-            <h2 id="accountDeleteTitle">Excluir sua conta?</h2>
-            <p>Tem certeza de que deseja excluir sua conta? Essa ação é permanente. Para entrar novamente, você precisará cadastrar uma nova conta.</p>
+            <h2 id="accountDeleteTitle">Excluir sua Conta?</h2>
+            <p>Tem certeza de que deseja excluir sua Conta? Essa ação é permanente. Para entrar novamente, você precisará cadastrar uma nova conta.</p>
             <label for="accountDeletePassword">Digite sua senha para confirmar</label>
             <input
                 id="accountDeletePassword"
@@ -109,7 +130,7 @@
             <p class="account-delete-feedback" id="accountDeleteFeedback" role="status" aria-live="polite"></p>
             <div class="account-delete-actions">
                 <button class="account-delete-cancel" id="cancelAccountDelete" type="button">Cancelar</button>
-                <button class="account-delete-confirm" id="confirmAccountDelete" type="submit">Excluir conta</button>
+                <button class="account-delete-confirm" id="confirmAccountDelete" type="submit">Excluir Conta</button>
             </div>
         </form>
     </dialog>
@@ -117,5 +138,6 @@
     <script type="module" src="../JAVA/MenuLat.js"></script>
     <script type="module" src="../JS/WorkSearch.js"></script>
     <script type="module" src="../JS/Perfil.js"></script>
+    <script type="module" src="../JS/BackButton.js"></script>
 </body>
 </html>

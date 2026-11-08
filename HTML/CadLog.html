@@ -74,7 +74,7 @@
             </div>
 
             <section class="auth-panel" id="registerPanel" role="tabpanel" aria-labelledby="registerTab">
-                <h1>Criar conta</h1>
+                <h1>Criar Conta</h1>
                 <form id="formCadastro">
                     <div class="auth-field">
                         <label for="registerName">Nome</label>
@@ -106,29 +106,57 @@
                     </div>
                     <div class="auth-field">
                         <label for="registerPassword">Senha</label>
-                        <input
-                            type="password"
-                            id="registerPassword"
-                            name="password"
-                            minlength="8"
-                            maxlength="256"
-                            autocomplete="new-password"
-                            required>
+                        <div class="auth-password-field">
+                            <input
+                                type="password"
+                                id="registerPassword"
+                                name="password"
+                                minlength="8"
+                                maxlength="256"
+                                autocomplete="new-password"
+                                required>
+                            <button
+                                class="auth-password-toggle"
+                                type="button"
+                                aria-label="Mostrar senha"
+                                aria-pressed="false"
+                                aria-controls="registerPassword">
+                                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                    <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"></path>
+                                    <circle cx="12" cy="12" r="3"></circle>
+                                    <path class="password-eye-slash" d="m4 4 16 16"></path>
+                                </svg>
+                            </button>
+                        </div>
                     </div>
                     <p class="auth-hint">A senha deve ter entre 8 e 256 caracteres.</p>
                     <div class="auth-field">
                         <label for="confirmRegisterPassword">Confirmar senha</label>
-                        <input
-                            type="password"
-                            id="confirmRegisterPassword"
-                            name="confirmPassword"
-                            minlength="8"
-                            maxlength="256"
-                            autocomplete="new-password"
-                            required>
+                        <div class="auth-password-field">
+                            <input
+                                type="password"
+                                id="confirmRegisterPassword"
+                                name="confirmPassword"
+                                minlength="8"
+                                maxlength="256"
+                                autocomplete="new-password"
+                                required>
+                            <button
+                                class="auth-password-toggle"
+                                type="button"
+                                aria-label="Mostrar senha"
+                                aria-pressed="false"
+                                aria-controls="confirmRegisterPassword">
+                                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                    <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"></path>
+                                    <circle cx="12" cy="12" r="3"></circle>
+                                    <path class="password-eye-slash" d="m4 4 16 16"></path>
+                                </svg>
+                            </button>
+                        </div>
                     </div>
                     <p class="auth-feedback" id="registerFeedback" role="status" aria-live="polite"></p>
-                    <button class="auth-submit" type="submit">Cadastrar</button>
+                    <button class="auth-submit" type="submit">Confirmar</button>
                 </form>
             </section>
 
@@ -136,22 +164,39 @@
                 <h1>Entrar</h1>
                 <form id="formLogin" action="/HTML/CadLog.html?mode=login" method="post">
                     <div class="auth-field">
-                        <label for="loginEmail">E-mail</label>
+                        <label class="auth-visually-hidden" for="loginEmail">E-mail</label>
                         <input
                             type="email"
                             id="loginEmail"
                             name="email"
+                            placeholder="Insira seu E-mail"
                             autocomplete="username"
                             required>
                     </div>
                     <div class="auth-field">
-                        <label for="loginPassword">Senha</label>
-                        <input
-                            type="password"
-                            id="loginPassword"
-                            name="password"
-                            autocomplete="current-password"
-                            required>
+                        <label class="auth-visually-hidden" for="loginPassword">Senha</label>
+                        <div class="auth-password-field">
+                            <input
+                                type="password"
+                                id="loginPassword"
+                                name="password"
+                                placeholder="Insira sua Senha"
+                                autocomplete="current-password"
+                                required>
+                            <button
+                                class="auth-password-toggle"
+                                id="toggleLoginPassword"
+                                type="button"
+                                aria-label="Mostrar senha"
+                                aria-pressed="false"
+                                aria-controls="loginPassword">
+                                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                    <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"></path>
+                                    <circle cx="12" cy="12" r="3"></circle>
+                                    <path class="password-eye-slash" d="m4 4 16 16"></path>
+                                </svg>
+                            </button>
+                        </div>
                     </div>
                     <p class="auth-feedback" id="loginFeedback" role="status" aria-live="polite"></p>
                     <button class="auth-submit" type="submit">Entrar</button>
@@ -160,17 +205,17 @@
                 <form class="recovery-request" id="formRecoveryRequest" hidden inert>
                     <p>Informe seu e-mail para receber um código de recuperação de 6 dígitos.</p>
                     <div class="auth-field">
-                        <label for="recoveryEmail">E-mail</label>
+                        <label class="auth-visually-hidden" for="recoveryEmail">E-mail</label>
                         <input
                             type="email"
                             id="recoveryEmail"
                             name="email"
+                            placeholder="E-mail"
                             autocomplete="email"
                             required>
                     </div>
                     <p class="auth-feedback" id="recoveryRequestFeedback" role="status" aria-live="polite"></p>
                     <button class="auth-submit" type="submit">Enviar código</button>
-                    <button class="auth-link" id="cancelRecoveryButton" type="button">Voltar ao login</button>
                 </form>
 
                 <form class="recovery-request" id="formPasswordReset" hidden inert>
@@ -192,31 +237,58 @@
                     <p class="auth-hint" id="recoveryCodeHint">O código expira após 15 minutos.</p>
                     <div class="auth-field">
                         <label for="newPassword">Nova senha</label>
-                        <input
-                            type="password"
-                            id="newPassword"
-                            name="password"
-                            minlength="8"
-                            maxlength="256"
-                            autocomplete="new-password"
-                            required>
+                        <div class="auth-password-field">
+                            <input
+                                type="password"
+                                id="newPassword"
+                                name="password"
+                                minlength="8"
+                                maxlength="256"
+                                autocomplete="new-password"
+                                required>
+                            <button
+                                class="auth-password-toggle"
+                                type="button"
+                                aria-label="Mostrar senha"
+                                aria-pressed="false"
+                                aria-controls="newPassword">
+                                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                    <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"></path>
+                                    <circle cx="12" cy="12" r="3"></circle>
+                                    <path class="password-eye-slash" d="m4 4 16 16"></path>
+                                </svg>
+                            </button>
+                        </div>
                     </div>
                     <p class="auth-hint">A senha deve ter entre 8 e 256 caracteres.</p>
                     <div class="auth-field">
                         <label for="confirmNewPassword">Confirmar nova senha</label>
-                        <input
-                            type="password"
-                            id="confirmNewPassword"
-                            name="confirmPassword"
-                            minlength="8"
-                            maxlength="256"
-                            autocomplete="new-password"
-                            required>
+                        <div class="auth-password-field">
+                            <input
+                                type="password"
+                                id="confirmNewPassword"
+                                name="confirmPassword"
+                                minlength="8"
+                                maxlength="256"
+                                autocomplete="new-password"
+                                required>
+                            <button
+                                class="auth-password-toggle"
+                                type="button"
+                                aria-label="Mostrar senha"
+                                aria-pressed="false"
+                                aria-controls="confirmNewPassword">
+                                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                    <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"></path>
+                                    <circle cx="12" cy="12" r="3"></circle>
+                                    <path class="password-eye-slash" d="m4 4 16 16"></path>
+                                </svg>
+                            </button>
+                        </div>
                     </div>
                     <p class="auth-feedback" id="passwordResetFeedback" role="status" aria-live="polite"></p>
                     <button class="auth-submit" type="submit">Salvar nova senha</button>
                     <button class="auth-link" id="resendRecoveryButton" type="button">Enviar outro código</button>
-                    <button class="auth-link" id="backToLoginButton" type="button">Voltar ao login</button>
                 </form>
             </section>
         </section>

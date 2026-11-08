@@ -19,6 +19,7 @@ const logoutButton = document.getElementById("profileLogoutButton");
 const passwordConfirmDialog = document.getElementById("passwordConfirmDialog");
 const passwordConfirmForm = document.getElementById("passwordConfirmForm");
 const passwordConfirmInput = document.getElementById("profileConfirmPassword");
+const toggleProfileConfirmPassword = document.getElementById("toggleProfileConfirmPassword");
 const passwordConfirmFeedback = document.getElementById("passwordConfirmFeedback");
 const submitPasswordConfirm = document.getElementById("submitPasswordConfirm");
 const cancelPasswordConfirm = document.getElementById("cancelPasswordConfirm");
@@ -43,6 +44,13 @@ editButton.disabled = true;
 saveButton.disabled = true;
 deleteAccountButton.disabled = true;
 logoutButton.disabled = true;
+
+toggleProfileConfirmPassword.addEventListener("click", () => {
+    const isVisible = passwordConfirmInput.type === "text";
+    passwordConfirmInput.type = isVisible ? "password" : "text";
+    toggleProfileConfirmPassword.setAttribute("aria-pressed", String(!isVisible));
+    toggleProfileConfirmPassword.setAttribute("aria-label", isVisible ? "Mostrar senha" : "Ocultar senha");
+});
 
 function showFeedback(message, isError = false) {
     profileFeedback.textContent = message;
@@ -174,6 +182,7 @@ async function saveAvatarChange() {
     pendingAvatar = savedAvatar;
     pendingAvatarFile = undefined;
     photoChanged = false;
+    profileCard.classList.remove("has-photo-changes");
     photoInput.value = "";
     revokePendingAvatarPreview();
     profileImage.src = savedAvatar;
@@ -205,6 +214,7 @@ function resetPendingChanges() {
     pendingAvatarFile = undefined;
     pendingAvatar = savedAvatar;
     photoChanged = false;
+    profileCard.classList.remove("has-photo-changes");
     confirmedPassword = "";
     profileCard.classList.remove("is-editing");
     profileImage.src = savedAvatar;
@@ -221,8 +231,8 @@ async function loadProfile() {
         setProfileFields(user);
         editButton.disabled = isAdmin;
         editButton.hidden = isAdmin;
+        saveButton.textContent = "Salvar Alterações";
         saveButton.disabled = false;
-        if (isAdmin) saveButton.textContent = "Salvar foto";
         deleteAccountButton.disabled = isAdmin;
         deleteAccountButton.hidden = isAdmin;
         logoutButton.disabled = false;
@@ -319,14 +329,15 @@ async function readAvatar(file) {
     pendingAvatarPreview = URL.createObjectURL(avatarFile);
     pendingAvatar = pendingAvatarPreview;
     photoChanged = true;
+    profileCard.classList.add("has-photo-changes");
     profileImage.src = pendingAvatar;
-    showFeedback("Foto selecionada. Salve as alterações para confirmar.");
+    showFeedback("Foto selecionada. Salve a foto para confirmar.");
 }
 
 async function saveProfile() {
     if (!user) return;
 
-    if (isAdmin) {
+    if (isAdmin || !profileCard.classList.contains("is-editing")) {
         if (!photoChanged) {
             showFeedback("Selecione uma foto para salvar.", true);
             return;
@@ -486,6 +497,7 @@ removePhotoButton.addEventListener("click", () => {
     pendingAvatarFile = undefined;
     pendingAvatar = defaultAvatar;
     photoChanged = true;
+    profileCard.classList.add("has-photo-changes");
     photoInput.value = "";
     profileImage.src = defaultAvatar;
     showFeedback("A foto padrão será restaurada ao salvar.");

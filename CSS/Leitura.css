@@ -50,9 +50,15 @@ h1.titulo-manga { font-size: 26px; margin-bottom: 5px; }
 /* Controles */
 .controls-row {
     display: flex;
+    align-items: center;
     gap: 15px;
     margin-bottom: 25px;
     position: relative;
+}
+
+.controls-row > .back-button {
+    flex: 0 0 auto;
+    margin-left: 430px;
 }
 
 .btn-select {
@@ -67,6 +73,23 @@ h1.titulo-manga { font-size: 26px; margin-bottom: 5px; }
     align-items: center;
     gap: 10px;
     font-size: 14px;
+}
+
+@media (max-width: 520px) {
+    .controls-row {
+        gap: 8px;
+    }
+
+    .btn-select {
+        padding-inline: 9px;
+        font-size: 12px;
+    }
+
+    .controls-row > .back-button {
+        min-height: 36px;
+        padding-inline: 10px;
+        font-size: 13px;
+    }
 }
 
 /* Dropdown do Modo de Exibição */

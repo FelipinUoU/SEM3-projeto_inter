@@ -28,14 +28,15 @@ body {
 }
 
 body > header.menu-lateral-header {
-    position: sticky;
+    position: fixed;
     inset: 0 0 auto;
+    z-index: 60;
 }
 
 .about-page {
     width: min(1120px, 100%);
     margin: 0 auto;
-    padding: 70px 32px 28px;
+    padding: 128px 32px 28px;
 }
 
 .about-hero {
@@ -279,7 +280,7 @@ body > header.menu-lateral-header {
 
 @media (max-width: 600px) {
     .about-page {
-        padding: 36px 18px 22px;
+        padding: 94px 18px 22px;
     }
 
     .about-hero {

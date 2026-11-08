@@ -7,6 +7,7 @@
     <title>Catálogo | HokuPédia</title>
     <link rel="stylesheet" href="../CSS/MenuLat.css">
     <link rel="stylesheet" href="../CSS/Catalogo.css">
+    <link rel="stylesheet" href="../CSS/BackButton.css">
 </head>
 <body>
     <header class="menu-lateral-header">
@@ -21,9 +22,7 @@
             <input id="work-search-input" type="search" name="q" placeholder="Buscar obra..." aria-autocomplete="list" aria-controls="work-search-results" aria-expanded="false">
             <div class="work-search__results" id="work-search-results" role="listbox" aria-live="polite" hidden></div>
         </form>
-        <a class="header-avatar" href="/HTML/Perfil.html" aria-label="Meu perfil">
-            <img src="../Img/Perfil/PerfilExemplo.svg" alt="">
-        </a>
+        <a class="header-login" href="/HTML/CadLog.html?mode=login">Login</a>
     </header>
 
     <button class="menu-lateral-overlay" id="menuOverlay" type="button" aria-label="Fechar navegação" hidden></button>
@@ -52,6 +51,7 @@
                     <p class="catalog-eyebrow">Descubra sua próxima leitura</p>
                     <h2 id="catalogTitle">Catálogo</h2>
                 </div>
+                <button class="back-button" type="button">Voltar</button>
             </div>
             <p class="catalog-format-filter" id="catalogFormatFilter" hidden>
                 <span id="catalogFormatLabel"></span>
@@ -65,5 +65,6 @@
     <script type="module" src="../JAVA/MenuLat.js"></script>
     <script type="module" src="../JS/WorkSearch.js"></script>
     <script type="module" src="../JS/Catalogo.js"></script>
+    <script type="module" src="../JS/BackButton.js"></script>
 </body>
 </html>
