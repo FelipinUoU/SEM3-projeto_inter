@@ -972,9 +972,11 @@ app.get('/api/works', async (req, res) => {
 
 app.get('/api/management/works', requireAuthenticatedUser, requireModeratorUser, async (req, res) => {
   try {
+    const userId = req.appwriteUser.$id;
+    const isAdmin = isAdminUser(req.appwriteUser);
     const [workDocuments, chapterDocuments] = await Promise.all([
-      listAllDocuments(worksCollectionId),
-      listAllDocuments(chaptersCollectionId)
+      listAllDocuments(worksCollectionId, isAdmin ? [] : [Query.equal('createBy', userId)]),
+      listAllDocuments(chaptersCollectionId, [Query.equal('createBy', userId)])
     ]);
     const workIds = new Set(workDocuments.map((work) => work.$id));
     const managedChapters = chapterDocuments.filter((chapter) => (
@@ -1094,7 +1096,7 @@ app.put('/api/works/:id', requireAuthenticatedUser, requireModeratorUser, async 
   }
   try {
     const currentWork = await databases.getDocument(appwriteDatabaseId, worksCollectionId, req.params.id);
-    if (!ownsDocument(req.appwriteUser, currentWork) && !isAdminUser(req.appwriteUser)) {
+    if (!ownsDocument(req.appwriteUser, currentWork)) {
       return res.status(403).json({ error: 'Você só pode editar obras criadas pela sua conta.' });
     }
     const document = await databases.updateDocument(
@@ -1232,7 +1234,10 @@ app.post('/api/works/:workId/chapters', requireAuthenticatedUser, requireModerat
   const validationError = getChapterValidationError(number, title, language, pages);
   if (validationError) return res.status(400).json({ error: validationError });
   try {
-    await databases.getDocument(appwriteDatabaseId, worksCollectionId, req.params.workId);
+    const work = await databases.getDocument(appwriteDatabaseId, worksCollectionId, req.params.workId);
+    if (!ownsDocument(req.appwriteUser, work)) {
+      return res.status(403).json({ error: 'Você só pode adicionar capítulos às suas próprias obras.' });
+    }
     const chapter = await databases.createDocument(
       appwriteDatabaseId,
       chaptersCollectionId,
@@ -1306,7 +1311,7 @@ app.put('/api/chapters/:id', requireAuthenticatedUser, requireModeratorUser, asy
       chaptersCollectionId,
       req.params.id
     );
-    if (!ownsDocument(req.appwriteUser, existingChapter) && !isAdminUser(req.appwriteUser)) {
+    if (!ownsDocument(req.appwriteUser, existingChapter)) {
       return res.status(403).json({ error: 'Você só pode editar capítulos criados pela sua conta.' });
     }
     const author = await getChapterAuthorName(existingChapter.createBy);
@@ -1370,7 +1375,7 @@ app.delete('/api/chapters/:id', requireAuthenticatedUser, requireModeratorUser, 
   let deletionStep = 'carregar capítulo';
   try {
     const chapter = await databases.getDocument(appwriteDatabaseId, chaptersCollectionId, req.params.id);
-    if (!ownsDocument(req.appwriteUser, chapter) && !isAdminUser(req.appwriteUser)) {
+    if (!ownsDocument(req.appwriteUser, chapter)) {
       return res.status(403).json({ error: 'Você só pode excluir capítulos criados pela sua conta.' });
     }
     deletionStep = 'carregar páginas do capítulo';

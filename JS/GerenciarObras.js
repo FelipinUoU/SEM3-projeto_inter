@@ -198,7 +198,9 @@ async function loadWorks() {
     if (!Array.isArray(data.works)) {
         throw new Error("A resposta do Neon PostgreSQL contém uma lista de obras inválida.");
     }
-    works = data.works;
+    works = isAdmin
+        ? data.works
+        : data.works.filter((work) => work.createBy === currentUserId);
     for (const work of works) {
         for (const genre of getSelectedValues(work.gender)) {
             if (!workGenres.includes(genre)) workGenres.push(genre);
@@ -329,8 +331,12 @@ function renderWorkCard(work) {
     hubLink.href = `/HTML/Obra.html?obra=${encodeURIComponent(work.id)}`;
     hubLink.textContent = "Ver Obra";
     actions.append(hubLink);
-    if (canManageWork) actions.append(createButton("✎ Editar", "edit-work", "text-action edit-action"));
-    actions.append(createButton("⊕ Novo Capítulo", "add-chapter", "text-action chapter-action"));
+    if (canManageWork) {
+        actions.append(
+            createButton("✎ Editar", "edit-work", "text-action edit-action"),
+            createButton("⊕ Novo Capítulo", "add-chapter", "text-action chapter-action")
+        );
+    }
     details.append(actions);
     card.append(details);
 
@@ -340,7 +346,9 @@ function renderWorkCard(work) {
 
     const chapterList = document.createElement("div");
     chapterList.className = "work-chapters";
-    if (work.chapters.length === 0) {
+    if (!canManageWork) {
+        chapterList.hidden = true;
+    } else if (work.chapters.length === 0) {
         const empty = document.createElement("p");
         empty.className = "no-chapters";
         empty.textContent = "Sem Capítulos";
@@ -499,10 +507,13 @@ function renderWorkRequestCard(request) {
 
 function renderWorks() {
     workList.replaceChildren();
+    const visibleWorks = isAdmin
+        ? works
+        : works.filter((work) => work.createBy === currentUserId);
     const visibleRequests = workRequests.filter((request) => (
         ["PENDENTE", "REPROVADO"].includes(request.status?.toUpperCase())
     ));
-    if (works.length === 0 && visibleRequests.length === 0) {
+    if (visibleWorks.length === 0 && visibleRequests.length === 0) {
         const empty = document.createElement("p");
         empty.className = "empty-works";
         empty.textContent = isAdmin
@@ -514,7 +525,7 @@ function renderWorks() {
     for (const request of visibleRequests) {
         workList.append(renderWorkRequestCard(request));
     }
-    for (const work of works) workList.append(renderWorkCard(work));
+    for (const work of visibleWorks) workList.append(renderWorkCard(work));
     applyWorkSearch();
 }
 

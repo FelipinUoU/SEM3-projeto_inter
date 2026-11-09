@@ -205,16 +205,30 @@ body > header.menu-lateral-header {
 
 .team-card__photo {
     display: flex;
+    aspect-ratio: 1;
     min-height: 170px;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: 9px;
+    overflow: hidden;
     border: 1px dashed rgba(213, 189, 0, 0.45);
     border-radius: 12px;
     background: linear-gradient(145deg, rgba(213, 189, 0, 0.06), rgba(169, 123, 237, 0.08));
     color: #d8d2df;
     font: 12px/1.4 Arial, sans-serif;
+}
+
+.team-card__photo--filled {
+    border-style: solid;
+    border-color: rgba(255, 255, 255, 0.14);
+}
+
+.team-card__photo-img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 
 .team-card__photo-icon {
@@ -235,26 +249,57 @@ body > header.menu-lateral-header {
 
 .team-card__links {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 8px;
 }
 
+.team-card__link,
 .team-card__link-placeholder {
     display: flex;
+    min-width: 0;
+    max-width: 100%;
     min-height: 38px;
     align-items: center;
     justify-content: space-between;
     gap: 8px;
     padding: 8px 10px;
+    overflow: hidden;
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 9px;
     color: #e6e1eb;
     font: 600 12px/1.2 Arial, sans-serif;
+    text-decoration: none;
 }
 
+.team-card__link {
+    background: rgba(255, 255, 255, 0.03);
+    transition: border-color 0.2s ease, background-color 0.2s ease, transform 0.2s ease;
+}
+
+.team-card__link:hover {
+    border-color: rgba(213, 189, 0, 0.45);
+    background: rgba(213, 189, 0, 0.08);
+    transform: translateY(-1px);
+}
+
+.team-card__link:focus-visible {
+    outline: 2px solid var(--about-gold);
+    outline-offset: 2px;
+}
+
+.team-card__link small,
 .team-card__link-placeholder small {
+    min-width: 0;
+    overflow: hidden;
     color: #b7adca;
     font: 11px/1.2 Arial, sans-serif;
     text-align: right;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.team-card__link:hover small {
+    color: var(--about-gold);
 }
 
 .about-footer {
@@ -342,6 +387,7 @@ body > header.menu-lateral-header {
         min-height: 132px;
     }
 
+    .team-card__link,
     .team-card__link-placeholder {
         flex-wrap: wrap;
     }
