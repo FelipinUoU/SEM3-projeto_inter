@@ -142,7 +142,7 @@ function getConfiguredApiKeys(name) {
   return [...new Set(configuredKeys)];
 }
 const geminiApiKeys = getConfiguredApiKeys('GEMINI_API_KEY');
-const geminiModel = process.env.GEMINI_MODEL?.trim() || 'gemini-3.8-flash';
+const geminiModel = process.env.GEMINI_MODEL?.trim() || 'gemini-3.6-flash';
 const providerTimeoutMs = 7 * 60 * 1000;
 const translationRequestTimeoutMs = 7 * 60 * 1000;
 const providerMaxAttempts = 2;
