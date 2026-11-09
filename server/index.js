@@ -46,6 +46,7 @@ import {
 } from './neonDatabase.js';
 
 const app = express();
+app.set('trust proxy', 1);
 const rootDirectory = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 dotenv.config({ path: path.join(rootDirectory, '.env') });
 const DEFAULT_PORT = Number.parseInt(process.env.PORT ?? '3001', 10);
