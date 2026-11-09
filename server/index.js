@@ -305,25 +305,25 @@ async function getUserDisplayName(userId) {
   }
 }
 
-function isImageKitAsset(url) {
-  if (typeof url !== 'string' || !url.trim()) return false;
+function isImageKitAsset(url, endpoint = process.env.IMAGEKIT_URL_ENDPOINT) {
+  if (typeof url !== 'string' || !url.trim() || typeof endpoint !== 'string' || !endpoint.trim()) return false;
   try {
     const assetUrl = new URL(url);
-    const endpointUrl = new URL(process.env.IMAGEKIT_URL_ENDPOINT);
+    const endpointUrl = new URL(endpoint);
     return assetUrl.protocol === 'https:' && assetUrl.origin === endpointUrl.origin;
   } catch {
     return false;
   }
 }
 
-function isSameImageKitAssetUrl(leftUrl, rightUrl) {
+function isSameImageKitAssetUrl(leftUrl, rightUrl, endpoint = process.env.IMAGEKIT_URL_ENDPOINT) {
   try {
     const left = new URL(leftUrl);
     const right = new URL(rightUrl);
-    const endpoint = new URL(process.env.IMAGEKIT_URL_ENDPOINT);
-    if (left.origin !== endpoint.origin || right.origin !== endpoint.origin) return false;
+    const endpointUrl = new URL(endpoint);
+    if (left.origin !== endpointUrl.origin || right.origin !== endpointUrl.origin) return false;
 
-    const endpointSegments = endpoint.pathname.split('/').filter(Boolean);
+    const endpointSegments = endpointUrl.pathname.split('/').filter(Boolean);
     const getAssetPath = (assetUrl) => {
       const segments = assetUrl.pathname.split('/').filter(Boolean);
       if (!endpointSegments.every((segment, index) => segments[index] === segment)) return null;
@@ -339,31 +339,37 @@ function isSameImageKitAssetUrl(leftUrl, rightUrl) {
   }
 }
 
-async function findImageKitFileIdByUrl(assetUrl) {
-  if (!imageKit) throw new Error('ImageKit não está configurado no servidor.');
+export function isImageKitNotFound(error) {
+  const status = error?.statusCode ?? error?.code ?? error?.$ResponseMetadata?.statusCode;
+  return status === 404 || error?.reason === 'FILE_NOT_FOUND';
+}
+
+async function findImageKitFileIdByUrl(assetUrl, client = imageKit, endpoint = process.env.IMAGEKIT_URL_ENDPOINT) {
+  if (!client) throw new Error('ImageKit não está configurado no servidor.');
   const asset = new URL(assetUrl);
-  const endpoint = new URL(process.env.IMAGEKIT_URL_ENDPOINT);
+  const endpointUrl = new URL(endpoint);
   let assetPath = decodeURIComponent(asset.pathname);
-  const endpointPath = endpoint.pathname.replace(/\/+$/, '');
+  const endpointPath = endpointUrl.pathname.replace(/\/+$/, '');
   if (endpointPath && assetPath.startsWith(`${endpointPath}/`)) {
     assetPath = assetPath.slice(endpointPath.length);
   }
   const fileName = path.posix.basename(assetPath).replace(/[\\"]/g, '\\$&');
-  const files = await imageKit.listFiles({
+  const files = await client.listFiles({
     searchQuery: `name = "${fileName}"`,
     limit: 100
   });
   return files.find((file) => (
-    isSameImageKitAssetUrl(file.url, assetUrl) && file.filePath.startsWith('/hokupedia/')
+    isSameImageKitAssetUrl(file.url, assetUrl, endpoint) && file.filePath.startsWith('/hokupedia/')
   ))?.fileId;
 }
 
-async function deleteImageKitFile(fileId, allowedFolderPrefix, expectedUrl) {
+export async function deleteImageKitFile(fileId, allowedFolderPrefix, expectedUrl, client = imageKit) {
+  if (!client) throw new Error('ImageKit não está configurado no servidor.');
   let file;
   try {
-    file = await imageKit.getFileDetails(fileId);
+    file = await client.getFileDetails(fileId);
   } catch (error) {
-    if (error?.statusCode === 404 || error?.code === 404) return;
+    if (isImageKitNotFound(error)) return false;
     throw error;
   }
   if (!file.filePath.startsWith(allowedFolderPrefix)) {
@@ -372,7 +378,113 @@ async function deleteImageKitFile(fileId, allowedFolderPrefix, expectedUrl) {
   if (expectedUrl && !isSameImageKitAssetUrl(file.url, expectedUrl)) {
     throw new Error('O arquivo do ImageKit não corresponde à URL registrada para esta imagem.');
   }
-  await imageKit.deleteFile(fileId);
+  try {
+    await client.deleteFile(fileId);
+    return true;
+  } catch (error) {
+    if (isImageKitNotFound(error)) return false;
+    throw error;
+  }
+}
+
+export function normalizeAccountPrefs(prefs) {
+  if (!prefs || typeof prefs !== 'object' || Array.isArray(prefs)) return prefs;
+  const normalized = { ...prefs };
+  const avatarUrl = typeof normalized.profileAvatarUrl === 'string'
+    ? normalized.profileAvatarUrl.trim()
+    : '';
+  const avatarFileId = typeof normalized.profileAvatarFileId === 'string'
+    ? normalized.profileAvatarFileId.trim()
+    : '';
+  if (!avatarUrl) {
+    delete normalized.profileAvatarUrl;
+    delete normalized.profileAvatarFileId;
+  } else {
+    normalized.profileAvatarUrl = avatarUrl;
+    if (avatarFileId) normalized.profileAvatarFileId = avatarFileId;
+    else delete normalized.profileAvatarFileId;
+  }
+  return normalized;
+}
+
+export async function cleanupUserProfileAvatars(
+  userId,
+  {
+    keepFileId = '',
+    previousFileId = '',
+    previousUrl = '',
+    client = imageKit,
+    endpoint = process.env.IMAGEKIT_URL_ENDPOINT
+  } = {}
+) {
+  const normalizedUserId = typeof userId === 'string' ? userId.trim() : '';
+  const retainedFileId = typeof keepFileId === 'string' ? keepFileId.trim() : '';
+  const oldFileId = typeof previousFileId === 'string' ? previousFileId.trim() : '';
+  const oldUrl = typeof previousUrl === 'string' ? previousUrl.trim() : '';
+  if (!client || !normalizedUserId) {
+    return { deletedFileIds: [], cleanupWarning: '' };
+  }
+
+  const folderPath = `/hokupedia/profiles/${normalizedUserId}`;
+  const allowedPrefix = `${folderPath}/`;
+  const fileIdsToDelete = new Set();
+  let hadLookupError = false;
+
+  if (oldFileId && oldFileId !== retainedFileId) {
+    fileIdsToDelete.add(oldFileId);
+  } else if (!oldFileId && oldUrl && isImageKitAsset(oldUrl, endpoint)) {
+    try {
+      const resolvedFileId = await findImageKitFileIdByUrl(oldUrl, client, endpoint);
+      if (resolvedFileId && resolvedFileId !== retainedFileId) {
+        fileIdsToDelete.add(resolvedFileId);
+      }
+    } catch (error) {
+      hadLookupError = true;
+      console.error('Could not find previous profile avatar in ImageKit by URL:', error);
+    }
+  }
+
+  if (typeof client.listFiles === 'function') {
+    try {
+      const folderFiles = await client.listFiles({
+        path: folderPath,
+        limit: 100
+      });
+      if (Array.isArray(folderFiles)) {
+        for (const file of folderFiles) {
+          if (typeof file?.fileId === 'string'
+            && file.fileId
+            && file.fileId !== retainedFileId
+            && typeof file?.filePath === 'string'
+            && file.filePath.startsWith(allowedPrefix)) {
+            fileIdsToDelete.add(file.fileId);
+          }
+        }
+      }
+    } catch (error) {
+      if (!isImageKitNotFound(error)) {
+        hadLookupError = true;
+        console.error('Could not list profile avatar folder in ImageKit:', error);
+      }
+    }
+  }
+
+  const deletedFileIds = [];
+  let hadDeleteError = false;
+  for (const fileId of fileIdsToDelete) {
+    try {
+      await deleteImageKitFile(fileId, allowedPrefix, undefined, client);
+      deletedFileIds.push(fileId);
+    } catch (error) {
+      hadDeleteError = true;
+      console.error(`Could not delete previous profile avatar (${fileId}) from ImageKit:`, error);
+    }
+  }
+
+  const cleanupWarning = hadDeleteError || (hadLookupError && deletedFileIds.length === 0 && Boolean(oldFileId || oldUrl))
+    ? 'A foto foi atualizada, mas não foi possível excluir a imagem anterior do ImageKit.'
+    : '';
+  return { deletedFileIds, cleanupWarning };
 }
 
 function getWorkAttribute(value) {
@@ -587,9 +699,10 @@ app.patch('/api/account', requireAuthenticatedUser, async (req, res) => {
       || Buffer.byteLength(JSON.stringify(prefs)) > 10000)) {
       return res.status(400).json({ error: 'As preferências da conta são inválidas ou muito grandes.' });
     }
+    const authUserId = getAuthUserId(req.appwriteUser);
     if (email !== undefined || newPassword !== undefined) {
       const confirmation = email !== undefined ? password : oldPassword;
-      if (typeof confirmation !== 'string' || !await verifyUserPassword(getAuthUserId(req.appwriteUser), confirmation)) {
+      if (typeof confirmation !== 'string' || !await verifyUserPassword(authUserId, confirmation)) {
         return res.status(401).json({ error: 'A senha informada está incorreta.' });
       }
     }
@@ -598,19 +711,51 @@ app.patch('/api/account', requireAuthenticatedUser, async (req, res) => {
       return res.status(400).json({ error: 'A nova senha deve ter entre 8 e 256 caracteres.' });
     }
 
+    const existingUser = prefs !== undefined ? await findUserById(authUserId) : null;
+    const previousPrefs = existingUser?.prefs || req.appwriteUser?.prefs || {};
+    const previousFileId = typeof previousPrefs.profileAvatarFileId === 'string'
+      ? previousPrefs.profileAvatarFileId.trim()
+      : '';
+    const previousUrl = typeof previousPrefs.profileAvatarUrl === 'string'
+      ? previousPrefs.profileAvatarUrl.trim()
+      : '';
+    const normalizedPrefs = prefs !== undefined ? normalizeAccountPrefs(prefs) : undefined;
+
     let updatedUser;
-    if (newPassword !== undefined) await updatePassword(getAuthUserId(req.appwriteUser), newPassword);
-    if (name !== undefined || email !== undefined || prefs !== undefined) {
-      updatedUser = await updateUserDetails(getAuthUserId(req.appwriteUser), {
+    if (newPassword !== undefined) await updatePassword(authUserId, newPassword);
+    if (name !== undefined || email !== undefined || normalizedPrefs !== undefined) {
+      updatedUser = await updateUserDetails(authUserId, {
         name: name?.trim(),
         email: email?.trim().toLowerCase(),
-        prefs
+        prefs: normalizedPrefs
       });
     } else {
-      updatedUser = await findUserById(getAuthUserId(req.appwriteUser));
+      updatedUser = await findUserById(authUserId);
     }
     if (!updatedUser) return res.status(404).json({ error: 'Conta não encontrada.' });
-    return res.json(getPublicUser(updatedUser));
+
+    let cleanupWarning = '';
+    if (normalizedPrefs !== undefined && imageKit) {
+      const nextFileId = typeof updatedUser.prefs?.profileAvatarFileId === 'string'
+        ? updatedUser.prefs.profileAvatarFileId.trim()
+        : '';
+      const nextUrl = typeof updatedUser.prefs?.profileAvatarUrl === 'string'
+        ? updatedUser.prefs.profileAvatarUrl.trim()
+        : '';
+      if (previousFileId !== nextFileId || previousUrl !== nextUrl) {
+        const cleanupResult = await cleanupUserProfileAvatars(req.appwriteUser.$id, {
+          keepFileId: nextFileId,
+          previousFileId,
+          previousUrl
+        });
+        cleanupWarning = cleanupResult.cleanupWarning;
+      }
+    }
+
+    return res.json({
+      ...getPublicUser(updatedUser),
+      ...(cleanupWarning ? { cleanupWarning } : {})
+    });
   } catch (error) {
     if (error?.code === '23505') return res.status(409).json({ error: 'Este e-mail já está sendo usado por outra conta.' });
     return sendDatabaseError(res, error, 'Não foi possível atualizar a conta.');
@@ -636,12 +781,21 @@ app.delete('/api/account', requireAuthenticatedUser, async (req, res) => {
   if (typeof password !== 'string' || password.length === 0 || password.length > 256) {
     return res.status(400).json({ error: 'Informe sua senha para confirmar a exclusão.' });
   }
-  if (!await verifyUserPassword(getAuthUserId(req.appwriteUser), password)) {
+  const authUserId = getAuthUserId(req.appwriteUser);
+  if (!await verifyUserPassword(authUserId, password)) {
     return res.status(401).json({ error: 'A senha informada está incorreta.' });
   }
   try {
-    if (!await deleteUserAccount(getAuthUserId(req.appwriteUser))) {
+    const existingUser = await findUserById(authUserId);
+    const previousPrefs = existingUser?.prefs || req.appwriteUser?.prefs || {};
+    if (!await deleteUserAccount(authUserId)) {
       return res.status(404).json({ error: 'Conta não encontrada.' });
+    }
+    if (imageKit) {
+      await cleanupUserProfileAvatars(req.appwriteUser.$id, {
+        previousFileId: previousPrefs.profileAvatarFileId,
+        previousUrl: previousPrefs.profileAvatarUrl
+      });
     }
     res.setHeader('Set-Cookie', clearSessionCookie);
     return res.status(204).end();
@@ -770,13 +924,13 @@ app.delete('/api/profile/avatar/:fileId', requireAuthenticatedUser, async (req, 
     return res.status(503).json({ error: 'Configure as chaves do ImageKit no servidor.' });
   }
   try {
-    await deleteImageKitFile(
+    const deleted = await deleteImageKitFile(
       req.params.fileId,
       `/hokupedia/profiles/${req.appwriteUser.$id}/`
     );
-    return res.json({ deleted: true });
+    return res.json(deleted ? { deleted: true } : { deleted: true, alreadyDeleted: true });
   } catch (error) {
-    if (error?.statusCode === 404 || error?.code === 404) {
+    if (isImageKitNotFound(error)) {
       return res.json({ deleted: true, alreadyDeleted: true });
     }
     console.error('Profile avatar deletion failed:', error);

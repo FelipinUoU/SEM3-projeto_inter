@@ -123,6 +123,7 @@ async function migrateLegacyAvatar() {
         if (file.size > maxAvatarSize) {
             file = await compressAvatar(new File([file], "perfil.webp", { type: file.type }));
         }
+        const previousFileId = savedAvatarFileId;
         const uploaded = await uploadProfileAvatar(new File([file], "perfil.webp", { type: file.type || "image/webp" }));
         const prefs = { ...(user.prefs || {}), profileAvatarUrl: uploaded.url, profileAvatarFileId: uploaded.fileId };
         try {
@@ -139,6 +140,13 @@ async function migrateLegacyAvatar() {
         savedAvatarFileId = uploaded.fileId;
         profileImage.src = savedAvatar;
         window.dispatchEvent(new CustomEvent("profile-avatar-updated", { detail: { url: savedAvatar } }));
+        if (previousFileId && previousFileId !== savedAvatarFileId) {
+            try {
+                await deleteProfileAvatar(previousFileId);
+            } catch (error) {
+                console.error("Não foi possível remover a foto anterior do ImageKit após migração:", error);
+            }
+        }
         try {
             localStorage.removeItem(avatarKey);
         } catch (error) {
@@ -177,6 +185,7 @@ async function saveAvatarChange() {
         throw error;
     }
 
+    const serverCleanupWarning = typeof user?.cleanupWarning === "string" ? user.cleanupWarning : "";
     savedAvatar = uploaded?.url || defaultAvatar;
     savedAvatarFileId = uploaded?.fileId || "";
     pendingAvatar = savedAvatar;
@@ -201,7 +210,7 @@ async function saveAvatarChange() {
             return "A foto foi atualizada, mas não foi possível excluir a imagem anterior do ImageKit.";
         }
     }
-    return "";
+    return serverCleanupWarning;
 }
 
 function resetPendingChanges() {
@@ -240,9 +249,9 @@ async function loadProfile() {
 
         const storedAvatar = user.prefs?.profileAvatarUrl;
         const storedAvatarFileId = user.prefs?.profileAvatarFileId;
-        if (isValidAvatarUrl(storedAvatar) && typeof storedAvatarFileId === "string") {
+        if (isValidAvatarUrl(storedAvatar)) {
             savedAvatar = storedAvatar;
-            savedAvatarFileId = storedAvatarFileId;
+            savedAvatarFileId = typeof storedAvatarFileId === "string" ? storedAvatarFileId : "";
         }
 
         pendingAvatar = savedAvatar;
